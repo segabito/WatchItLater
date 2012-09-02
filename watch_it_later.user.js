@@ -1147,7 +1147,7 @@
       $("#resultPagination").css({padding: '5px', marginTop: '-64px'});
       $("#resultPagination").css({fontWeight: 'bolder', border: '1px dotted silver', fontSize: '130%'});
       
-      $("#resultPagination, #searchResultSortOptions").mousedown(function() {
+      $("#resultPagination, #searchResultSortOptions, #searchResultNavigation").mousedown(function() {
 	      AnchorHoverPopup.hidePopup();
       });
       
