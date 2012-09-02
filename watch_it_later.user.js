@@ -793,7 +793,7 @@
     }
     
     
-    var videoReg = /(\?cc_video_id=|watch\/)([a-z0-9]+)/
+    var videoReg = /(\?cc_video_id=|\?cc_id=|watch\/)([a-z0-9]+)/
     var excludeReg = /(news|live|seiga)\..*?nicovideo\.jp/
 
     function bind(force) {
