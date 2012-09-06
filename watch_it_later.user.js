@@ -162,10 +162,11 @@
     function nicoSearch(word, search_type) {
       search_type = search_type || 'tag';
       w.WatchApp.ns.init.ComponentInitializer.videoSelection.searchVideo(word, search_type);
+      AnchorHoverPopup.hidePopup();
       setTimeout(function() {
         w.WatchApp.ns.util.WindowUtil.scrollFitMinimum('#searchResultExplorer', 300);
         $('.searchText input').focus();
-     }, 500);
+      }, 500);
     }
 
     pt.get = function(watchId, callback) {
@@ -497,17 +498,17 @@
     /**
      *  マイリスト登録パネルを返す
      */
-    pt.getPanel = function(watchId) {
+    pt.getPanel = function(watchId, videoId) {
       if (isNativeGM || host == location.host) {
-        return this.getNativePanel(watchId);
+        return this.getNativePanel(watchId, videoId);
       } else {
-        return this.getIframePanel(watchId);
+        return this.getIframePanel(watchId, videoId);
       }
     }
     
-    pt.getNativePanel = function(watchId){
+    pt.getNativePanel = function(watchId, videoId){
       var self = this;
-      var _watchId = watchId;
+      var _watchId = watchId, _videoId = videoId || watchId;
       var body = document.createElement('div');
       body.style.height = '24px';
       body.style.zIndex = 10000;
@@ -521,9 +522,10 @@
       
       var extArea = document.createElement('span');
       
-      body.watchId = function(w) {
+      body.watchId = function(w, v) {
         if (w) {
           _watchId = w;
+          _videoId = v || w;
           this.clearExtElement();
           if (self.findDefListByWatchId(w)) {
             deleteDef.style.display = '';
@@ -645,9 +647,9 @@
           setTimeout(function() {btn.disabled = false;}, 1000);
           if (w.jQuery) {
 						var $btn = w.jQuery(btn), o = $btn.offset();
-          	VideoTags.popupItems(_watchId, o.left, o.top + $btn.outerHeight());
+          	VideoTags.popupItems(_videoId, o.left, o.top + $btn.outerHeight());
 					} else {
-          	VideoTags.popupItems(_watchId, e.pageX, e.pageY);
+          	VideoTags.popupItems(_videoId, e.pageX, e.pageY);
           }
         } ,false);
         return btn;
@@ -685,7 +687,7 @@
       
       nobr.appendChild(extArea);
 
-      body.watchId(watchId);
+      body.watchId(_watchId, _videoId);
       return body;
     };
     
@@ -970,8 +972,8 @@
 
     $.fx.interval = conf.fxInterval;
 
-    var video_id = "";
-    var iframe = Mylist.getPanel(''), tv_chan = $(".videoMenuToggle")[0];
+    var video_id = '', watch_id = '';
+    var iframe = Mylist.getPanel(''), tv_chan = $('.videoMenuToggle')[0];
     var WatchApp = w.WatchApp, WatchJsApi = w.WatchJsApi;
     var isFixedHeader = !$('body').hasClass('nofix');
     var watch = WatchApp.namespace.init;
@@ -1008,11 +1010,12 @@
     }
 
     function watchVideoId() {
-      var new_video_id = w.WatchApp.namespace.init.CommonModelInitializer.watchInfoModel.id;
-      if (video_id != new_video_id) {
-        console.log("video_id=" + new_video_id);
-        onVideoChange(new_video_id);
-        video_id = new_video_id;
+      var newVideoId = w.WatchApp.namespace.init.CommonModelInitializer.watchInfoModel.id;
+      var newWatchId = w.WatchApp.namespace.init.CommonModelInitializer.watchInfoModel.v;
+      if (video_id != newVideoId) {
+//        console.log("video_id=" + newVideoId);
+        onVideoChange(newVideoId, newWatchId);
+        video_id = newVideoId;
       }
     }
 
@@ -1026,7 +1029,7 @@
       $("html, body").animate({scrollTop: head}, 600);
     }
 
-    function onVideoChange(new_video_id) {
+    function onVideoChange(newVideoId) {
     }
     
     function setVideoCounter(watchInfoModel) {
@@ -1052,12 +1055,13 @@
       tagv = watch.TagInitializer.tagViewController;
       pim  = watch.PlayerInitializer.playerInitializeModel;
       npc  = watch.PlayerInitializer.nicoPlayerConnector;
-      new_video_id = watch.CommonModelInitializer.watchInfoModel.id;
-      iframe.watchId(new_video_id);
+      newVideoId = watch.CommonModelInitializer.watchInfoModel.id;
+      newWatchId = watch.CommonModelInitializer.watchInfoModel.v;
+      iframe.watchId(newVideoId, newWatchId);
 
       setVideoCounter(watch.CommonModelInitializer.watchInfoModel);
 
-      console.log("onVideoInitialized: " + new_video_id);
+      console.log("onVideoInitialized: " + newVideoId);
       scrollToVideoPlayer();
       if (conf.autoBrowserFull) setTimeout(function() {
         changePlayerScreenMode("browserFull");
@@ -1210,6 +1214,24 @@
   })();
 
 
+  /**
+   *  原宿プレイヤーでのあれこれ
+   *
+   *	マイリストパネルだけ追加
+   *
+   */
+  (function() {
+    if (!w.Video) return;
+    var Video = w.Video, watchId = Video.v, videoId = Video.id;
+    var iframe = Mylist.getPanel('');
+    iframe.id = "mylyst_add_frame";
+    iframe.style.position = 'fixed';
+    iframe.style.right = 0;
+    iframe.style.bottom = 0;
+    document.body.appendChild(iframe);
+    iframe.watchId(watchId, videoId);
+
+	})();
 
   //===================================================
   //===================================================
