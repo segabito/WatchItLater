@@ -6,7 +6,7 @@ WatchItLater.js
 FirefoxとChromeに対応しています。
 
 開発版のデモ動画
-http://www.nicovideo.jp/watch/sm18748437
+http://www.nicovideo.jp/watch/sm18845030
 
 ランキングや検索結果を見て「これは面白そうだなあ」「あとで見よう」という動画があった時、
 とりあえずマイリストにどんどん登録しておいて、あとからZeroWatchやVitaやiPadで
