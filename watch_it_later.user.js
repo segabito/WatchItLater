@@ -63,14 +63,14 @@
 
 
     if (!isNativeGM) {
-      this.GM_getValue=function (key, def) {
+      this.GM_getValue = function(key, def) {
         if (window.localStorage[key] === undefined) return def;
         return JSON.parse(window.localStorage.getItem(key));
       };
-      this.GM_setValue=function (key,value) {
+      this.GM_setValue = function(key,value) {
         return window.localStorage.setItem(key, JSON.stringfy(value));
       };
-      this.GM_addStyle = function (styles){ 
+      this.GM_addStyle = function(styles) {
         var S = document.createElement('style');
         S.type = 'text/css';
         var T = ''+styles+'';
@@ -80,7 +80,7 @@
         head = head[0]
         head.appendChild(S);
         return;
-      }
+      };
       this.GM_xmlhttpRequest = function(options) {
         try {
           var req = new XMLHttpRequest();
@@ -89,7 +89,7 @@
             if (req.readyState == 4) {
               if (typeof options.onload == "function") options.onload(req);
             }
-          }
+          };
           req.open(method, options.url, true);
           if (options.headers) {
             for (var h in options.headers) {
@@ -101,7 +101,7 @@
         } catch (e) {
           console.log(e);
         }
-      }
+      };
     }
 
 
@@ -113,7 +113,7 @@
        }
      } catch (e) {
      }
-    }
+    };
     conf.load = function() {
       try {
         for (var v in conf) {
@@ -122,7 +122,7 @@
         }
       } catch (e) {
       }
-    }
+    };
     conf.reset = (function(conf_def) {
       return function() {
         for (var v in conf) {
@@ -130,28 +130,28 @@
           conf[v] = conf_def[v];
         }
         conf.save();
-      }
+      };
     })(conf);
     conf.load();
 
     w.WatchItLater = {
-    	setConf: function(k, v) {
-	      conf[k] = v;
-  	    conf.save();
- 	   },
-	    showConf: function() {
-	      console.log(conf);
-	    }
+      setConf: function(k, v) {
+        conf[k] = v;
+        conf.save();
+      },
+      showConf: function() {
+        console.log(conf);
+      }
     }
 
 
 
-	/**
-	 *	動画タグ取得とポップアップ
-	 *
-	 */
+  /**
+   *  動画タグ取得とポップアップ
+   *
+   */
   var VideoTags = (function(){
-    var VideoTags = function() {
+    function VideoTags() {
     }
     
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
@@ -181,15 +181,15 @@
         }
       };
       GM_xmlhttpRequest(req);
-    }
+    };
     
     pt.hidePopup = function() {
       if (lastPopup) {
         lastPopup.style.display = 'none';
       }
-    }
+    };
     
-		var uniq = null, $history = null;
+    var uniq = null, $history = null;
     pt.popupItems = function(watchId, baseX, baseY) {
       var self = this;
       this.get(watchId, function(status, resp) {
@@ -233,13 +233,13 @@
       
       function createPopupDOM() {
         var popup = document.createElement('div');
-        popup.style.position = 'absolute';
-        popup.className = 'tagItemsPopup';
-        popup.style.minWidth = '150px';
-        popup.style.fontSize = '10pt';
+        popup.style.position   = 'absolute';
+        popup.className        = 'tagItemsPopup';
+        popup.style.minWidth   = '150px';
+        popup.style.fontSize   = '10pt';
         popup.style.background = '#ccf';
-        popup.style.border = '1px solid #99c';
-        popup.style.zIndex = 2000000;
+        popup.style.border     = '1px solid #99c';
+        popup.style.zIndex     = 2000000;
         popup.addEventListener('click', function(e) {
           popup.style.display = 'none';
         });
@@ -247,24 +247,24 @@
       }
 
 
-			function appendTagHistory(dom, text, dic) {
-				var $ = w.$;
-				if (uniq === null) {
-					uniq = {};
-					$history = $('<div><p>タグ履歴</p></div>');
-					$history.css({width: $('#searchResultNavigation').width(), height: '300px', overflowY: 'auto'});
+      function appendTagHistory(dom, text, dic) {
+        var $ = w.$;
+        if (uniq === null) {
+          uniq = {};
+          $history = $('<div><p>タグ履歴</p></div>');
+          $history.css({width: $('#searchResultNavigation').width(), height: '300px', overflowY: 'auto'});
           $('#searchResultNavigation').append($history);
-				}
+        }
         if (!uniq[text]) {
           var a = $(dom).clone().css({marginRight: '8px', fontSize: '80%'}).click(function(e) {
             nicoSearch(text);
             e.preventDefault();
           });
-	        dic.style.marginRight = '0';
+          dic.style.marginRight = '0';
           $history.find('p').after(a).after(dic);
         }
         uniq[text] = 1;
-			}
+      }
 
       function createItemDOM(tag) {
         var text = tag.tag;
@@ -302,8 +302,8 @@
         icon.src = tag.dic ? 'http://res.nimg.jp/img/watch_zero/icon_dic.png' : 'http://res.nimg.jp/img/watch_zero/icon_disable_dic.png';
         dic.appendChild(icon);
         return dic;
-			}
-    }
+      }
+    };
     
     return new VideoTags();
   })();
@@ -334,7 +334,7 @@
 
     function Mylist(){
       this.initialize();
-    };
+    }
     
     function getToken() {
       if (!isNativeGM && host != location.host) return; // 
@@ -364,7 +364,7 @@
       } else {
         return false;
       }
-    }
+    };
     
     pt.initialize = function() {
       if (initialized) return;
@@ -390,7 +390,7 @@
         }
       });
       this.reloadDefList();
-    }
+    };
     
     pt.reloadDefList = function(callback) {
       var url = 'http://' + host + '/api/deflist/list';
@@ -405,7 +405,7 @@
           }
         }
       });
-    }
+    };
     
     pt.findDefListByWatchId = function(watchId) {
       for (var i = 0, len = defListItems.length; i < len; i++) {
@@ -413,7 +413,7 @@
         if (wid == watchId) return item;
       }
       return null;
-    }
+    };
     
     // おもに参考にしたページ
     // http://uni.res.nimg.jp/js/nicoapi.js
@@ -437,7 +437,7 @@
       };
       GM_xmlhttpRequest(req);
       return true;
-    }
+    };
     
     pt.addDefList = function(watchId, callback) {
       var self = this;
@@ -446,7 +446,7 @@
       // 例えば、とりマイの300番目に登録済みだった場合に「登録済みです」と言われても探すのがダルいし、
       // 他の動画を追加していけば、そのうち押し出されて消えてしまう。
       // なので、重複時にエラーを出すのではなく、「消してから追加」することによって先頭に持ってくる。
-      // 要望掲示板にこっそり書いたりしたけど相手にされないので自分で書いた。
+      // 要望掲示板にこっそり書いたりしたけど相手にされないので自分で実装した。
       var data = "item_id=" + watchId + "&token=" + token;
 
       var _add = function(status, resp) {
@@ -464,7 +464,7 @@
       }
       // とりあえずマイリストにある場合はdeleteDefList()のcallbackで追加、ない場合は即時追加
       if (!this.deleteDefList(watchId, _add)) _add();
-    }
+    };
     
     pt.addMylist = function(watchId, groupId, callback) {
       var self = this;
@@ -493,7 +493,7 @@
       }
       // 普通のマイリストに入れたら、とりあえずマイリストからは削除(≒移動)
       if (!this.deleteDefList(watchId, _add)) _add();
-    }
+    };
     
     /**
      *  マイリスト登録パネルを返す
@@ -504,19 +504,19 @@
       } else {
         return this.getIframePanel(watchId, videoId);
       }
-    }
+    };
     
-    pt.getNativePanel = function(watchId, videoId){
+    pt.getNativePanel = function(watchId, videoId) {
       var self = this;
       var _watchId = watchId, _videoId = videoId || watchId;
       var body = document.createElement('div');
-      body.style.height = '24px';
-      body.style.zIndex = 10000;
-      body.style.border = '1px solid silver';
-      body.style.padding = 0;
-      body.style.margin  = 0;
+      body.style.height   = '24px';
+      body.style.zIndex   = 10000;
+      body.style.border   = '1px solid silver';
+      body.style.padding  = 0;
+      body.style.margin   = 0;
       body.style.overflow = 'hidden';
-      body.style.display = 'inline-block';
+      body.style.display  = 'inline-block';
       var nobr = document.createElement('nobr');
       body.appendChild(nobr);
       
@@ -539,16 +539,16 @@
       
       body.addExtElement = function(elm) {
         extArea.appendChild(elm);
-      }
+      };
       body.clearExtElement = function() {
         extArea.innerHTML = '';
-      }
+      };
       body.show = function() {
-				body.style.display = '';
-			}
+        body.style.display = '';
+      };
       body.hide = function() {
-				body.style.display = 'none';
-			}
+        body.style.display = 'none';
+      };
       
       function createSelector() {
         var sel = document.createElement('select');
@@ -646,28 +646,28 @@
           btn.disabled = true;
           setTimeout(function() {btn.disabled = false;}, 1000);
           if (w.jQuery) {
-						var $btn = w.jQuery(btn), o = $btn.offset();
-          	VideoTags.popupItems(_videoId, o.left, o.top + $btn.outerHeight());
-					} else {
-          	VideoTags.popupItems(_videoId, e.pageX, e.pageY);
+            var $btn = w.jQuery(btn), o = $btn.offset();
+            VideoTags.popupItems(_videoId, o.left, o.top + $btn.outerHeight());
+          } else {
+            VideoTags.popupItems(_videoId, e.pageX, e.pageY);
           }
         } ,false);
         return btn;
       }
       
       function createCloseButton() {
-				var btn = document.createElement('a');
-				btn.style.color = 'red';
-				btn.style.padding = 0;
-				btn.style.margin = 0;
-				btn.href = 'javascript:;';
-				btn.style.fontSize = '80%';
-				btn.innerHTML = '[x]';
-				btn.addEventListener('click', function(e) {
-					body.hide();
-				}, false);
-				return btn;
-			}
+        var btn = document.createElement('a');
+        btn.style.color = 'red';
+        btn.style.padding = 0;
+        btn.style.margin = 0;
+        btn.href = 'javascript:;';
+        btn.style.fontSize = '80%';
+        btn.innerHTML = '[x]';
+        btn.addEventListener('click', function(e) {
+          body.hide();
+        }, false);
+        return btn;
+      }
 
       
       var sel = createSelector(mylistlist);
@@ -720,16 +720,16 @@
       // ダミーメソッド
       body.addExtElement = function(elm) {
         //var insertAfter = function(parent, node, referenceNode) { parent.insertBefore(node, referenceNode.nextSibling);}
-      }
-      body.clearExtElement = function() {}
+      };
+      body.clearExtElement = function() {};
       
       body.show = function() {
-				body.style.display = '';
-			}
+        body.style.display = '';
+      };
       body.hide = function() {
-				body.style.display = 'none';
-			}
-			
+        body.style.display = 'none';
+      };
+      
       
       return body;
     };
@@ -737,12 +737,12 @@
     return new Mylist();
   })();
 
-	/**
-	 *	左下に出るポップアップメッセージ
-	 *
-	 */
+  /**
+   *  左下に出るポップアップメッセージ
+   *
+   */
   var Popup = (function(){
-    var Popup = function() {
+    function Popup() {
     }
     Popup.show = function(text) {
       if (w.WatchApp) {
@@ -751,7 +751,7 @@
           '<span>' + text + '</span>'
         );
       }
-    }
+    };
     Popup.alert = function(text) {
       if (w.WatchApp) {
         text = text.replace(/[\n]/, '<br />');
@@ -761,20 +761,20 @@
       } else {
         w.alert(text);
       }
-    }
+    };
     return Popup;
   })();
 
 
-	  /**
-	   *  リンクのマウスオーバーに仕込む処理
-	   *  ここの表示は再考の余地あり
-	   */
-	var AnchorHoverPopup = (function() {
+  /**
+   *  リンクのマウスオーバーに仕込む処理
+   *  ここの表示は再考の余地あり
+   */
+  var AnchorHoverPopup = (function() {
     var mylistPanel = Mylist.getPanel('');
-    mylistPanel.style.position = 'absolute';
-    mylistPanel.style.zIndex = 1000000;
-    mylistPanel.style.display = 'none';
+    mylistPanel.style.position   = 'absolute';
+    mylistPanel.style.zIndex     = 1000000;
+    mylistPanel.style.display    = 'none';
     mylistPanel.style.background = '#ccc';
     document.body.appendChild(mylistPanel);
 
@@ -795,8 +795,8 @@
     }
     
     
-    var videoReg = /(\?cc_video_id=|\?cc_id=|watch\/)([a-z0-9]+)/
-    var excludeReg = /(news|live|seiga)\..*?nicovideo\.jp/
+    var videoReg = /(\?cc_video_id=|\?cc_id=|watch\/)([a-z0-9]+)/;
+    var excludeReg = /(news|live|seiga)\..*?nicovideo\.jp/;
 
     function bind(force) {
       function each(e, watchId) {
@@ -805,10 +805,10 @@
         var mx = 0, my = 0;
 
         if (!w.jQuery) {
-	        e.addEventListener('mousemove', function(ev) {
-	          mx = ev.pageX;
-	          my = ev.pageY;
-	        });
+          e.addEventListener('mousemove', function(ev) {
+            mx = ev.pageX;
+            my = ev.pageY;
+          });
         }
         e.addEventListener('mouseover', over = function(ev) {
           e.mouse_in = true;
@@ -821,41 +821,39 @@
               showPanel(watchId, mx + 8, my + 8);
             }
             addlink(mylistPanel, e, watchId);
-          }, 500);
+          }, 400);
         }, false);
         e.addEventListener('mouseout', out = function() {
-          e.mouse_timer = setTimeout(function() {
-            e.mouse_in = false;
-            if (e.mouse_timer) {
-              clearTimeout(e.mouse_timer);
-            }
-          }, 300);
+          e.mouse_in = false;
+          if (e.mouse_timer) {
+            clearTimeout(e.mouse_timer);
+          }
         }, false);
         e.added = 1;
       };
 
       //var a = document.getElementsByTagName("A");
       var a = document.links;
-	      for (var i = 0, len = a.length; i < len; i++) {
-	        var e = a[i];
-	        try {
-		        var m;// = videoReg.test(e.href);
-	          if (
-	            !e.added && 
-	            (m = videoReg.exec(e.href)) != null &&
-	            !excludeReg.test(e.href) &&
-	//            e.className != "itemLink" && 
-	//            e.className != "itemVideoTitle" && 
-	            e.className != "itemEcoLink" && 
-	//            e.parentNode.className != "thumbContainer" &&
-	            true
-	          ) {
-	            each(e, m[2]);
-	          }
-	        } catch (ex) {
-	          console.log(ex);
-	        }
-	      }
+        for (var i = 0, len = a.length; i < len; i++) {
+          var e = a[i];
+          try {
+            var m;// = videoReg.test(e.href);
+            if (
+              !e.added && 
+              (m = videoReg.exec(e.href)) != null &&
+              !excludeReg.test(e.href) &&
+  //            e.className != "itemLink" && 
+  //            e.className != "itemVideoTitle" && 
+              e.className != "itemEcoLink" && 
+  //            e.parentNode.className != "thumbContainer" &&
+              true
+            ) {
+              each(e, m[2]);
+            }
+          } catch (ex) {
+            console.log(ex);
+          }
+        }
 
 
     }
@@ -865,24 +863,24 @@
     } else {
       bind();
       setInterval(
-      	function() { bind(); }, 3000
+        function() { bind(); }, 3000
       );
       //w.Event.observe(w, 'load', function() { add_btn('a[href*="watch/"]'); }, false);
     }
 
-		return {
-			hidePopup: function() {
-	      VideoTags.hidePopup();
-				mylistPanel.hide();
-				return this;
-			},
-			updateNow: function() {
-				bind();
-				setTimeout(function() { bind();}, 1000);
-				return this;
-			}
-		};
-	})();
+    return {
+      hidePopup: function() {
+        VideoTags.hidePopup();
+        mylistPanel.hide();
+        return this;
+      },
+      updateNow: function() {
+        bind();
+        setTimeout(function() { bind();}, 1000);
+        return this;
+      }
+    };
+  })();
 
 
 
@@ -943,12 +941,12 @@
       w.window.close = function()
       {
         return;
-      }
+      };
       w.window.alert = function()
       {
         document.write('<span style="position:absolute;top:0;left:0;font-size:8pt;color:red;">' +
                  arguments[0] + '</span>');
-      }
+      };
   })();
 
 
@@ -1088,17 +1086,17 @@
     }
 
     function onVideoSelectPanelOpened() {
-			isSearchOpen = true;
+      isSearchOpen = true;
       AnchorHoverPopup.hidePopup().updateNow();
     }
 
     function onVideoSelectPanelOpening() {
-			isSearchOpen = true;
+      isSearchOpen = true;
       $('#searchResultExplorer').css({zIndex: 600});
     }
 
     function onVideoSelectPanelClosed() {
-			isSearchOpen = false;
+      isSearchOpen = false;
       AnchorHoverPopup.hidePopup().updateNow();
       $('#searchResultExplorer').css({zIndex: 1});
       $('#content').css({zIndex: 2});
@@ -1120,13 +1118,13 @@
         });
         $('#openSearchResultExplorer').css({marginTop: 0});
         if (!isSearchOpen) {
-	        var m = $('#content').offset().top + $('#content').outerHeight() - $('#openSearchResultExplorer').offset().top;
-	        $('#openSearchResultExplorer').css({marginTop: m + 'px'});
-	      }
+          var m = $('#content').offset().top + $('#content').outerHeight() - $('#openSearchResultExplorer').offset().top;
+          $('#openSearchResultExplorer').css({marginTop: m + 'px'});
+        }
 
         // フル画面時プレイリストを閉じる
         if (conf.autoClosePlaylistInFull && 
-        		$('#content .browserFullPlaylistOption .browserFullPlaylistClose').is(':visible')) {
+            $('#content .browserFullPlaylistOption .browserFullPlaylistClose').is(':visible')) {
           $('#content .browserFullPlaylistOption .browserFullPlaylistClose').click();
         } 
       }, 500);
@@ -1152,7 +1150,7 @@
       $("#resultPagination").css({fontWeight: 'bolder', border: '1px dotted silver', fontSize: '130%'});
       
       $("#resultPagination, #searchResultSortOptions, #searchResultNavigation").mousedown(function() {
-	      AnchorHoverPopup.hidePopup();
+        AnchorHoverPopup.hidePopup();
       });
       
     }
@@ -1184,14 +1182,14 @@
         tagv.isPinned = true;
         tagv.onMouseOverTagContainer();
       }
-			$('#siteHeaderInner').width(
-				$('#siteHeaderInner').width() + 200
-			);
+      $('#siteHeaderInner').width(
+        $('#siteHeaderInner').width() + 200
+      );
     }
     
 
     function hideAds() {
-			return;
+      return;
     }
 
     try
@@ -1217,7 +1215,7 @@
   /**
    *  原宿プレイヤーでのあれこれ
    *
-   *	マイリストパネルだけ追加
+   *  マイリストパネルだけ追加
    *
    */
   (function() {
@@ -1230,8 +1228,7 @@
     iframe.style.bottom = 0;
     document.body.appendChild(iframe);
     iframe.watchId(watchId, videoId);
-
-	})();
+  })();
 
   //===================================================
   //===================================================
