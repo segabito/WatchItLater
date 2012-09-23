@@ -16,7 +16,7 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.120825
+// @version        1.120923
 // ==/UserScript==
 
 
@@ -1053,8 +1053,8 @@
       tagv = watch.TagInitializer.tagViewController;
       pim  = watch.PlayerInitializer.playerInitializeModel;
       npc  = watch.PlayerInitializer.nicoPlayerConnector;
-      newVideoId = watch.CommonModelInitializer.watchInfoModel.id;
-      newWatchId = watch.CommonModelInitializer.watchInfoModel.v;
+      var newVideoId = watch.CommonModelInitializer.watchInfoModel.id;
+      var newWatchId = watch.CommonModelInitializer.watchInfoModel.v;
       iframe.watchId(newVideoId, newWatchId);
 
       setVideoCounter(watch.CommonModelInitializer.watchInfoModel);
@@ -1146,7 +1146,7 @@
 //        $("#resultPagination").css({position: 'fixed'});
       }
       // ページャーの字が小さくてクリックしにくいよね
-      $("#resultPagination").css({padding: '5px', marginTop: '-64px'});
+      $("#resultPagination").css({padding: '5px'});
       $("#resultPagination").css({fontWeight: 'bolder', border: '1px dotted silver', fontSize: '130%'});
       
       $("#resultPagination, #searchResultSortOptions, #searchResultNavigation").mousedown(function() {
