@@ -20,7 +20,7 @@
 // ==/UserScript==
 
 // * ver 1.121017
-// - 白くなったwatchに対応
+// - QWatchに対応
 // - コメントパネルを広く
 // （＾ω＾）…
 
@@ -354,7 +354,6 @@
       GM_xmlhttpRequest({
         url: url,
         onload: function(resp) {
-            console.log(arguments);
           var result = resp.responseText;
           if (result.match(/NicoAPI\.token = "([a-z0-9\-]+)";/)) {
             token = RegExp.$1;
@@ -390,7 +389,6 @@
       GM_xmlhttpRequest({
         url: url,
         onload: function(resp) {
-            console.log(url, arguments);
           var result = JSON.parse(resp.responseText);
           if (result.status == "ok" && result.list) {
             mylistlist = result.list;
@@ -1069,7 +1067,6 @@
 
       setVideoCounter(watch.CommonModelInitializer.watchInfoModel);
 
-      console.log("onVideoInitialized: " + newVideoId);
       scrollToVideoPlayer();
       if (conf.autoBrowserFull) setTimeout(function() {
         changePlayerScreenMode("browserFull");
