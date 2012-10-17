@@ -16,10 +16,15 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.120923
+// @version        1.121017
 // ==/UserScript==
 
+// * ver 1.121017
+// - 白くなったwatchに対応
+// - コメントパネルを広く
+// （＾ω＾）…
 
+// TODO: GM_addStyleを活用
 
 
 (function() {
@@ -54,7 +59,9 @@
       topPager: true, // 検索ボックスのページャを上にする
       fxInterval: 40, // アニメーションのフレームレート 40 = 25fps
       hideLeftIchiba: false,
-      autoClosePlaylistInFull: true // 全画面時にプレイリストを自動で閉じる
+      autoClosePlaylistInFull: true, // 全画面時にプレイリストを自動で閉じる
+      hideNewsInFull: true, // 全画面時にニュースを閉じる
+      wideCommentPanel: true // コメントパネルをワイドにする
     };
 
   //===================================================
@@ -347,6 +354,7 @@
       GM_xmlhttpRequest({
         url: url,
         onload: function(resp) {
+            console.log(arguments);
           var result = resp.responseText;
           if (result.match(/NicoAPI\.token = "([a-z0-9\-]+)";/)) {
             token = RegExp.$1;
@@ -382,6 +390,7 @@
       GM_xmlhttpRequest({
         url: url,
         onload: function(resp) {
+            console.log(url, arguments);
           var result = JSON.parse(resp.responseText);
           if (result.status == "ok" && result.list) {
             mylistlist = result.list;
@@ -840,6 +849,7 @@
             var m;// = videoReg.test(e.href);
             if (
               !e.added && 
+              e.href && 
               (m = videoReg.exec(e.href)) != null &&
               !excludeReg.test(e.href) &&
   //            e.className != "itemLink" && 
@@ -1098,11 +1108,14 @@
     function onVideoSelectPanelClosed() {
       isSearchOpen = false;
       AnchorHoverPopup.hidePopup().updateNow();
-      $('#searchResultExplorer').css({zIndex: 1});
-      $('#content').css({zIndex: 2});
-      var m = $('#content').offset().top + $('#content').outerHeight() - $('#openSearchResultExplorer').offset().top;
-      $('#openSearchResultExplorer').css({marginTop: m + 'px'});
-      //scrollToVideoPlayer();
+      setTimeout(function() {
+        $('#searchResultExplorer').css({zIndex: 1});
+        $('#content').css({zIndex: 2});
+        $('#openSearchResultExplorer').css({marginTop: '0px'});
+        var m = $('#content').offset().top + $('#content').outerHeight() - $('#openSearchResultExplorer').offset().top;
+        $('#openSearchResultExplorer').css({marginTop: m + 'px'});
+        //scrollToVideoPlayer();
+      }, 1500);
     }
     
     function onWatchInfoReset(w) {
@@ -1124,9 +1137,24 @@
 
         // フル画面時プレイリストを閉じる
         if (conf.autoClosePlaylistInFull && 
-            $('#content .browserFullPlaylistOption .browserFullPlaylistClose').is(':visible')) {
-          $('#content .browserFullPlaylistOption .browserFullPlaylistClose').click();
-        } 
+          $('#content .browserFullPlaylistClose').is(':visible')) {
+          $('#content .browserFullPlaylistClose').click();
+          $('#content .browserFullOption').css({paddingRight: '200px'});
+        }
+
+        if (sc.mode == 'browserFull') {
+          if (conf.hideNewsInFull && $('#textMarquee').is(':visible')) {
+            $('#playerContainerSlideArea').css({marginBottom: '-45px'});
+//            $('#textMarquee').css({display: 'none'});
+            $('#playlist').css('zIndex', 100);
+            $('.generationMessage').hide();
+          }
+        } else {
+            $('#playerContainerSlideArea').css({marginBottom: ''});
+            $('#textMarquee').css({display: ''});
+            $('#playlist').css('zIndex', 'auto');
+            $('.generationMessage').show();
+        }
       }, 500);
     }
 
@@ -1136,10 +1164,29 @@
       w.document.body.appendChild(iframe);
     }
     
-    function initIchiba() {
-      // 市場パネル無くなった。。。
+    function initSidePanel() {
+      function wideCommentPanel(px) {
+        var elms = [
+          '#playerCommentPanelOuter', 
+          '#playerCommentPanel',
+          '#playerCommentPanel .commentTable', 
+          '#playerCommentPanel .commentTable .commentTableContainer'
+        ];
+        for (var v in elms) {
+          var $e = $(elms[v]);
+          $e.width($e.width() + px);
+        }
+        $('#playerCommentPanelOuter').css({'right': - $('#playerCommentPanelOuter').outerWidth() - 'px'});
+      }
+      if (conf.wideCommentPanel) {
+//      完全に横スクロール不要にしたい場合はこっち
+//        var tarinaiWidth = $('#commentDefault .commentTableContainer').innerWidth() - $('#commentDefault .commentTableContainerInner').outerWidth();
+//        wideCommentPanel(tarinaiWidth - 10);
+        wideCommentPanel(420 - $('#playerCommentPanelOuter').outerWidth());
+      }
+
     }
-    
+
     function initPager() {
       if (conf.topPager) {
         $("#resultPagination").insertBefore($("#resultlist")); // 検索窓のページャーを上に (好み次第)
@@ -1195,7 +1242,7 @@
     try
     {
       initIframe();
-      initIchiba();
+      initSidePanel();
       initEvents();
       initPager();
       initOther();
@@ -1206,6 +1253,8 @@
         $('#searchResultExplorer').css({zIndex: 1});
       }, 3000);
 
+      $('#videoMenuTopList').append('<li style="position:absolute;top:50px;left:300px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;">（＾ω＾）</a><a href="/watch/sm18845030" style="color: black;" class="itemEcoLink">…</a></li>'); // （＾ω＾） …
+      
     } catch(e) {
       w.alert(e);
     }
@@ -1259,3 +1308,20 @@
     monkey(true);
   }
 })();
+
+
+/*
+  メモ
+  
+  WatchApp.ns.init.SidePanelInitializer.panelSlideViewController.innerLeftElements = [$('#ichibaPanel')];  
+  $("#ichibaPanel").append('<iframe scrolling="no" width="312" height="176" frameborder="0" src="http://ext.nicovideo.jp/thumb/sm9" class="nicovideo"></iframe>');
+
+    // とりあえずマイリストフォルダがクリックされた
+    this.contentsAreaVC.addEventListener(
+      'deflistFolderClickedEvent',
+      function (itemInfo) {
+        self._openMylistFolder(itemInfo, true);
+      }
+    )
+          videoSelection.showMylistgroup(mylistGroupID);
+*/
