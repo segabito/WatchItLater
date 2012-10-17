@@ -16,13 +16,18 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121017
+// @version        1.121018
 // ==/UserScript==
 
-// * ver 1.121017
+// * ver 1.121018
 // - QWatchに対応
 // - コメントパネルを広く
 // （＾ω＾）…
+// * ver 1.121018
+// - 「動画をもっと見る」が時々行方不明になるのを修正
+// - 空っぽになった左になんか表示してみる
+
+
 
 // TODO: GM_addStyleを活用
 
@@ -1035,7 +1040,7 @@
       $("html, body").animate({scrollTop: head}, 600);
     }
 
-    function onVideoChange(newVideoId) {
+    function onVideoChange(newVideoId, newWatchId) {
     }
     
     function setVideoCounter(watchInfoModel) {
@@ -1074,8 +1079,19 @@
         onWindowResize();
       }, 100);
 
-
-    }
+    // - 空っぽになった左になんか表示してみる
+    var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
+    var $leftPanel = $('#ichibaPanel'), h = $leftPanel.innerHeight() - 100;
+      panelSVC.innerLeftElements = [$('#ichibaPanel')];  
+      panelSVC.refresh();
+      $leftPanel.css({background: '#bbb', textAlign: 'left', 'overflowY': 'auto'}).empty()
+        .append($('#videoThumbnailImage').clone().css({margin: 'auto'}))
+        .append(
+          $('.videoDescription').clone(true) //.css({height: h + 'px', overflowY: 'auto'})
+            .append($('#userProfile .userIconContainer').clone(true).css({background: '#ccc', width: '100%'})
+            .append('<span>' + $('#videoInfo .userName').text() + '</span>'))
+        );
+      }
 
     function onVideoStopped() {
       console.log("video stopped");
@@ -1102,17 +1118,24 @@
       $('#searchResultExplorer').css({zIndex: 600});
     }
 
+
     function onVideoSelectPanelClosed() {
       isSearchOpen = false;
       AnchorHoverPopup.hidePopup().updateNow();
       setTimeout(function() {
         $('#searchResultExplorer').css({zIndex: 1});
         $('#content').css({zIndex: 2});
-        $('#openSearchResultExplorer').css({marginTop: '0px'});
-        var m = $('#content').offset().top + $('#content').outerHeight() - $('#openSearchResultExplorer').offset().top;
-        $('#openSearchResultExplorer').css({marginTop: m + 'px'});
+        resetOpenSearchResultExplorerPos();
         //scrollToVideoPlayer();
       }, 1500);
+    }
+    
+    function resetOpenSearchResultExplorerPos() {
+      if (isSearchOpen) return;
+
+      $('#openSearchResultExplorer').css({marginTop: '0px'});
+      var m = $('#content').offset().top + $('#content').outerHeight() - $('#openSearchResultExplorer').offset().top;
+      $('#openSearchResultExplorer').css({marginTop: m + 'px'});
     }
     
     function onWatchInfoReset(w) {
@@ -1151,6 +1174,8 @@
             $('#textMarquee').css({display: ''});
             $('#playlist').css('zIndex', 'auto');
             $('.generationMessage').show();
+            resetOpenSearchResultExplorerPos();
+
         }
       }, 500);
     }
@@ -1229,6 +1254,9 @@
       $('#siteHeaderInner').width(
         $('#siteHeaderInner').width() + 200
       );
+
+      resetOpenSearchResultExplorerPos();
+
     }
     
 
@@ -1250,7 +1278,7 @@
         $('#searchResultExplorer').css({zIndex: 1});
       }, 3000);
 
-      $('#videoMenuTopList').append('<li style="position:absolute;top:50px;left:300px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;">（＾ω＾）</a><a href="/watch/sm18845030" style="color: black;" class="itemEcoLink">…</a></li>'); // （＾ω＾） …
+      $('#videoMenuTopList').append('<li style="position:absolute;top:50px;left:-80px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;">（＾ω＾）</a><a href="/watch/sm18845030" style="color: black;" class="itemEcoLink">…</a></li>'); // （＾ω＾） …
       
     } catch(e) {
       w.alert(e);
@@ -1311,14 +1339,8 @@
   メモ
   
   WatchApp.ns.init.SidePanelInitializer.panelSlideViewController.innerLeftElements = [$('#ichibaPanel')];  
-  $("#ichibaPanel").append('<iframe scrolling="no" width="312" height="176" frameborder="0" src="http://ext.nicovideo.jp/thumb/sm9" class="nicovideo"></iframe>');
+  WatchApp.ns.init.SidePanelInitializer.panelSlideViewController.refresh();
+  $('#ichibaPanel').append($('#videoThumbnailImage').clone(true).css({float: 'right'}));
+//  $("#ichibaPanel").append('<iframe scrolling="no" width="312" height="176" frameborder="0" src="http://ext.nicovideo.jp/thumb/sm9" class="nicovideo"></iframe>');
 
-    // とりあえずマイリストフォルダがクリックされた
-    this.contentsAreaVC.addEventListener(
-      'deflistFolderClickedEvent',
-      function (itemInfo) {
-        self._openMylistFolder(itemInfo, true);
-      }
-    )
-          videoSelection.showMylistgroup(mylistGroupID);
 */
