@@ -16,16 +16,21 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121018
+// @version        1.121021b
 // ==/UserScript==
+
+// * ver 1.121021
+// - プレイリストの開閉(デフォルトは閉)
+// - cssの調整
+
+// * ver 1.121018
+// - 「動画をもっと見る」が時々行方不明になるのを修正
+// - 空っぽになった左になんか表示してみる
 
 // * ver 1.121018
 // - QWatchに対応
 // - コメントパネルを広く
 // （＾ω＾）…
-// * ver 1.121018
-// - 「動画をもっと見る」が時々行方不明になるのを修正
-// - 空っぽになった左になんか表示してみる
 
 
 
@@ -248,10 +253,10 @@
       '}',
       // 少しでも縦スクロールを減らすため、動画情報を近づける。人によっては窮屈に感じるかも
       '#outline {',
-        'margin-top: -72px;',
+        'margin-top: -64px;',
       '}',
       '#outline #feedbackLink{',
-        'margin-top: 72px;',
+        'margin-top: 64px;',
       '}',
       // ヘッダに表示する再生数
       '#videoCounter {',
@@ -284,6 +289,11 @@
         ' background-image: linear-gradient(top, #a5b8da, #7089b3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#a5b8da, endColorstr=#7089b3);',
       '}',
       
+      
+      // ページャーの字が小さくてクリックしにくいよね
+       '#resultPagination {',
+        'padding: 5px; font-weight: bolder; border: 1px dotted silter; font-size: 130%;',
+       '}',
     ''].join('');
     GM_addStyle(style);
   })();
@@ -622,7 +632,7 @@
       // 例えば、とりマイの300番目に登録済みだった場合に「登録済みです」と言われても探すのがダルいし、
       // 他の動画を追加していけば、そのうち押し出されて消えてしまう。
       // なので、重複時にエラーを出すのではなく、「消してから追加」することによって先頭に持ってくる。
-      // 要望掲示板にこっそり書いたりしたけど相手にされないので自分で実装した。
+      // 「重複してたら先頭に持ってきて欲しいな～」って要望掲示板にこっそり書いたりしたけど相手にされないので自分で実装した。
       var data = "item_id=" + watchId + "&token=" + token;
 
       var _add = function(status, resp) {
@@ -1145,15 +1155,22 @@
       setTimeout(function(){$(window).resize();}, 3000);
     }
 
+    var initialExplorerWidth = null;
     function onWindowResize() {
-      function expandSearchResult(px) {
+      function expandSearchResult(target) {
         var elms = ['#searchResult', '#resultContainer', '#searchResultContainer', '#searchResultExplorer', '#searchResultHeader', '#resultlist'];
+        if (!initialExplorerWidth) {
+          initialExplorerWidth = {};
+          for (var v in elms) {
+            initialExplorerWidth[elms[v]] = $(elms[v]).width();
+          }
+        }
+        var px = target - initialExplorerWidth['#searchResultExplorer'];
         for (var v in elms) {
-          var $e = $(elms[v]);
-          $e.width($e.width() + px);
+          $(elms[v]).width(initialExplorerWidth[elms[v]] + px);
         }
       }
-      expandSearchResult($('body').innerWidth() - $('#searchResultExplorer').outerWidth());
+      expandSearchResult($('body').innerWidth());
     }
     
     function watchVideoStatus() {
@@ -1289,8 +1306,6 @@
 
     function onScreenModeChange(sc) {
       $('body').toggleClass('w_notFull', sc.mode != 'browserFull');
-//      console.log('screenmode change', sc.mode, $('html, body').scrollTop());
-
 
       AnchorHoverPopup.hidePopup().updateNow();
       if (conf.hideNewsInFull) { $('body').addClass('hideNewsInFull'); }
@@ -1354,9 +1369,6 @@
         $("#resultPagination").insertBefore($("#resultlist")); // 検索窓のページャーを上に (好み次第)
 //        $("#resultPagination").css({position: 'fixed'});
       }
-      // ページャーの字が小さくてクリックしにくいよね
-      $("#resultPagination").css({padding: '5px'});
-      $("#resultPagination").css({fontWeight: 'bolder', border: '1px dotted silver', fontSize: '130%'});
       
       $("#resultPagination, #searchResultSortOptions, #searchResultNavigation").mousedown(function() {
         AnchorHoverPopup.hidePopup();
