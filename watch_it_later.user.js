@@ -117,6 +117,178 @@
     }
 
 
+
+  (function() {
+    var style = [
+    // 動画タグのポップアップ
+      '.tagItemsPopup {',
+        'position: absolute; ',
+        'min-width: 150px; ',
+        'font-Size: 10pt; ',
+        'background: #eef; ',
+        'z-index: 2000000; ',
+        'box-shadow: 2px 2px 2px #888;',
+      '}\n',
+      '.tagItemsPopup ul,.tagItemsPopup ul li {',
+        'position: relative; ',
+        'list-style-type: none; ',
+        'margin: 0; padding: 0; ', 
+      '}\n',
+      '.tagItemsPopup li a{',
+      '}\n',
+      '.tagItemsPopup .nicodic {',
+        'margin-right: 4px;; ',
+      '}',
+      '.tagItemsPopup .icon{',
+        'width: 17px; ',
+        'height: 15px; ',
+        '',
+      '}\n',
+    // マイリスト登録パネル
+      '.mylistPopupPanel {',
+        'height: 24px; ',
+        'z-index: 10000; ',
+        'border: 1px solid silver;',
+        'border-radius: 3px; ',
+        'padding: 0;',
+        'margin: 0;',
+        'overflow: hidden; ',
+        'display: inline-block; ',
+        'background: #eee; ',
+      '}\n',
+      // マウスホバーで出るほうのマイリスト登録パネル
+      '.mylistPopupPanel.popup {',
+        'position: absolute; ',
+        'z-index: 1000000;',
+        'box-shadow: 2px 2px 2px #888;',
+      '}\n',
+      // マイリスト登録パネルの中の各要素
+      '.mylistPopupPanel .mylistSelect {',
+        'width: 64px; ',
+        'margin: 0;',
+        'padding: 0;',
+        'font-size: 80%; ',
+        'white-space: nowrap; ',
+        'background: #eee; ',
+        'border: 1px solid silver;',
+      '}',
+      '.mylistPopupPanel button {',
+        'margin: 0; ',
+        'font-weight: bolder; ',
+        'cursor: pointer;  ',
+      '}',
+      '.mylistPopupPanel button:active, .playlistToggle:active {',
+        'border:1px inset !important',
+      '}',
+      '.mylistPopupPanel button:hover, .playlistToggle:hover {',
+        'border:1px outset',
+      '}',
+      '.mylistPopupPanel .mylistAdd{',
+        'border:1px solid #d7dada; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f4f5f5;',
+        ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#d9dddd), color-stop(100%, #c6c3c3));',
+        ' background-image: -webkit-linear-gradient(top, #d9dddd, #c6c3c3);',
+        ' background-image: -moz-linear-gradient(top, #d9dddd, #c6c3c3);',
+        ' background-image: -ms-linear-gradient(top, #d9dddd, #c6c3c3);',
+        ' background-image: -o-linear-gradient(top, #d9dddd, #c6c3c3);',
+        ' background-image: linear-gradient(top, #d9dddd, #c6c3c3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#d9dddd, endColorstr=#c6c3c3);',
+
+      '}',
+      '.mylistPopupPanel .deflistRemove{',
+        'border:1px solid #ebb7b7; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f7e3e3;',
+        ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #f7e3e3), color-stop(100%, #ffd7d7));',
+        ' background-image: -webkit-linear-gradient(top, #f7e3e3, #ffd7d7);',
+        ' background-image: -moz-linear-gradient(top, #f7e3e3, #ffd7d7);',
+        ' background-image: -ms-linear-gradient(top, #f7e3e3, #ffd7d7);',
+        ' background-image: -o-linear-gradient(top, #f7e3e3, #ffd7d7);',
+        ' background-image: linear-gradient(top, #f7e3e3, #ffd7d7);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#f7e3e3, endColorstr=#ffd7d7);',
+
+      '}',
+      '.mylistPopupPanel .tagGet{',
+        'border:1px solid #d7dada; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f4f5f5;',
+        ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#d9dddd), color-stop(100%, #c6c3c3));',
+        ' background-image: -webkit-linear-gradient(top, #d9dddd, #c6c3c3);',
+        ' background-image: -moz-linear-gradient(top, #d9dddd, #c6c3c3);',
+        ' background-image: -ms-linear-gradient(top, #d9dddd, #c6c3c3);',
+        ' background-image: -o-linear-gradient(top, #d9dddd, #c6c3c3);',
+        ' background-image: linear-gradient(top, #d9dddd, #c6c3c3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#d9dddd, endColorstr=#c6c3c3);',
+
+      '}',
+      '.mylistPopupPanel .closeButton{',
+        'color: #339; ',
+        'padding: 0;',
+        'margin: 0;',
+        'font-size: 80%;',
+        'text-decoration: none;', 
+      '}',
+      '',
+
+      // 全画面時にタグとプレイリストを表示しない時
+      'body.full_and_mini.full_with_browser #playerContainerSlideArea{',
+        'margin-bottom: 0 !important;',
+      '}',
+      'body.full_and_mini.full_with_browser #playlist{',
+        'z-index: auto;',
+      '}',
+      'body.full_and_mini.full_with_browser .generationMessage{',
+        'display: inline-block;',
+      '}',
+      // 全画面時にタグとプレイリストを表示する時
+      'body.full_with_browser #playlist{',
+        'z-index: 100;',
+      '}',
+      'body.full_with_browser .generationMessage{',
+        'display: none;',
+      '}',
+      'body.full_with_browser .browserFullOption{',
+        'padding-right: 200px;', // マイリストパネルの下に隠れるのでずらす
+      '}',
+      // 全画面時にニュースを隠す時
+      'body.full_with_browser.hideNewsInFull #playerContainerSlideArea{',
+        'margin-bottom: -45px;',
+      '}',
+      // 少しでも縦スクロールを減らすため、動画情報を近づける。人によっては窮屈に感じるかも
+      '#outline {',
+        'margin-top: -72px;',
+      '}',
+      '#outline #feedbackLink{',
+        'margin-top: 72px;',
+      '}',
+      // ヘッダに表示する再生数
+      '#videoCounter {',
+        'color: #ff9; font-size: 70%;',
+      '}',
+      // 左に表示する動画情報
+      '#ichibaPanel.leftVideoInfo {',
+        'background: #bbb; text-Align: left; overflow-Y: auto;', 
+      '}',
+      '#ichibaPanel.leftVideoInfo .userIconContainer{',
+        'background: #ccc; width: 100%;', 
+      '}',
+      
+      
+      // プレイリスト出したり隠したり
+      'body.w_notFull #playlist{',
+        'position: absolute; top: -9999px;', 
+      '}',
+      'body.w_notFull #playlist.w_show{',
+        'position: relative; top: 0;', 
+      '}',
+      '#content .playlistToggle {',
+        'cursor: pointer;position: absolute; bottom: 0;', 
+        'border:1px solid #7d99ca; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 0px 0px 0px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #a5b8da;',
+        ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #a5b8da), color-stop(100%, #7089b3));',
+        ' background-image: -webkit-linear-gradient(top, #a5b8da, #7089b3);',
+        ' background-image: -moz-linear-gradient(top, #a5b8da, #7089b3);',
+        ' background-image: -ms-linear-gradient(top, #a5b8da, #7089b3);',
+        ' background-image: -o-linear-gradient(top, #a5b8da, #7089b3);',
+        ' background-image: linear-gradient(top, #a5b8da, #7089b3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#a5b8da, endColorstr=#7089b3);',
+      '}',
+      
+    ''].join('');
+    GM_addStyle(style);
+  })();
+
+
     conf.save = function() {
      try {
        for (var v in conf) {
@@ -154,8 +326,7 @@
       showConf: function() {
         console.log(conf);
       }
-    }
-
+    };
 
 
   /**
@@ -245,13 +416,7 @@
       
       function createPopupDOM() {
         var popup = document.createElement('div');
-        popup.style.position   = 'absolute';
         popup.className        = 'tagItemsPopup';
-        popup.style.minWidth   = '150px';
-        popup.style.fontSize   = '10pt';
-        popup.style.background = '#ccf';
-        popup.style.border     = '1px solid #99c';
-        popup.style.zIndex     = 2000000;
         popup.addEventListener('click', function(e) {
           popup.style.display = 'none';
         });
@@ -305,12 +470,11 @@
       
       function createDicIconDOM(tag, text) {
         var dic = document.createElement('a');
+        dic.className = 'nicodic';
         dic.href = 'http://dic.nicovideo.jp/a/' + encodeURIComponent(text);
         dic.target = '_blank';
-        dic.style.marginRight = '4px';
         var icon = document.createElement('img');
-        icon.style.width = '17px';
-        icon.style.height = '15px';
+        icon.className = 'icon';
         icon.src = tag.dic ? 'http://res.nimg.jp/img/watch_zero/icon_dic.png' : 'http://res.nimg.jp/img/watch_zero/icon_disable_dic.png';
         dic.appendChild(icon);
         return dic;
@@ -335,7 +499,7 @@
    *  ポップアップウィンドウは評判が悪いし、そのうち廃止されるだろうなと思うので、
    *  真面目にAPIを叩くようにした。 (マイリストの新規作成機能は省略)
    *
-   *  …と思っていたのだが、(9)からZeroになった今でもポップアップウィンドウは廃止されないようだ。
+   *  …と思っていたのだが、(9)からQになった今でもポップアップウィンドウは廃止されないようだ。
    */
   var Mylist = (function(){
     var mylistlist = [];
@@ -522,13 +686,7 @@
       var self = this;
       var _watchId = watchId, _videoId = videoId || watchId;
       var body = document.createElement('div');
-      body.style.height   = '24px';
-      body.style.zIndex   = 10000;
-      body.style.border   = '1px solid silver';
-      body.style.padding  = 0;
-      body.style.margin   = 0;
-      body.style.overflow = 'hidden';
-      body.style.display  = 'inline-block';
+      body.className = 'mylistPopupPanel';
       var nobr = document.createElement('nobr');
       body.appendChild(nobr);
       
@@ -564,11 +722,7 @@
       
       function createSelector() {
         var sel = document.createElement('select');
-        sel.style.width    = '64px';
-        sel.style.margin   = 0;
-        sel.style.padding  = 0;
-        sel.style.fontSize = '90%';
-        sel.style.whiteSpace = 'nowrap';
+        sel.className = 'mylistSelect';
         function appendO(sel, text, value) {
           var opt = document.createElement('option');
           opt.appendChild(document.createTextNode(text));
@@ -590,10 +744,7 @@
       function createSubmitButton(sel) {
         var btn = document.createElement('button');
         btn.appendChild(document.createTextNode('マ'));
-        btn.style.margin  = 0;
-        btn.style.color = 'green';
-        btn.style.fontWeight = 'bolder';
-        btn.style.cursor = 'pointer';
+        btn.className = 'mylistAdd';
         btn.title = 'マイリストに追加';
         btn.addEventListener('click', function() {
           btn.disabled = true;
@@ -626,10 +777,7 @@
       function createDeleteDeflistButton(sel) {
         var btn = document.createElement('button');
         btn.appendChild(document.createTextNode('消'));
-        btn.style.margin  = 0;
-        btn.style.cursor = 'pointer';
-        btn.style.color = 'red';
-        btn.style.display = 'none';
+        btn.className = 'deflistRemove';
         btn.title = 'とりあえずマイリストから削除';
         btn.addEventListener('click', function() {
           btn.disabled = true;
@@ -650,9 +798,7 @@
       function createTagListButton() {
         var btn = document.createElement('button');
         btn.appendChild(document.createTextNode('tag'));
-        btn.style.margin  = 0;
-        btn.style.cursor = 'pointer';
-        btn.style.color = 'blue';
+        btn.className = 'tagGet';
         btn.title = 'タグ取得';
         btn.addEventListener('click', function(e) {
           btn.disabled = true;
@@ -669,11 +815,8 @@
       
       function createCloseButton() {
         var btn = document.createElement('a');
-        btn.style.color = 'red';
-        btn.style.padding = 0;
-        btn.style.margin = 0;
+        btn.className = 'closeButton';
         btn.href = 'javascript:;';
-        btn.style.fontSize = '80%';
         btn.innerHTML = '[x]';
         btn.addEventListener('click', function(e) {
           body.hide();
@@ -688,11 +831,11 @@
       var submit = createSubmitButton(sel);
       nobr.appendChild(submit);
 
-      var deleteDef = createDeleteDeflistButton();
-      nobr.appendChild(deleteDef);
-
       var tagBtn = createTagListButton();
       nobr.appendChild(tagBtn);
+
+      var deleteDef = createDeleteDeflistButton();
+      nobr.appendChild(deleteDef);
 
       var closeBtn = createCloseButton();
       nobr.appendChild(closeBtn);
@@ -784,10 +927,8 @@
    */
   var AnchorHoverPopup = (function() {
     var mylistPanel = Mylist.getPanel('');
-    mylistPanel.style.position   = 'absolute';
-    mylistPanel.style.zIndex     = 1000000;
+    mylistPanel.className = 'mylistPopupPanel popup';
     mylistPanel.style.display    = 'none';
-    mylistPanel.style.background = '#ccc';
     document.body.appendChild(mylistPanel);
 
     function showPanel(watchId, baseX, baseY) {
@@ -827,7 +968,9 @@
           e.mouse_timer = setTimeout(function() {
             if (!e.mouse_in) return;
             if (w.jQuery) {
-              var o = w.jQuery(e).offset();
+              var $e = w.jQuery(e);
+              var t = $e.text();
+              var o = t != "" ? $e.offset() : $e.find('*').offset();
               showPanel(watchId, o.left, o.top);
             } else {
               showPanel(watchId, mx + 8, my + 8);
@@ -1003,7 +1146,6 @@
     }
 
     function onWindowResize() {
-//      $('#searchResult').css({height: '400px', overflowY: 'auto'});
       function expandSearchResult(px) {
         var elms = ['#searchResult', '#resultContainer', '#searchResultContainer', '#searchResultExplorer', '#searchResultHeader', '#resultlist'];
         for (var v in elms) {
@@ -1048,14 +1190,13 @@
       if (vc.length < 1) {
         var li = $('<li></li>')[0];
         li.id = 'videoCounter';
-        $(li).css({color: '#ff9', fontSize: '70%' });
         $('#siteHeaderLeftMenu').after(li);
         vc = $('li.#videoCounter');
       }
       var h = [
         'v:', watchInfoModel.viewCount,
-        ' m:', watchInfoModel.mylistCount,
         ' c:', watchInfoModel.commentCount,
+        ' m:', watchInfoModel.mylistCount
       ].join('');
       vc.html(h);
     }
@@ -1069,6 +1210,7 @@
       var newVideoId = watch.CommonModelInitializer.watchInfoModel.id;
       var newWatchId = watch.CommonModelInitializer.watchInfoModel.v;
       iframe.watchId(newVideoId, newWatchId);
+      iframe.show();
 
       setVideoCounter(watch.CommonModelInitializer.watchInfoModel);
 
@@ -1081,17 +1223,18 @@
 
     // - 空っぽになった左になんか表示してみる
     var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
-    var $leftPanel = $('#ichibaPanel'), h = $leftPanel.innerHeight() - 100;
+    var $leftPanel = $('#ichibaPanel').addClass('leftVideoInfo'), h = $leftPanel.innerHeight() - 100;
       panelSVC.innerLeftElements = [$('#ichibaPanel')];  
       panelSVC.refresh();
-      $leftPanel.css({background: '#bbb', textAlign: 'left', 'overflowY': 'auto'}).empty()
-        .append($('#videoThumbnailImage').clone().css({margin: 'auto'}))
+      $leftPanel.empty()
+        .append($('#videoThumbnailImage').clone(true).css({margin: 'auto'}))
         .append(
-          $('.videoDescription').clone(true) //.css({height: h + 'px', overflowY: 'auto'})
-            .append($('#userProfile .userIconContainer').clone(true).css({background: '#ccc', width: '100%'})
+          $('.videoDescription').clone(true)
+            .append($('#userProfile .userIconContainer').clone(true)
             .append('<span>' + $('#videoInfo .userName').text() + '</span>'))
         );
-      }
+      resetSearchExplorerPos();
+    }
 
     function onVideoStopped() {
       console.log("video stopped");
@@ -1122,15 +1265,18 @@
     function onVideoSelectPanelClosed() {
       isSearchOpen = false;
       AnchorHoverPopup.hidePopup().updateNow();
-      setTimeout(function() {
+//      setTimeout(function() {
         $('#searchResultExplorer').css({zIndex: 1});
         $('#content').css({zIndex: 2});
-        resetOpenSearchResultExplorerPos();
-        //scrollToVideoPlayer();
-      }, 1500);
+        resetSearchExplorerPos();
+//      }, 500);
+      //scrollToVideoPlayer();
     }
     
-    function resetOpenSearchResultExplorerPos() {
+    function resetSearchExplorerPos() {
+      $('#searchResultExplorer').css({
+        top: ($('#nicoplayerContainerInner').offset().top + $('#nicoplayerContainerInner').outerHeight()) + 'px'
+      });
       if (isSearchOpen) return;
 
       $('#openSearchResultExplorer').css({marginTop: '0px'});
@@ -1142,7 +1288,12 @@
     }
 
     function onScreenModeChange(sc) {
+      $('body').toggleClass('w_notFull', sc.mode != 'browserFull');
+//      console.log('screenmode change', sc.mode, $('html, body').scrollTop());
+
+
       AnchorHoverPopup.hidePopup().updateNow();
+      if (conf.hideNewsInFull) { $('body').addClass('hideNewsInFull'); }
       setTimeout(function() {
         $('#content').css({zIndex: 2});
         //$('#searchResultExplorer').css({top: $('#textMarquee').offset().top + 'px'});
@@ -1159,31 +1310,20 @@
         if (conf.autoClosePlaylistInFull && 
           $('#content .browserFullPlaylistClose').is(':visible')) {
           $('#content .browserFullPlaylistClose').click();
-          $('#content .browserFullOption').css({paddingRight: '200px'});
         }
 
         if (sc.mode == 'browserFull') {
-          if (conf.hideNewsInFull && $('#textMarquee').is(':visible')) {
-            $('#playerContainerSlideArea').css({marginBottom: '-45px'});
-//            $('#textMarquee').css({display: 'none'});
-            $('#playlist').css('zIndex', 100);
-            $('.generationMessage').hide();
-          }
         } else {
-            $('#playerContainerSlideArea').css({marginBottom: ''});
-            $('#textMarquee').css({display: ''});
-            $('#playlist').css('zIndex', 'auto');
-            $('.generationMessage').show();
-            resetOpenSearchResultExplorerPos();
-
+            resetSearchExplorerPos();
         }
       }, 500);
     }
 
     function initIframe() {
       iframe.id = "mylyst_add_frame";
-      $(iframe).css({position: 'fixed', right: 0, bottom: 0});
+      $(iframe).css({position: 'fixed', right: 0, bottom: 0}).find('.closeButton').hide();
       w.document.body.appendChild(iframe);
+      iframe.hide(); // ページの初期化が終わるまでは表示しない
     }
     
     function initSidePanel() {
@@ -1198,7 +1338,7 @@
           var $e = $(elms[v]);
           $e.width($e.width() + px);
         }
-        $('#playerCommentPanelOuter').css({'right': - $('#playerCommentPanelOuter').outerWidth() - 'px'});
+        $('#playerCommentPanelOuter').css({'right': - $('#playerCommentPanelOuter').outerWidth() + 'px'});
       }
       if (conf.wideCommentPanel) {
 //      完全に横スクロール不要にしたい場合はこっち
@@ -1237,6 +1377,10 @@
       vs.addEventListener("videoSelectPanelClosedEvent", onVideoSelectPanelClosed);
       vs.panelOPC.addEventListener("videoSelectPanelOpenedEvent", onVideoSelectPanelOpened);
 
+      // メモ
+      // とりあえずマイリストのオープン
+      //watch.ComponentInitializer.videoSelection.contentsAreaVC.addEventListener('deflistFolderClickedEvent', function(){ })
+
       $('body').dblclick(function(){
         scrollToVideoPlayer();
       });
@@ -1255,8 +1399,16 @@
         $('#siteHeaderInner').width() + 200
       );
 
-      resetOpenSearchResultExplorerPos();
+      resetSearchExplorerPos();
 
+      var btn = $('<button alt="プレイリスト表示/非表示">playlist</button>');
+      btn.addClass('playlistToggle');
+      $('#playerContainerWrapper').append(btn);
+      btn.click(function() {
+        $('#playlist').toggleClass('w_show');
+        AnchorHoverPopup.hidePopup();
+        resetSearchExplorerPos();
+      })
     }
     
 
