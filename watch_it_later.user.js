@@ -379,8 +379,8 @@
       w.WatchApp.ns.init.ComponentInitializer.videoSelection.searchVideo(word, search_type);
       AnchorHoverPopup.hidePopup();
       setTimeout(function() {
-        w.WatchApp.ns.util.WindowUtil.scrollFitMinimum('#searchResultExplorer', 300);
-        $('.searchText input').focus();
+        //w.WatchApp.ns.util.WindowUtil.scrollFitMinimum('#searchResultExplorer', 300);
+        $('#searchResultExplorer .searchText input').focus();
       }, 500);
     }
 
