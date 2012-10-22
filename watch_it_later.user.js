@@ -16,12 +16,13 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121023
+// @version        1.121023b
 // ==/UserScript==
 
 // * ver 1.121023
 // - QWatch上でのみ、新しいウィンドウで開くためのリンク追加
 // - プレイリストの吹き出しとポップアップが被らないよう調整
+// - 少しでも縦スクロールを減らすため、動画検索部分の余白を詰めた。横1366あれば二段に納まるかも
 
 
 // * ver 1.121021
@@ -310,6 +311,10 @@
        
       '#playlistContainer #playlistContainerInner .playlistItem .balloon {\n',
         'bottom: auto; top: -2px; padding: auto;\n',
+      '}\n',
+      
+      '#searchResultExplorer ul#resultlist li {',
+        'margin: 0 4px 0;',
       '}\n',
     ''].join('');
     GM_addStyle(style);
