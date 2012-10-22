@@ -16,8 +16,13 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121021b
+// @version        1.121023
 // ==/UserScript==
+
+// * ver 1.121023
+// - QWatch上でのみ、新しいウィンドウで開くためのリンク追加
+// - プレイリストの吹き出しとポップアップが被らないよう調整
+
 
 // * ver 1.121021
 // - プレイリストの開閉(デフォルトは閉)
@@ -176,19 +181,19 @@
         'white-space: nowrap; ',
         'background: #eee; ',
         'border: 1px solid silver;',
-      '}',
+      '}\n',
       '.mylistPopupPanel button {',
         'margin: 0; ',
         'font-weight: bolder; ',
         'cursor: pointer;  ',
-      '}',
+      '}\n',
       '.mylistPopupPanel button:active, .playlistToggle:active {',
         'border:1px inset !important',
-      '}',
+      '}\n',
       '.mylistPopupPanel button:hover, .playlistToggle:hover {',
         'border:1px outset',
-      '}',
-      '.mylistPopupPanel .mylistAdd{',
+      '}\n',
+      '.mylistPopupPanel .mylistAdd {',
         'border:1px solid #d7dada; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f4f5f5;',
         ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#d9dddd), color-stop(100%, #c6c3c3));',
         ' background-image: -webkit-linear-gradient(top, #d9dddd, #c6c3c3);',
@@ -197,7 +202,7 @@
         ' background-image: -o-linear-gradient(top, #d9dddd, #c6c3c3);',
         ' background-image: linear-gradient(top, #d9dddd, #c6c3c3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#d9dddd, endColorstr=#c6c3c3);',
 
-      '}',
+      '}\n',
       '.mylistPopupPanel .deflistRemove{',
         'border:1px solid #ebb7b7; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f7e3e3;',
         ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #f7e3e3), color-stop(100%, #ffd7d7));',
@@ -207,7 +212,7 @@
         ' background-image: -o-linear-gradient(top, #f7e3e3, #ffd7d7);',
         ' background-image: linear-gradient(top, #f7e3e3, #ffd7d7);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#f7e3e3, endColorstr=#ffd7d7);',
 
-      '}',
+      '}\n',
       '.mylistPopupPanel .tagGet{',
         'border:1px solid #d7dada; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f4f5f5;',
         ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#d9dddd), color-stop(100%, #c6c3c3));',
@@ -217,67 +222,75 @@
         ' background-image: -o-linear-gradient(top, #d9dddd, #c6c3c3);',
         ' background-image: linear-gradient(top, #d9dddd, #c6c3c3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#d9dddd, endColorstr=#c6c3c3);',
 
-      '}',
+      '}\n',
       '.mylistPopupPanel .closeButton{',
         'color: #339; ',
         'padding: 0;',
         'margin: 0;',
         'font-size: 80%;',
         'text-decoration: none;', 
-      '}',
+      '}\n',
+      '.mylistPopupPanel .newTabLink{',
+        'padding: 0 2px; text-decoration: underline; text-shadow: -1px -1px 0px #442B2B;', 
+      '}\n',
+      '.mylistPopupPanel.fixed .newTabLink, .mylistPopupPanel.fixed .closeButton {',
+        'display: none;',
+      '}\n',
       '',
+      
+      
 
       // 全画面時にタグとプレイリストを表示しない時
       'body.full_and_mini.full_with_browser #playerContainerSlideArea{',
         'margin-bottom: 0 !important;',
-      '}',
+      '}\n',
       'body.full_and_mini.full_with_browser #playlist{',
         'z-index: auto;',
-      '}',
+      '}\n',
       'body.full_and_mini.full_with_browser .generationMessage{',
         'display: inline-block;',
-      '}',
+      '}\n',
       // 全画面時にタグとプレイリストを表示する時
       'body.full_with_browser #playlist{',
         'z-index: 100;',
-      '}',
+      '}\n',
       'body.full_with_browser .generationMessage{',
         'display: none;',
-      '}',
+      '}\n',
       'body.full_with_browser .browserFullOption{',
         'padding-right: 200px;', // マイリストパネルの下に隠れるのでずらす
-      '}',
+      '}\n',
       // 全画面時にニュースを隠す時
       'body.full_with_browser.hideNewsInFull #playerContainerSlideArea{',
         'margin-bottom: -45px;',
-      '}',
+      '}\n',
       // 少しでも縦スクロールを減らすため、動画情報を近づける。人によっては窮屈に感じるかも
       '#outline {',
         'margin-top: -64px;',
-      '}',
+      '}\n',
       '#outline #feedbackLink{',
         'margin-top: 64px;',
-      '}',
+      '}\n',
       // ヘッダに表示する再生数
       '#videoCounter {',
         'color: #ff9; font-size: 70%;',
-      '}',
+      '}\n',
       // 左に表示する動画情報
       '#ichibaPanel.leftVideoInfo {',
         'background: #bbb; text-Align: left; overflow-Y: auto;', 
-      '}',
+      '}\n',
       '#ichibaPanel.leftVideoInfo .userIconContainer{',
         'background: #ccc; width: 100%;', 
-      '}',
+      '}\n',
       
       
       // プレイリスト出したり隠したり
       'body.w_notFull #playlist{',
         'position: absolute; top: -9999px;', 
-      '}',
+      '}\n',
       'body.w_notFull #playlist.w_show{',
         'position: relative; top: 0;', 
-      '}',
+      '}\n',
       '#content .playlistToggle {',
         'cursor: pointer;position: absolute; bottom: 0;', 
         'border:1px solid #7d99ca; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 0px 0px 0px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #a5b8da;',
@@ -287,13 +300,17 @@
         ' background-image: -ms-linear-gradient(top, #a5b8da, #7089b3);',
         ' background-image: -o-linear-gradient(top, #a5b8da, #7089b3);',
         ' background-image: linear-gradient(top, #a5b8da, #7089b3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#a5b8da, endColorstr=#7089b3);',
-      '}',
+      '}\n',
       
       
       // ページャーの字が小さくてクリックしにくいよね
-       '#resultPagination {',
+      '#resultPagination {',
         'padding: 5px; font-weight: bolder; border: 1px dotted silter; font-size: 130%;',
-       '}',
+      '}\n',
+       
+      '#playlistContainer #playlistContainerInner .playlistItem .balloon {\n',
+        'bottom: auto; top: -2px; padding: auto;\n',
+      '}\n',
     ''].join('');
     GM_addStyle(style);
   })();
@@ -712,6 +729,9 @@
           } else {
             deleteDef.style.display = 'none';
           }
+          if (newTabLink) {
+            newTabLink.href = 'http://nico.ms/' + _watchId; // QWatchに乗っ取られないようにnico.msをかます(せこい)
+          }
           return body;
         }
         return _watchId;
@@ -833,6 +853,20 @@
         }, false);
         return btn;
       }
+      
+      function createNewTabLink() {
+        var a = document.createElement('a');
+        a.className = 'newTabLink';
+        a.target = '_blank';
+        a.title = 'この動画を新しいウィンドウで開く';
+        a.innerHTML = '▲';
+        return a;
+      }
+
+      var newTabLink = createNewTabLink();
+      if (w.WatchApp) {
+        nobr.appendChild(newTabLink);
+      }
 
       
       var sel = createSelector(mylistlist);
@@ -846,10 +880,12 @@
 
       var deleteDef = createDeleteDeflistButton();
       nobr.appendChild(deleteDef);
+      
 
       var closeBtn = createCloseButton();
       nobr.appendChild(closeBtn);
-      
+
+
       nobr.appendChild(extArea);
 
       body.watchId(_watchId, _videoId);
@@ -1336,7 +1372,8 @@
 
     function initIframe() {
       iframe.id = "mylyst_add_frame";
-      $(iframe).css({position: 'fixed', right: 0, bottom: 0}).find('.closeButton').hide();
+      iframe.className += " fixed";
+      $(iframe).css({position: 'fixed', right: 0, bottom: 0});
       w.document.body.appendChild(iframe);
       iframe.hide(); // ページの初期化が終わるまでは表示しない
     }
