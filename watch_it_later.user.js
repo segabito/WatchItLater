@@ -16,8 +16,13 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121023b
+// @version        1.121024
 // ==/UserScript==
+
+// * ver 1.121024
+// - 左パネルに投稿日付も欲しくなったので追加
+// - 誤操作を減らすため、とりマイだけ色を変えた
+// - http://www.nicovideo.jp/mylist/xxxxx の動画をマイリスト出来なかったのを修正
 
 // * ver 1.121023
 // - QWatch上でのみ、新しいウィンドウで開くためのリンク追加
@@ -40,8 +45,12 @@
 
 
 
-// TODO: GM_addStyleを活用
-
+// TODO: 
+// - QWatch上からお気に入りタグ取得・お気に入りマイリストを検索・登録
+// - ランキング取得
+// - 市場を色々なんとかする
+// - 検索部分を開閉するショートカットキーが欲くなった
+// - 段幕がちょっとだけ邪魔な時「CTRLを押してる間だけコメントが消える」とかやりたい
 
 (function() {
   var isNativeGM = true;
@@ -183,6 +192,12 @@
         'background: #eee; ',
         'border: 1px solid silver;',
       '}\n',
+      // 誤操作を減らすため、とりマイの時だけスタイルを変える用
+      '.mylistPopupPanel.deflistSelected button {',
+      '}\n',
+      '.mylistPopupPanel.mylistSelected  button {',
+        'color: #ccf; ',
+      '}\n',
       '.mylistPopupPanel button {',
         'margin: 0; ',
         'font-weight: bolder; ',
@@ -204,6 +219,9 @@
         ' background-image: linear-gradient(top, #d9dddd, #c6c3c3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#d9dddd, endColorstr=#c6c3c3);',
 
       '}\n',
+      '.mylistPopupPanel.deflistSelected {',
+        'color: #ff9;',
+      '}\n',
       '.mylistPopupPanel .deflistRemove{',
         'border:1px solid #ebb7b7; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f7e3e3;',
         ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #f7e3e3), color-stop(100%, #ffd7d7));',
@@ -213,6 +231,9 @@
         ' background-image: -o-linear-gradient(top, #f7e3e3, #ffd7d7);',
         ' background-image: linear-gradient(top, #f7e3e3, #ffd7d7);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#f7e3e3, endColorstr=#ffd7d7);',
 
+      '}\n',
+      '.mylistPopupPanel.mylistSelected .deflistRemove {',
+        'display: none; ',
       '}\n',
       '.mylistPopupPanel .tagGet{',
         'border:1px solid #d7dada; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f4f5f5;',
@@ -271,6 +292,9 @@
       '}\n',
       '#outline #feedbackLink{',
         'margin-top: 64px;',
+      '}\n',
+      '#outline .videoEditMenuExpand{', // 「動画情報・コメントの編集▲」
+        'position: absolute;right: 0;top: 26px; z-index: 1;',
       '}\n',
       // ヘッダに表示する再生数
       '#videoCounter {',
@@ -547,6 +571,7 @@
     function getToken() {
       if (!isNativeGM && host != location.host) return; // 
       var _token = (w.NicoAPI) ? w.NicoAPI.token : (w.WatchApp ? w.WatchApp.ns.init.CommonModelInitializer.watchInfoModel.csrfToken : '');
+      if (_token === null && w.FavMylist && w.FavMylist.csrf_token) _token = w.FavMylist.csrf_token;
       if (_token != '') {
         return _token;
       }
@@ -718,7 +743,7 @@
       var self = this;
       var _watchId = watchId, _videoId = videoId || watchId;
       var body = document.createElement('div');
-      body.className = 'mylistPopupPanel';
+      body.className = 'mylistPopupPanel deflistSelected';
       var nobr = document.createElement('nobr');
       body.appendChild(nobr);
       
@@ -773,6 +798,14 @@
             appendO(sel, mylist.name, mylist.id);
           }
         }, initialized ? 0 : 3000);
+        sel.addEventListener('change', function() {
+          // jQueryは全てのページにあるわけではないので気をつける
+          if (sel.selectedIndex == 0) {
+            body.className = body.className.replace('mylistSelected', 'deflistSelected');
+          } else {
+            body.className = body.className.replace('deflistSelected', 'mylistSelected');
+          }
+        });
         return sel;
       }
       
@@ -978,7 +1011,7 @@
    */
   var AnchorHoverPopup = (function() {
     var mylistPanel = Mylist.getPanel('');
-    mylistPanel.className = 'mylistPopupPanel popup';
+    mylistPanel.className += ' popup';
     mylistPanel.style.display    = 'none';
     document.body.appendChild(mylistPanel);
 
@@ -1231,13 +1264,9 @@
     }
 
     function scrollToVideoPlayer() {
-      var head = (isFixedHeader ? $("#siteHeader").outerHeight() : 0);
-      if ($(window).height() >= 700 ) {
-        head = $("#videoTagContainer").offset().top - head;
-      } else {
-        head = $("#playerContainer").offset().top - head;
-      }
-      $("html, body").animate({scrollTop: head}, 600);
+      // 縦解像度がタグ+プレイヤーより大きいならタグの開始位置、そうでないならプレイヤーの位置
+      var h = $('#playerContainer').outerHeight() + $('#videoTagContainer').outerHeight();
+      w.WatchApp.ns.util.WindowUtil.scrollFitMinimum($(window).height() >= h ? '#videoTagContainer' : '#playerContainer', 600)
     }
 
     function onVideoChange(newVideoId, newWatchId) {
@@ -1285,6 +1314,7 @@
       panelSVC.innerLeftElements = [$('#ichibaPanel')];  
       panelSVC.refresh();
       $leftPanel.empty()
+        .append($('#videoInfoHead .videoPostedAt').clone())
         .append($('#videoThumbnailImage').clone(true).css({margin: 'auto'}))
         .append(
           $('.videoDescription').clone(true)
@@ -1484,7 +1514,7 @@
         $('#searchResultExplorer').css({zIndex: 1});
       }, 3000);
 
-      $('#videoMenuTopList').append('<li style="position:absolute;top:50px;left:-80px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;">（＾ω＾）</a><a href="/watch/sm18845030" style="color: black;" class="itemEcoLink">…</a></li>'); // （＾ω＾） …
+      $('#videoMenuTopList').append('<li style="position:absolute;top:50px;left:-80px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;">（＾ω＾）</a><a href="http://nico.ms/sm18845030" style="color: black;" class="itemEcoLink">…</a></li>'); // （＾ω＾） …
       
     } catch(e) {
       w.alert(e);
