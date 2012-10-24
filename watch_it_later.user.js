@@ -16,7 +16,7 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121024
+// @version        1.121024b
 // ==/UserScript==
 
 // * ver 1.121024
@@ -754,6 +754,7 @@
           _watchId = w;
           _videoId = v || w;
           this.clearExtElement();
+          deleteDef.disabled = false;
           if (self.findDefListByWatchId(w)) {
             deleteDef.style.display = '';
           } else {
