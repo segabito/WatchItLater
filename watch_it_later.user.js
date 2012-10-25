@@ -16,8 +16,13 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121024b
+// @version        1.121026
 // ==/UserScript==
+
+// * ver 1.121026
+// - 設定パネルと検索画面が被るのを修正
+// - 左パネルに「この投稿者の関連動画を見る」とチャンネルアイコンを追加
+
 
 // * ver 1.121024
 // - 左パネルに投稿日付も欲しくなったので追加
@@ -339,6 +344,13 @@
       
       '#searchResultExplorer ul#resultlist li {',
         'margin: 0 4px 0;',
+      '}\n',
+      
+      'body.w_setting #searchResultExplorer {', // 設定パネルと検索ウィンドウが被るのを防止
+        'top: auto !important;',
+      '}\n',
+      'body.w_channel #ichibaPanel .userIconContainer{',
+        'display: none;',
       '}\n',
     ''].join('');
     GM_addStyle(style);
@@ -850,10 +862,10 @@
         btn.title = 'とりあえずマイリストから削除';
         btn.addEventListener('click', function() {
           btn.disabled = true;
+          setTimeout(function() {btn.disabled = false;}, 1000);
           self.deleteDefList(_watchId, function(status, result) {
             self.reloadDefList();
             btn.style.display = 'none';
-            setTimeout(function() {btn.disabled = false;}, 1000);
             if (status != "ok") {
               Popup.alert('とりあえずマイリストから削除に失敗: ' + result.error.description);
             } else {
@@ -1265,9 +1277,10 @@
     }
 
     function scrollToVideoPlayer() {
-      // 縦解像度がタグ+プレイヤーより大きいならタグの開始位置、そうでないならプレイヤーの位置
+      // 縦解像度がタグ+プレイヤーより大きいならタグの開始位置、そうでないならプレイヤーの位置にスクロール
+      // ただし、該当部分が画面内に納まっている場合は、勝手にスクロールすると帰ってうざいのでなにもしない
       var h = $('#playerContainer').outerHeight() + $('#videoTagContainer').outerHeight();
-      w.WatchApp.ns.util.WindowUtil.scrollFitMinimum($(window).height() >= h ? '#videoTagContainer' : '#playerContainer', 600)
+      w.WatchApp.ns.util.WindowUtil.scrollFitMinimum($(window).height() >= h ? '#videoTagContainer, #playerContainer' : '#playerContainer', 600)
     }
 
     function onVideoChange(newVideoId, newWatchId) {
@@ -1299,7 +1312,7 @@
       var newWatchId = watch.CommonModelInitializer.watchInfoModel.v;
       iframe.watchId(newVideoId, newWatchId);
       iframe.show();
-
+      $('body').toggleClass('w_channel', watch.CommonModelInitializer.watchInfoModel.isChannelVideo());
       setVideoCounter(watch.CommonModelInitializer.watchInfoModel);
 
       scrollToVideoPlayer();
@@ -1315,14 +1328,31 @@
       panelSVC.innerLeftElements = [$('#ichibaPanel')];  
       panelSVC.refresh();
       $leftPanel.empty()
-        .append($('#videoInfoHead .videoPostedAt').clone())
-        .append($('#videoThumbnailImage').clone(true).css({margin: 'auto'}))
+//        .append($('#videoInfoHead .videoPostedAt').clone().css({fontSize: '90%'}))
+        .append($('<div>'+$('#videoInfoHead .videoPostedAt').text()+'</div>').css({textAlign: 'center'})
+                .append($('#videoThumbnailImage').clone(true))
+        )
         .append(
           $('.videoDescription').clone(true)
             .append($('#userProfile .userIconContainer').clone(true)
-            .append('<span>' + $('#videoInfo .userName').text() + '</span>'))
-        );
+              .append($('<span>' + $('#videoInfo .userName').text() + '</span><br>'))
+              .append($('#userProfile .showOtherVideos').clone(true).text('関連動画'))
+            )
+            .append($('#ch_prof').clone(true))
+
+            
+        ).css({fontSize: '90%'});
       resetSearchExplorerPos();
+      resetHidariue();
+    }
+    var hidariue = null;
+    function resetHidariue() {
+      if (!hidariue) {
+        $('#videoMenuTopList').append('<li style="position:absolute;top:22px;left:20px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;"><img id="hidariue"></a><a href="http://nico.ms/sm18845030" class="itemEcoLink">…</a></li>');
+        hidariue = $('#hidariue')[0];
+      }
+      hidariue.src = 'http://res.nimg.jp/img/base/head/icon/nico/' + 
+              (1000 + Math.floor(Math.random() * 1000)).toString().substr(1) + '.gif';
     }
 
     function onVideoStopped() {
@@ -1378,12 +1408,16 @@
 
     function onScreenModeChange(sc) {
       $('body').toggleClass('w_notFull', sc.mode != 'browserFull');
-
+      $('body').toggleClass('w_small',   sc.mode == 'small');
       AnchorHoverPopup.hidePopup().updateNow();
       if (conf.hideNewsInFull) { $('body').addClass('hideNewsInFull'); }
       setTimeout(function() {
         $('#content').css({zIndex: 2});
         //$('#searchResultExplorer').css({top: $('#textMarquee').offset().top + 'px'});
+        resetSearchExplorerPos();
+        $('body').toggleClass('w_setting',   $('#playerSettingPanel').is(':visible'));
+
+/*
         $('#searchResultExplorer').css({
           top: ($('#nicoplayerContainerInner').offset().top + $('#nicoplayerContainerInner').outerHeight()) + 'px'
         });
@@ -1392,7 +1426,7 @@
           var m = $('#content').offset().top + $('#content').outerHeight() - $('#openSearchResultExplorer').offset().top;
           $('#openSearchResultExplorer').css({marginTop: m + 'px'});
         }
-
+*/
         // フル画面時プレイリストを閉じる
         if (conf.autoClosePlaylistInFull && 
           $('#content .browserFullPlaylistClose').is(':visible')) {
@@ -1515,7 +1549,7 @@
         $('#searchResultExplorer').css({zIndex: 1});
       }, 3000);
 
-      $('#videoMenuTopList').append('<li style="position:absolute;top:50px;left:-80px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;">（＾ω＾）</a><a href="http://nico.ms/sm18845030" style="color: black;" class="itemEcoLink">…</a></li>'); // （＾ω＾） …
+//      $('#videoMenuTopList').append('<li style="position:absolute;top:50px;left:-80px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;">（＾ω＾）</a><a href="http://nico.ms/sm18845030" style="color: black;" class="itemEcoLink">…</a></li>'); // （＾ω＾） …
       
     } catch(e) {
       w.alert(e);
