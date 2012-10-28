@@ -16,8 +16,13 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121026
+// @version        1.121027
 // ==/UserScript==
+
+// * ver 1.121027
+// - 検索ワード入力欄で上下キーを押すと、タグ検索/キーワード検索を切り替える
+// - てれびちゃんメニューを押すとランダム画像(原宿の左上にあるアレ)が出現
+
 
 // * ver 1.121026
 // - 設定パネルと検索画面が被るのを修正
@@ -1348,7 +1353,7 @@
     var hidariue = null;
     function resetHidariue() {
       if (!hidariue) {
-        $('#videoMenuTopList').append('<li style="position:absolute;top:22px;left:20px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;"><img id="hidariue"></a><a href="http://nico.ms/sm18845030" class="itemEcoLink">…</a></li>');
+        $('#videoMenuTopList').append('<li style="position:absolute;top:22px;left:0px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;"><img id="hidariue"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:Q"></a></p><a href="http://nico.ms/sm18845030" class="itemEcoLink">…</a></li>');
         hidariue = $('#hidariue')[0];
       }
       hidariue.src = 'http://res.nimg.jp/img/base/head/icon/nico/' + 
@@ -1507,6 +1512,16 @@
 
     }
     
+    
+    function toggleSearchType() {
+      if ($('.searchText a').hasClass('searchKeywordIcon')) {
+        $('.searchTag a').click();
+      } else {
+        $('.searchKeyword a').click();
+      }
+      $('.searchOption').hide();
+    }
+    
     function initOther() {
       //$('#videoInformation').css({position: 'relative', top: '-85px'});
 
@@ -1528,6 +1543,13 @@
         AnchorHoverPopup.hidePopup();
         resetSearchExplorerPos();
       })
+
+      $('.searchText input').keydown(function(e){
+        if (e.which == 38 || e.which == 40) { 
+          toggleSearchType();
+        }
+      });
+
     }
     
 
