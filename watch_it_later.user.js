@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name           WatchItLater
-// @namespace      niconico
+// @namespace      https://github.com/segabito/
 // @description    動画を見る前にマイリストに登録したいGreasemonkey (Chrome/Fx用)
 // @include        http://www.nicovideo.jp/*
 // @include        http://ext.nicovideo.jp/thumb/*
@@ -16,8 +16,11 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121027
+// @version        1.121029
 // ==/UserScript==
+
+// * ver 1.121029
+// - ニコニコ市場へのクイックアクセスボタン
 
 // * ver 1.121027
 // - 検索ワード入力欄で上下キーを押すと、タグ検索/キーワード検索を切り替える
@@ -213,10 +216,10 @@
         'font-weight: bolder; ',
         'cursor: pointer;  ',
       '}\n',
-      '.mylistPopupPanel button:active, .playlistToggle:active {',
+      '.mylistPopupPanel button:active, #content .playlistToggle:active, #content .quickIchiba:active {',
         'border:1px inset !important',
       '}\n',
-      '.mylistPopupPanel button:hover, .playlistToggle:hover {',
+      '.mylistPopupPanel button:hover, #content .playlistToggle:hover, #content .quickIchiba:hover {',
         'border:1px outset',
       '}\n',
       '.mylistPopupPanel .mylistAdd {',
@@ -319,6 +322,9 @@
       '}\n',
       
       
+      '#content .bottomAccessContainer {',
+        'position: absolute; bottom: 0;',
+      '}\n',
       // プレイリスト出したり隠したり
       'body.w_notFull #playlist{',
         'position: absolute; top: -9999px;', 
@@ -326,8 +332,8 @@
       'body.w_notFull #playlist.w_show{',
         'position: relative; top: 0;', 
       '}\n',
-      '#content .playlistToggle {',
-        'cursor: pointer;position: absolute; bottom: 0;', 
+      '#content .playlistToggle, #content .quickIchiba {',
+        'cursor: pointer;',
         'border:1px solid #7d99ca; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 0px 0px 0px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #a5b8da;',
         ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #a5b8da), color-stop(100%, #7089b3));',
         ' background-image: -webkit-linear-gradient(top, #a5b8da, #7089b3);',
@@ -994,6 +1000,41 @@
     return new Mylist();
   })();
 
+  var FavMylist = (function() {
+    var favMylistList = [];
+    var host = location.host.replace(/^([\w\d]+)\./, 'www.');
+    var $ = w.$;
+    function FavMylist() {
+    }
+    var pt = FavMylist.prototype;
+    pt.loadFavList = loadFavList;
+
+    /**
+     *  お気に入りマイリストの取得。 jQueryのあるページでしか使えない
+     *  マイページを無理矢理パースしてるので突然使えなくなるかも
+     */ 
+    function loadFavList(callback) {
+      if (!w.jQuery) return; // 
+      var url = 'http://' + host + '/my/fav/mylist';
+      GM_xmlhttpRequest({
+        url: url,
+        onload: function(resp) {
+          // 
+          var $result = $(resp.responseText).find('#favMylist');
+          w.$result = $result;
+          if ($result.length < 1) return;
+          $result.find('.outer').each(function() {
+            var $a = $(this).find('h5 a'), $desc = $(this).find('.mylistDescription');
+            favMylistList.push({href: $a.attr('href'), name: $a.text(), description: $desc.text()});
+          });
+          if (typeof callback === 'function') { callback(favMylistList); }
+        }
+      });
+    }
+    return new FavMylist();
+  })();
+  // w.FavMylist = FavMylist;
+
   /**
    *  左下に出るポップアップメッセージ
    *
@@ -1089,7 +1130,6 @@
         e.added = 1;
       };
 
-      //var a = document.getElementsByTagName("A");
       var a = document.links;
         for (var i = 0, len = a.length; i < len; i++) {
           var e = a[i];
@@ -1100,10 +1140,7 @@
               e.href && 
               (m = videoReg.exec(e.href)) != null &&
               !excludeReg.test(e.href) &&
-  //            e.className != "itemLink" && 
-  //            e.className != "itemVideoTitle" && 
               e.className != "itemEcoLink" && 
-  //            e.parentNode.className != "thumbContainer" &&
               true
             ) {
               each(e, m[2]);
@@ -1288,6 +1325,41 @@
       w.WatchApp.ns.util.WindowUtil.scrollFitMinimum($(window).height() >= h ? '#videoTagContainer, #playerContainer' : '#playerContainer', 600)
     }
 
+    /**
+     *  デフォルトの市場貼付ボタンはなぜかページの一番上までスクロールするという意地悪な仕様だが、
+     *  こっちはがんばって見やすい位置に調整して開く
+     */  
+    function ichibaSearch(word, shopCode) {
+      var wait = 10, opened = false;
+      //shopCode = shopCode || 'az'; // az = amazon
+      var search = function() {
+        if ($('#ichibaConsole').is(':visible')) {
+          setTimeout(function() {
+            w.WatchApp.ns.util.WindowUtil.scrollFitMinimum('#ichibaConsole', 300);
+          }, 1000);
+          if (!word) {
+            return;
+          }
+          if ($('#ichiba_search_form_query').is(':visible')) {
+              $('#ichiba_search_form_query').val(word);
+              w.ichiba.search(shopCode, 0, 'all');
+            setTimeout(function() {$('#ichiba_search_form_query').focus()}, 1000);
+          } else {
+            if (!opened) {
+              if(shopCode) { w.ichiba.showRelatedTagItems(shopCode, 0, 'all'); }
+              opened = true;
+            }
+            if (wait-- > 0) setTimeout(search, 1000);
+          }
+        } else {
+          if (wait-- > 0) setTimeout(search, 1000);
+        }
+      }
+      search();
+      w.ichiba.showConsole();
+    }
+
+
     function onVideoChange(newVideoId, newWatchId) {
     }
     
@@ -1422,16 +1494,6 @@
         resetSearchExplorerPos();
         $('body').toggleClass('w_setting',   $('#playerSettingPanel').is(':visible'));
 
-/*
-        $('#searchResultExplorer').css({
-          top: ($('#nicoplayerContainerInner').offset().top + $('#nicoplayerContainerInner').outerHeight()) + 'px'
-        });
-        $('#openSearchResultExplorer').css({marginTop: 0});
-        if (!isSearchOpen) {
-          var m = $('#content').offset().top + $('#content').outerHeight() - $('#openSearchResultExplorer').offset().top;
-          $('#openSearchResultExplorer').css({marginTop: m + 'px'});
-        }
-*/
         // フル画面時プレイリストを閉じる
         if (conf.autoClosePlaylistInFull && 
           $('#content .browserFullPlaylistClose').is(':visible')) {
@@ -1535,19 +1597,37 @@
 
       resetSearchExplorerPos();
 
-      var btn = $('<button alt="プレイリスト表示/非表示">playlist</button>');
-      btn.addClass('playlistToggle');
-      $('#playerContainerWrapper').append(btn);
-      btn.click(function() {
+      var $div = $('<div></div>');
+
+      $div.addClass('bottomAccessContainer');
+      var $playlistToggle = $('<button alt="プレイリスト表示/非表示">playlist</button>');
+      $playlistToggle.addClass('playlistToggle');
+      $playlistToggle.click(function() {
         $('#playlist').toggleClass('w_show');
         AnchorHoverPopup.hidePopup();
         resetSearchExplorerPos();
-      })
+      });
+      $div.append($playlistToggle);
+
+      var $ichiba = $('<button alt="市場クイックアクセス">ichiba</button>');
+      $ichiba.addClass('quickIchiba');
+      $ichiba.click(function() {
+        AnchorHoverPopup.hidePopup();
+        ichibaSearch();
+      });
+      $div.append($ichiba);
+
+      $('#playerContainerWrapper').append($div);
+
 
       $('.searchText input').keydown(function(e){
         if (e.which == 38 || e.which == 40) { 
           toggleSearchType();
         }
+      });
+
+      $('.showVideoInfoButton').click(function() { // 「動画情報をもっと見る」クリック時
+        WatchApp.ns.init.ComponentInitializer.videoSelection.panelOPC.close();
       });
 
     }
