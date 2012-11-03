@@ -6,6 +6,7 @@
 // @include        http://ext.nicovideo.jp/thumb/*
 // @exclude        http://ads*.nicovideo.jp/*
 // @exclude        http://live*.nicovideo.jp/*
+// @exclude        http://dic.nicovideo.jp/*
 // @match          http://www.nicovideo.jp/*
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
@@ -16,8 +17,14 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121029
+// @version        1.121103
 // ==/UserScript==
+
+// * ver 1.121103
+// - 設定パネルの追加
+// - マイリストボタンのスタイル調整
+// - dic.nicovideo.jpを除外
+// - @ジャンプキャンセラー (副作用あるかも)
 
 // * ver 1.121029
 // - ニコニコ市場へのクイックアクセスボタン
@@ -58,16 +65,17 @@
 
 
 
-// TODO: 
+// TODO:
 // - QWatch上からお気に入りタグ取得・お気に入りマイリストを検索・登録
 // - ランキング取得
 // - 市場を色々なんとかする
 // - 検索部分を開閉するショートカットキーが欲くなった
 // - 段幕がちょっとだけ邪魔な時「CTRLを押してる間だけコメントが消える」とかやりたい
+// - いいかげんコード整理
 
 (function() {
   var isNativeGM = true;
-  var monkey = 
+  var monkey =
   (function(isNativeGM){
     var w;
     try { w = unsafeWindow || window; } catch (e) { var w = window;}
@@ -91,15 +99,24 @@
     }
 
     var conf = {
-      autoBrowserFull: false,
+      autoBrowserFull: false, // 再生開始時に自動最大化
       autoNotFull: true, // 再生完了時にフルスクリーン解除(原宿と同じにする)
       autoTagPin: false,
       topPager: true, // 検索ボックスのページャを上にする
-      fxInterval: 40, // アニメーションのフレームレート 40 = 25fps
       hideLeftIchiba: false,
       autoClosePlaylistInFull: true, // 全画面時にプレイリストを自動で閉じる
+      autoScrollToPlayer: true, // プレイヤー位置に自動スクロール(自動最大化オフ時)
       hideNewsInFull: true, // 全画面時にニュースを閉じる
-      wideCommentPanel: true // コメントパネルをワイドにする
+      wideCommentPanel: true, // コメントパネルをワイドにする
+      leftPanelJack: true, // 左パネルに動画情報を表示
+      headerViewCounter: true, // ヘッダにコメントパネルを表示
+      ignoreJumpCommand: false, // @ジャンプ無効化(不具合があるかも)
+      doubleClickScroll: true, // 空白部分ををダブルクリックで動画の位置にスクロールする
+      hidePlaylist: true, // プレイリストを閉じる
+      hidariue: true, // てれびちゃんメニュー内に、原宿以前のランダム画像復活
+      videoExplorerHack: true, // 動画検索画面を広くする
+
+      fxInterval: 40 // アニメーションのフレームレート 40 = 25fps
     };
 
   //===================================================
@@ -108,13 +125,6 @@
 
 
     if (!isNativeGM) {
-      this.GM_getValue = function(key, def) {
-        if (window.localStorage[key] === undefined) return def;
-        return JSON.parse(window.localStorage.getItem(key));
-      };
-      this.GM_setValue = function(key,value) {
-        return window.localStorage.setItem(key, JSON.stringfy(value));
-      };
       this.GM_addStyle = function(styles) {
         var S = document.createElement('style');
         S.type = 'text/css';
@@ -141,7 +151,7 @@
               req.setRequestHeader(h, options.headers[h]);
             }
           }
-          
+
           req.send(options.data || null);
         } catch (e) {
           console.log(e);
@@ -149,263 +159,347 @@
       };
     }
 
-
-
   (function() {
     var style = [
-    // 動画タグのポップアップ
-      '.tagItemsPopup {',
-        'position: absolute; ',
-        'min-width: 150px; ',
-        'font-Size: 10pt; ',
-        'background: #eef; ',
-        'z-index: 2000000; ',
-        'box-shadow: 2px 2px 2px #888;',
-      '}\n',
-      '.tagItemsPopup ul,.tagItemsPopup ul li {',
-        'position: relative; ',
-        'list-style-type: none; ',
-        'margin: 0; padding: 0; ', 
-      '}\n',
-      '.tagItemsPopup li a{',
-      '}\n',
-      '.tagItemsPopup .nicodic {',
-        'margin-right: 4px;; ',
-      '}',
-      '.tagItemsPopup .icon{',
-        'width: 17px; ',
-        'height: 15px; ',
-        '',
-      '}\n',
-    // マイリスト登録パネル
-      '.mylistPopupPanel {',
-        'height: 24px; ',
-        'z-index: 10000; ',
-        'border: 1px solid silver;',
-        'border-radius: 3px; ',
-        'padding: 0;',
-        'margin: 0;',
-        'overflow: hidden; ',
-        'display: inline-block; ',
-        'background: #eee; ',
-      '}\n',
-      // マウスホバーで出るほうのマイリスト登録パネル
-      '.mylistPopupPanel.popup {',
-        'position: absolute; ',
-        'z-index: 1000000;',
-        'box-shadow: 2px 2px 2px #888;',
-      '}\n',
-      // マイリスト登録パネルの中の各要素
-      '.mylistPopupPanel .mylistSelect {',
-        'width: 64px; ',
-        'margin: 0;',
-        'padding: 0;',
-        'font-size: 80%; ',
-        'white-space: nowrap; ',
-        'background: #eee; ',
-        'border: 1px solid silver;',
-      '}\n',
-      // 誤操作を減らすため、とりマイの時だけスタイルを変える用
-      '.mylistPopupPanel.deflistSelected button {',
-      '}\n',
-      '.mylistPopupPanel.mylistSelected  button {',
-        'color: #ccf; ',
-      '}\n',
-      '.mylistPopupPanel button {',
-        'margin: 0; ',
-        'font-weight: bolder; ',
-        'cursor: pointer;  ',
-      '}\n',
-      '.mylistPopupPanel button:active, #content .playlistToggle:active, #content .quickIchiba:active {',
-        'border:1px inset !important',
-      '}\n',
-      '.mylistPopupPanel button:hover, #content .playlistToggle:hover, #content .quickIchiba:hover {',
-        'border:1px outset',
-      '}\n',
-      '.mylistPopupPanel .mylistAdd {',
-        'border:1px solid #d7dada; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f4f5f5;',
-        ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#d9dddd), color-stop(100%, #c6c3c3));',
-        ' background-image: -webkit-linear-gradient(top, #d9dddd, #c6c3c3);',
-        ' background-image: -moz-linear-gradient(top, #d9dddd, #c6c3c3);',
-        ' background-image: -ms-linear-gradient(top, #d9dddd, #c6c3c3);',
-        ' background-image: -o-linear-gradient(top, #d9dddd, #c6c3c3);',
-        ' background-image: linear-gradient(top, #d9dddd, #c6c3c3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#d9dddd, endColorstr=#c6c3c3);',
-
-      '}\n',
-      '.mylistPopupPanel.deflistSelected {',
-        'color: #ff9;',
-      '}\n',
-      '.mylistPopupPanel .deflistRemove{',
-        'border:1px solid #ebb7b7; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f7e3e3;',
-        ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #f7e3e3), color-stop(100%, #ffd7d7));',
-        ' background-image: -webkit-linear-gradient(top, #f7e3e3, #ffd7d7);',
-        ' background-image: -moz-linear-gradient(top, #f7e3e3, #ffd7d7);',
-        ' background-image: -ms-linear-gradient(top, #f7e3e3, #ffd7d7);',
-        ' background-image: -o-linear-gradient(top, #f7e3e3, #ffd7d7);',
-        ' background-image: linear-gradient(top, #f7e3e3, #ffd7d7);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#f7e3e3, endColorstr=#ffd7d7);',
-
-      '}\n',
-      '.mylistPopupPanel.mylistSelected .deflistRemove {',
-        'display: none; ',
-      '}\n',
-      '.mylistPopupPanel .tagGet{',
-        'border:1px solid #d7dada; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f4f5f5;',
-        ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#d9dddd), color-stop(100%, #c6c3c3));',
-        ' background-image: -webkit-linear-gradient(top, #d9dddd, #c6c3c3);',
-        ' background-image: -moz-linear-gradient(top, #d9dddd, #c6c3c3);',
-        ' background-image: -ms-linear-gradient(top, #d9dddd, #c6c3c3);',
-        ' background-image: -o-linear-gradient(top, #d9dddd, #c6c3c3);',
-        ' background-image: linear-gradient(top, #d9dddd, #c6c3c3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#d9dddd, endColorstr=#c6c3c3);',
-
-      '}\n',
-      '.mylistPopupPanel .closeButton{',
-        'color: #339; ',
-        'padding: 0;',
-        'margin: 0;',
-        'font-size: 80%;',
-        'text-decoration: none;', 
-      '}\n',
-      '.mylistPopupPanel .newTabLink{',
-        'padding: 0 2px; text-decoration: underline; text-shadow: -1px -1px 0px #442B2B;', 
-      '}\n',
-      '.mylistPopupPanel.fixed .newTabLink, .mylistPopupPanel.fixed .closeButton {',
-        'display: none;',
-      '}\n',
-      '',
-      
-      
-
-      // 全画面時にタグとプレイリストを表示しない時
-      'body.full_and_mini.full_with_browser #playerContainerSlideArea{',
-        'margin-bottom: 0 !important;',
-      '}\n',
-      'body.full_and_mini.full_with_browser #playlist{',
-        'z-index: auto;',
-      '}\n',
-      'body.full_and_mini.full_with_browser .generationMessage{',
-        'display: inline-block;',
-      '}\n',
-      // 全画面時にタグとプレイリストを表示する時
-      'body.full_with_browser #playlist{',
-        'z-index: 100;',
-      '}\n',
-      'body.full_with_browser .generationMessage{',
-        'display: none;',
-      '}\n',
-      'body.full_with_browser .browserFullOption{',
-        'padding-right: 200px;', // マイリストパネルの下に隠れるのでずらす
-      '}\n',
-      // 全画面時にニュースを隠す時
-      'body.full_with_browser.hideNewsInFull #playerContainerSlideArea{',
-        'margin-bottom: -45px;',
-      '}\n',
-      // 少しでも縦スクロールを減らすため、動画情報を近づける。人によっては窮屈に感じるかも
-      '#outline {',
-        'margin-top: -64px;',
-      '}\n',
-      '#outline #feedbackLink{',
-        'margin-top: 64px;',
-      '}\n',
-      '#outline .videoEditMenuExpand{', // 「動画情報・コメントの編集▲」
-        'position: absolute;right: 0;top: 26px; z-index: 1;',
-      '}\n',
-      // ヘッダに表示する再生数
-      '#videoCounter {',
-        'color: #ff9; font-size: 70%;',
-      '}\n',
-      // 左に表示する動画情報
-      '#ichibaPanel.leftVideoInfo {',
-        'background: #bbb; text-Align: left; overflow-Y: auto;', 
-      '}\n',
-      '#ichibaPanel.leftVideoInfo .userIconContainer{',
-        'background: #ccc; width: 100%;', 
-      '}\n',
-      
-      
-      '#content .bottomAccessContainer {',
-        'position: absolute; bottom: 0;',
-      '}\n',
-      // プレイリスト出したり隠したり
-      'body.w_notFull #playlist{',
-        'position: absolute; top: -9999px;', 
-      '}\n',
-      'body.w_notFull #playlist.w_show{',
-        'position: relative; top: 0;', 
-      '}\n',
-      '#content .playlistToggle, #content .quickIchiba {',
-        'cursor: pointer;',
-        'border:1px solid #7d99ca; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 0px 0px 0px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #a5b8da;',
-        ' background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #a5b8da), color-stop(100%, #7089b3));',
-        ' background-image: -webkit-linear-gradient(top, #a5b8da, #7089b3);',
-        ' background-image: -moz-linear-gradient(top, #a5b8da, #7089b3);',
-        ' background-image: -ms-linear-gradient(top, #a5b8da, #7089b3);',
-        ' background-image: -o-linear-gradient(top, #a5b8da, #7089b3);',
-        ' background-image: linear-gradient(top, #a5b8da, #7089b3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#a5b8da, endColorstr=#7089b3);',
-      '}\n',
-      
-      
-      // ページャーの字が小さくてクリックしにくいよね
-      '#resultPagination {',
-        'padding: 5px; font-weight: bolder; border: 1px dotted silter; font-size: 130%;',
-      '}\n',
-       
-      '#playlistContainer #playlistContainerInner .playlistItem .balloon {\n',
-        'bottom: auto; top: -2px; padding: auto;\n',
-      '}\n',
-      
-      '#searchResultExplorer ul#resultlist li {',
-        'margin: 0 4px 0;',
-      '}\n',
-      
-      'body.w_setting #searchResultExplorer {', // 設定パネルと検索ウィンドウが被るのを防止
-        'top: auto !important;',
-      '}\n',
-      'body.w_channel #ichibaPanel .userIconContainer{',
-        'display: none;',
-      '}\n',
+    '\
+    /* 動画タグのポップアップ */\n\
+      .tagItemsPopup {\n\
+        position: absolute; \n\
+        min-width: 150px; \n\
+        font-Size: 10pt; \n\
+        background: #eef; \n\
+        z-index: 2000000; \n\
+        box-shadow: 2px 2px 2px #888;\n\
+      }\n\n\
+      .tagItemsPopup ul,.tagItemsPopup ul li {\n\
+        position: relative; \n\
+        list-style-type: none; \n\
+        margin: 0; padding: 0; \n\
+      }\n\n\
+      .tagItemsPopup li a{\n\
+      }\n\n\
+      .tagItemsPopup .nicodic {\n\
+        margin-right: 4px; \n\
+      }\n\
+      .tagItemsPopup .icon{\n\
+        width: 17px; \n\
+        height: 15px; \n\
+        \n\
+      }\n\n\
+    /* マイリスト登録パネル */\
+      .mylistPopupPanel {\n\
+        height: 24px; \n\
+        z-index: 10000; \n\
+        border: 1px solid silver;\n\
+        border-radius: 3px; \n\
+        padding: 0;\n\
+        margin: 0;\n\
+        overflow: hidden; \n\
+        display: inline-block; \n\
+        background: #eee; \n\
+      }\n\n\
+    /* マウスホバーで出るほうのマイリスト登録パネル */\
+      .mylistPopupPanel.popup {\n\
+        position: absolute; \n\
+        z-index: 1000000;\n\
+        box-shadow: 2px 2px 2px #888;\n\
+      }\n\
+    /* マイリスト登録パネルの中の各要素 */\
+      .mylistPopupPanel .mylistSelect {\n\
+        width: 64px; \n\
+        margin: 0;\n\
+        padding: 0;\n\
+        font-size: 80%; \n\
+        white-space: nowrap; \n\
+        background: #eee; \n\
+        border: 1px solid silver;\n\
+      }\n\
+    /* 誤操作を減らすため、とりマイの時だけスタイルを変える用 */\
+      .mylistPopupPanel.deflistSelected button {\n\
+      }\n\n\
+      .mylistPopupPanel.mylistSelected  button {\n\
+        color: #ccf; \n\
+      }\n\n\
+      .mylistPopupPanel button {\n\
+        margin: 0; \n\
+        font-weight: bolder; \n\
+        cursor: pointer;  \n\
+      }\n\n\
+      .mylistPopupPanel button:active, #content .playlistToggle:active, #content .quickIchiba:active, #content .openConfButton:active {\n\
+        border:1px inset !important\n\
+      }\n\n\
+      .mylistPopupPanel button:hover, #content .playlistToggle:hover, #content .quickIchiba:hover, #content .openConfButton:hover {\n\
+        border:1px outset\n\
+      }\n\n\
+\
+      .mylistPopupPanel .mylistAdd, .mylistPopupPanel .tagGet {\
+        border:1px solid #b7b7b7; -webkit-border-radius: 3px; -moz-border-radius: 3px;border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #d3d3d3;\
+        background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #d3d3d3), color-stop(100%, #707070));\
+        background-image: -webkit-linear-gradient(top, #d3d3d3, #707070);\
+        background-image: -moz-linear-gradient(top, #d3d3d3, #707070);\
+        background-image: -ms-linear-gradient(top, #d3d3d3, #707070);\
+        background-image: -o-linear-gradient(top, #d3d3d3, #707070);\
+        background-image: linear-gradient(top, #d3d3d3, #707070);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#d3d3d3, endColorstr=#707070);\
+        }\n\
+        .mylistPopupPanel.deflistSelected {\
+          color: #ff9;\
+        }\n\
+        .mylistPopupPanel .deflistRemove{\
+          border:1px solid #ebb7b7; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f7e3e3;\
+           background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #f7e3e3), color-stop(100%, #ffd7d7));\
+           background-image: -webkit-linear-gradient(top, #f7e3e3, #ffd7d7);\
+           background-image: -moz-linear-gradient(top, #f7e3e3, #ffd7d7);\
+           background-image: -ms-linear-gradient(top, #f7e3e3, #ffd7d7);\
+           background-image: -o-linear-gradient(top, #f7e3e3, #ffd7d7);\
+           background-image: linear-gradient(top, #f7e3e3, #ffd7d7);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#f7e3e3, endColorstr=#ffd7d7);\
+        }\n\
+        .mylistPopupPanel.mylistSelected .deflistRemove {\
+          display: none; \
+        }\n\
+        .mylistPopupPanel .closeButton{\
+          color: #339; \
+          padding: 0;\
+          margin: 0;\
+          font-size: 80%;\
+          text-decoration: none;\
+        }\n\
+        .mylistPopupPanel .newTabLink{\
+          padding: 0 2px; text-decoration: underline; text-shadow: -1px -1px 0px #442B2B;\
+        }\n\
+        .mylistPopupPanel.fixed .newTabLink, .mylistPopupPanel.fixed .closeButton {\
+          display: none;\
+        }\n\
+\
+\
+\
+\
+      /* 全画面時にタグとプレイリストを表示しない時*/\
+      body.full_and_mini.full_with_browser #playerContainerSlideArea{\n\
+        margin-bottom: 0 !important;\n\
+      }\n\n\
+      body.full_and_mini.full_with_browser #playlist{\n\
+        z-index: auto;\n\
+      }\n\n\
+      body.full_and_mini.full_with_browser .generationMessage{\n\
+        display: inline-block;\n\
+      }\n\
+      /* 全画面時にタグとプレイリストを表示する時 */\
+      body.full_with_browser #playlist{\n\
+        z-index: 100;\n\
+      }\n\n\
+      body.full_with_browser .generationMessage{\n\
+        display: none;\n\
+      }\n\n\
+      body.full_with_browser .browserFullOption{\n\
+        padding-right: 200px;\n\
+      }\n\
+      /* 全画面時にニュースを隠す時 */\
+      body.full_with_browser.hideNewsInFull #playerContainerSlideArea{\
+        \margin-bottom: -45px;\
+      }\n\
+      /* 少しでも縦スクロールを減らすため、動画情報を近づける。人によっては窮屈に感じるかも */\
+      #outline {\n\
+        margin-top: -64px;\n\
+      }\n\n\
+      #outline #feedbackLink{\n\
+        margin-top: 64px;\n\
+      }\n\n\
+      #outline .videoEditMenuExpand{\n\
+        position: absolute;right: 0;top: 26px; z-index: 1;\n\
+      }\n\n\
+      /* ヘッダに表示する再生数 */\
+      #videoCounter {\n\
+        color: #ff9; font-size: 70%;\n\
+      }\n\n\
+      /* 左に表示する動画情報 */\
+      #ichibaPanel.leftVideoInfo {\n\
+        background: #bbb; text-Align: left; overflow-Y: auto;\n\
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .userIconContainer{\n\
+        background: #ccc; width: 100%;\n\
+      }\n\n\
+\
+\
+      #content .bottomAccessContainer {\n\
+        position: absolute; bottom: 0;\n\
+      }\n\n\
+      /* プレイリスト出したり隠したり */\
+      body.w_notFull #playlist{\n\
+        position: absolute; top: -9999px;\n\
+      }\n\n\
+      body.w_notFull #playlist.w_show{\n\
+        position: relative; top: 0;\n\
+      }\n\n\
+      #content .playlistToggle, #content .quickIchiba, #content .openConfButton {\n\
+        cursor: pointer;\n\
+        border:1px solid #7d99ca; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 0px 0px 0px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #a5b8da;\n\
+         background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #a5b8da), color-stop(100%, #7089b3));\n\
+         background-image: -webkit-linear-gradient(top, #a5b8da, #7089b3);\n\
+         background-image: -moz-linear-gradient(top, #a5b8da, #7089b3);\n\
+         background-image: -ms-linear-gradient(top, #a5b8da, #7089b3);\n\
+         background-image: -o-linear-gradient(top, #a5b8da, #7089b3);\n\
+         background-image: linear-gradient(top, #a5b8da, #7089b3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#a5b8da, endColorstr=#7089b3);\n\
+      }\n\n\
+\
+\
+      /* ページャーの字が小さくてクリックしにくいよね */\
+      #resultPagination {\n\
+        padding: 5px; font-weight: bolder; border: 1px dotted silter; font-size: 130%;\n\
+      }\n\n\
+\
+      #playlistContainer #playlistContainerInner .playlistItem .balloon {\n\n\
+        bottom: auto; top: -2px; padding: auto;\n\n\
+      }\n\n\
+\
+      #searchResultExplorer.wide ul#resultlist li {\n\
+        margin: 0 4px 0;\n\
+      }\n\n\
+\
+      body.w_setting #searchResultExplorer.wide {\n\ /* 設定パネルと検索ウィンドウが被るのを防止 */\
+        top: auto !important;\n\
+      }\n\n\
+      body.w_channel #ichibaPanel .userIconContainer{\n\
+        display: none;\n\
+      }\n\n\
+      /* 設定パネル */\
+      #watchItLaterConfigPanel {\n\
+        position: fixed; bottom:0; right:0; z-index: 10001; display: none;\n\
+        width: 400px; padding: 4px;\n\
+        background: #eff; border: 1px outset; color: black;\n\
+        \n\
+      }\n\n\
+      #watchItLaterConfigPanel .inner{\n\
+        margin: 0 12px; padding: 4px;\n\
+        max-height: 300px; overflow-y: auto;\n\
+        border: 1px inset\n\
+      }\n\n\
+      #watchItLaterConfigPanel li{\n\
+        margin: 4px auto;\n\
+      }\n\n\
+      #watchItLaterConfigPanel li.buggy{\n\
+        color: #888;\n\
+      }\n\n\
+      #watchItLaterConfigPanel .description{\n\
+      }\n\n\
+      #watchItLaterConfigPanel label{\n\
+        margin: 0 5px;\n\
+      }\n\n\
+      #watchItLaterConfigPanel label:hober{\n\
+      }\n\n\
+      #watchItLaterConfigPanel .closeButton{\n\
+        cursor: pointer; border: 1px solid;\n\
+      }\n\n\
+      #content .openConfButton {\n\
+        position: absolute; bottom:0; right: 0;\n\
+      }\n',
     ''].join('');
+    //console.log(style);
     GM_addStyle(style);
   })();
 
+  conf.load = function() {
+    try {
+      function loadStorage(key, def) {
+        if (window.localStorage[key] === undefined) return def;
+        return JSON.parse(window.localStorage.getItem(key));
+      }
 
-    conf.save = function() {
-     try {
-       for (var v in conf) {
-         if (typeof conf[v] == 'function') continue;
-         GM_setValue(v, conf[v]);
-       }
-     } catch (e) {
-     }
-    };
-    conf.load = function() {
-      try {
-        for (var v in conf) {
-          if (typeof conf[v] == 'function') continue;
-          conf[v] = GM_getValue(v, conf[v]);
+      for (var v in conf) {
+        if (typeof conf[v] == 'function') continue;
+        conf[v] = loadStorage('watchItLater_' + v, conf[v]);
+      }
+    } catch (e) {
+    }
+  };
+
+  conf.getValue = function(varName) {
+    return conf[varName];
+  };
+  conf.setValue = function(k, v) {
+    conf[k] = v;
+    window.localStorage.setItem('watchItLater_' + k, JSON.stringify(v));
+  };
+  conf.load();
+
+  var ConfigPanel = (function(conf) {
+    function ConfigPanel() {
+    }
+    var pt = ConfigPanel.prototype;
+    var $panel = null;
+    var menus = [
+      {description: 'プレイヤーを自動で最大化', varName: 'autoBrowserFull',
+        values: {'する': true, 'しない': false}},
+      {description: '動画終了時に最大化を解除(原宿と同じにする)', varName: 'autoNotFull',
+        values: {'する': true, 'しない': false}},
+      {description: 'プレイヤー位置に自動スクロール(自動最大化オフ時)', varName: 'autoScrollToPlayer',
+        values: {'する': true, 'しない': false}},
+      {description: 'コメントパネルのワイド化', varName: 'wideCommentPanel',
+        values: {'する': true, 'しない': false}},
+      {description: '左のパネルに動画情報を表示', varName: 'leftPanelJack',
+        values: {'する': true, 'しない': false}},
+      {description: 'ヘッダに再生数表示', varName: 'headerViewCounter',
+        values: {'する': true, 'しない': false}},
+      {description: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
+        values: {'する': true, 'しない': false}},
+      {description: 'てれびちゃんメニュー内に、原宿以前のランダム画像復活', varName: 'hidariue',
+        values: {'する': true, 'しない': false}},
+      {description: '動画検索画面を広くする', varName: 'videoExplorerHack',
+        values: {'する': true, 'しない': false}},
+      {description: '「@ジャンプ」を無効化(※実験中。不具合があるかも)', varName: 'ignoreJumpCommand',
+        values: {'する': true, 'しない': false}, className: 'buggy'},
+    ];
+    pt.createPanelDom = function() {
+      if ($panel == null) {
+        $panel = w.jQuery('<div id="watchItLaterConfigPanel"><h2>WatchItLater設定</h2><div class="inner"><ul></ul></div></div>');
+        var $ul = $panel.find('ul');
+        for (var i = 0, len = menus.length; i < len; i++) {
+          var $item = this.createMenuItem(menus[i]);
+          $ul.append($item);
         }
-      } catch (e) {
+        var $close = w.jQuery('<p><button class="closeButton">閉じる</button>項目によっては再読み込みが必要です</p>'), self = this;
+        $close.click(function() {
+          self.close();
+        });
+        $panel.append($close);
+        w.jQuery('body').append($panel);
       }
     };
-    conf.reset = (function(conf_def) {
-      return function() {
-        for (var v in conf) {
-          if (typeof conf[v] == 'function') continue;
-          conf[v] = conf_def[v];
-        }
-        conf.save();
-      };
-    })(conf);
-    conf.load();
+    pt.createMenuItem = function(menu) {
+      var description = menu.description, varName = menu.varName, values = menu.values;
+      var $menu = w.jQuery('<li><p class="description">' + description + '</p></li>');
+      if (menu.className) { $menu.addClass(menu.className);}
+      var currentValue = conf.getValue(varName);
+      for (var k in values) {
+        var v = values[k];
+        var $label = w.jQuery('<label></label>');
+        var $chk = w.jQuery('<input>');
+        $chk.attr({type: 'radio', name: varName, value: JSON.stringify(v)});
 
-    w.WatchItLater = {
-      setConf: function(k, v) {
-        conf[k] = v;
-        conf.save();
-      },
-      showConf: function() {
-        console.log(conf);
+        if (currentValue == v) {
+          $chk.attr('checked', 'checked');
+        }
+        $chk.click(function() {
+          conf.setValue(this.name, JSON.parse(this.value));
+        });
+        $label.append($chk).append(w.jQuery('<span>' + k + '</span>'));
+        $menu.append($label);
+      }
+      return $menu;
+    };
+
+    pt.open = function() { $panel.show(200); };
+    pt.close = function() { $panel.hide(200); };
+    pt.toggle = function() {
+      this.createPanelDom();
+      if ($panel.is(':visible')) {
+        this.close();
+      } else {
+        this.open();
       }
     };
+
+    return new ConfigPanel();
+  })(conf);
 
 
   /**
@@ -415,7 +509,7 @@
   var VideoTags = (function(){
     function VideoTags() {
     }
-    
+
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
     var pt = VideoTags.prototype;
     var lastPopup = null;
@@ -444,13 +538,13 @@
       };
       GM_xmlhttpRequest(req);
     };
-    
+
     pt.hidePopup = function() {
       if (lastPopup) {
         lastPopup.style.display = 'none';
       }
     };
-    
+
     var uniq = null, $history = null;
     pt.popupItems = function(watchId, baseX, baseY) {
       var self = this;
@@ -467,7 +561,7 @@
           Popup.alert(resp.error_message);
         }
       });
-      
+
       function createPopup(tags, baseX, baseY) {
         var popup = createDOM(tags, baseX, baseY);
         document.body.appendChild(popup);
@@ -481,7 +575,7 @@
 
         return popup;
       }
-      
+
       function createDOM(tags) {
         var items = document.createElement('ul');
         for (var i = 0, len = tags.length; i < len; i++) {
@@ -492,7 +586,7 @@
         popup.appendChild(items);
         return popup;
       }
-      
+
       function createPopupDOM() {
         var popup = document.createElement('div');
         popup.className        = 'tagItemsPopup';
@@ -513,6 +607,7 @@
         }
         if (!uniq[text]) {
           var a = $(dom).clone().css({marginRight: '8px', fontSize: '80%'}).click(function(e) {
+            if (e.button != 0 || e.metaKey) return;
             nicoSearch(text);
             e.preventDefault();
           });
@@ -546,7 +641,7 @@
 
         return li;
       }
-      
+
       function createDicIconDOM(tag, text) {
         var dic = document.createElement('a');
         dic.className = 'nicodic';
@@ -559,7 +654,7 @@
         return dic;
       }
     };
-    
+
     return new VideoTags();
   })();
 
@@ -590,9 +685,9 @@
     function Mylist(){
       this.initialize();
     }
-    
+
     function getToken() {
-      if (!isNativeGM && host != location.host) return; // 
+      if (!isNativeGM && host != location.host) return; //
       var _token = (w.NicoAPI) ? w.NicoAPI.token : (w.WatchApp ? w.WatchApp.ns.init.CommonModelInitializer.watchInfoModel.csrfToken : '');
       if (_token === null && w.FavMylist && w.FavMylist.csrf_token) _token = w.FavMylist.csrf_token;
       if (_token != '') {
@@ -611,9 +706,9 @@
       });
       return _token;
     }
-    
+
     var pt = Mylist.prototype;
-    
+
     pt.getUserId = function() {
       if (document.cookie.match(/user_session_(\d+)/)) {
         return RegExp.$1;
@@ -621,12 +716,11 @@
         return false;
       }
     };
-    
+
     pt.initialize = function() {
       if (initialized) return;
       var uid = this.getUserId();
       if (!uid) {
-        console.log('userid unknown');
         return;
       }
       if (!isNativeGM && host != location.host) {
@@ -647,7 +741,7 @@
       });
       this.reloadDefList();
     };
-    
+
     pt.reloadDefList = function(callback) {
       var url = 'http://' + host + '/api/deflist/list';
       var self = this;
@@ -662,7 +756,7 @@
         }
       });
     };
-    
+
     pt.findDefListByWatchId = function(watchId) {
       for (var i = 0, len = defListItems.length; i < len; i++) {
         var item = defListItems[i], wid = item.item_data.watch_id;
@@ -670,7 +764,7 @@
       }
       return null;
     };
-    
+
     // おもに参考にしたページ
     // http://uni.res.nimg.jp/js/nicoapi.js
     // http://d.hatena.ne.jp/lolloo-htn/20110115/1295105845
@@ -694,7 +788,7 @@
       GM_xmlhttpRequest(req);
       return true;
     };
-    
+
     pt.addDefList = function(watchId, callback) {
       var self = this;
       var url = 'http://' + host + '/api/deflist/add';
@@ -721,14 +815,14 @@
       // とりあえずマイリストにある場合はdeleteDefList()のcallbackで追加、ない場合は即時追加
       if (!this.deleteDefList(watchId, _add)) _add();
     };
-    
+
     pt.addMylist = function(watchId, groupId, callback) {
       var self = this;
       var url = 'http://' + host + '/api/mylist/add';
-      var data = ['item_id=', watchId, 
+      var data = ['item_id=', watchId,
                   '&group_id=', groupId,
                   '&item_type=', 0, // video=0 seiga=5
-                  '&description=', '', 
+                  '&description=', '',
                   '&token=', token,
       ].join('');
       // 普通のマイリストのほうは重複しても「消してから追加」という処理を行っていない。
@@ -750,7 +844,7 @@
       // 普通のマイリストに入れたら、とりあえずマイリストからは削除(≒移動)
       if (!this.deleteDefList(watchId, _add)) _add();
     };
-    
+
     /**
      *  マイリスト登録パネルを返す
      */
@@ -761,7 +855,7 @@
         return this.getIframePanel(watchId, videoId);
       }
     };
-    
+
     pt.getNativePanel = function(watchId, videoId) {
       var self = this;
       var _watchId = watchId, _videoId = videoId || watchId;
@@ -769,9 +863,9 @@
       body.className = 'mylistPopupPanel deflistSelected';
       var nobr = document.createElement('nobr');
       body.appendChild(nobr);
-      
+
       var extArea = document.createElement('span');
-      
+
       body.watchId = function(w, v) {
         if (w) {
           _watchId = w;
@@ -790,7 +884,7 @@
         }
         return _watchId;
       };
-      
+
       body.addExtElement = function(elm) {
         extArea.appendChild(elm);
       };
@@ -803,7 +897,7 @@
       body.hide = function() {
         body.style.display = 'none';
       };
-      
+
       function createSelector() {
         var sel = document.createElement('select');
         sel.className = 'mylistSelect';
@@ -832,7 +926,7 @@
         });
         return sel;
       }
-      
+
       function createSubmitButton(sel) {
         var btn = document.createElement('button');
         btn.appendChild(document.createTextNode('マ'));
@@ -862,7 +956,7 @@
             });
           }
         } ,false);
-        
+
         return btn;
       }
 
@@ -904,7 +998,7 @@
         } ,false);
         return btn;
       }
-      
+
       function createCloseButton() {
         var btn = document.createElement('a');
         btn.className = 'closeButton';
@@ -915,7 +1009,7 @@
         }, false);
         return btn;
       }
-      
+
       function createNewTabLink() {
         var a = document.createElement('a');
         a.className = 'newTabLink';
@@ -930,7 +1024,7 @@
         nobr.appendChild(newTabLink);
       }
 
-      
+
       var sel = createSelector(mylistlist);
       nobr.appendChild(sel);
 
@@ -942,7 +1036,7 @@
 
       var deleteDef = createDeleteDeflistButton();
       nobr.appendChild(deleteDef);
-      
+
 
       var closeBtn = createCloseButton();
       nobr.appendChild(closeBtn);
@@ -953,7 +1047,7 @@
       body.watchId(_watchId, _videoId);
       return body;
     };
-    
+
     // XHRでクロスドメインを超えられない場合はこちら
     // 将来マイリストのポップアップウィンドウが廃止されたら使えない
     // (マイページから強引に生成するか？)
@@ -985,18 +1079,18 @@
         //var insertAfter = function(parent, node, referenceNode) { parent.insertBefore(node, referenceNode.nextSibling);}
       };
       body.clearExtElement = function() {};
-      
+
       body.show = function() {
         body.style.display = '';
       };
       body.hide = function() {
         body.style.display = 'none';
       };
-      
-      
+
+
       return body;
     };
-    
+
     return new Mylist();
   })();
 
@@ -1012,16 +1106,14 @@
     /**
      *  お気に入りマイリストの取得。 jQueryのあるページでしか使えない
      *  マイページを無理矢理パースしてるので突然使えなくなるかも
-     */ 
+     */
     function loadFavList(callback) {
-      if (!w.jQuery) return; // 
+      if (!w.jQuery) return; //
       var url = 'http://' + host + '/my/fav/mylist';
       GM_xmlhttpRequest({
         url: url,
         onload: function(resp) {
-          // 
           var $result = $(resp.responseText).find('#favMylist');
-          w.$result = $result;
           if ($result.length < 1) return;
           $result.find('.outer').each(function() {
             var $a = $(this).find('h5 a'), $desc = $(this).find('.mylistDescription');
@@ -1033,7 +1125,40 @@
     }
     return new FavMylist();
   })();
-  // w.FavMylist = FavMylist;
+
+
+  var FavTags = (function() {
+    var favTagList = [];
+    var host = location.host.replace(/^([\w\d]+)\./, 'www.');
+    var $ = w.$;
+    function FavTags() {
+    }
+    var pt = FavTags.prototype;
+    pt.loadFavTags = loadFavTags;
+
+    /**
+     *  お気に入りタグの取得。 jQueryのあるページでしか使えない
+     *  マイページを無理矢理パースしてるので突然使えなくなるかも
+     */
+    function loadFavTags(callback) {
+      if (!w.jQuery) return; //
+      var url = 'http://' + host + '/my/fav/tag';
+      GM_xmlhttpRequest({
+        url: url,
+        onload: function(resp) {
+          var $result = $(resp.responseText).find('#favTag');
+          if ($result.length < 1) return;
+          $result.find('.outer').each(function() {
+            var $a = $(this).find('h5 a');
+            favTagList.push({href: $a.attr('href'), name: $a.text()});
+          });
+          if (typeof callback === 'function') { callback(favTagList); }
+        }
+      });
+    }
+    return new FavTags();
+  })();
+
 
   /**
    *  左下に出るポップアップメッセージ
@@ -1087,10 +1212,10 @@
         mylistPanel.style.left = null;
         mylistPanel.style.right = 0;
       }
-      
+
     }
-    
-    
+
+
     var videoReg = /(\?cc_video_id=|\?cc_id=|watch\/)([a-z0-9]+)/;
     var excludeReg = /(news|live|seiga)\..*?nicovideo\.jp/;
 
@@ -1136,11 +1261,11 @@
           try {
             var m;// = videoReg.test(e.href);
             if (
-              !e.added && 
-              e.href && 
+              !e.added &&
+              e.href &&
               (m = videoReg.exec(e.href)) != null &&
               !excludeReg.test(e.href) &&
-              e.className != "itemEcoLink" && 
+              e.className != "itemEcoLink" &&
               true
             ) {
               each(e, m[2]);
@@ -1211,7 +1336,7 @@
 
       $('select').css({width: "100px",position:"absolute", top:0, left:0});
       $('select')[0].selectedIndex = $('select')[0].options.length - 1;
-      
+
       var submit = document.createElement("input");
       submit.type = "submit";
       submit.value = "登録";
@@ -1219,20 +1344,20 @@
       $('select')[0].parentNode.appendChild(submit);
 
       var dt = new Date();
-      $('#edit_description')[0].value = dt.getFullYear() + "/" + 
-                        (dt.getMonth() + 1) + "/" + 
-                        dt.getDate() + " " + 
-                        dt.getHours() + ":" + 
-                        dt.getMinutes() + ":" + 
+      $('#edit_description')[0].value = dt.getFullYear() + "/" +
+                        (dt.getMonth() + 1) + "/" +
+                        dt.getDate() + " " +
+                        dt.getHours() + ":" +
+                        dt.getMinutes() + ":" +
                         dt.getSeconds() +
                         "";
-      
+
       w.document.documentElement.scrollTop  = 0;
       w.document.documentElement.scrollLeft = 0;
-      
-      
+
+
       $($.browser.safari ? 'body' : 'html').scrollTop(0);
-      
+
       w.window.close = function()
       {
         return;
@@ -1287,6 +1412,7 @@
     var initialExplorerWidth = null;
     function onWindowResize() {
       function expandSearchResult(target) {
+        if (!conf.videoExplorerHack) { return; }
         var elms = ['#searchResult', '#resultContainer', '#searchResultContainer', '#searchResultExplorer', '#searchResultHeader', '#resultlist'];
         if (!initialExplorerWidth) {
           initialExplorerWidth = {};
@@ -1301,7 +1427,7 @@
       }
       expandSearchResult($('body').innerWidth());
     }
-    
+
     function watchVideoStatus() {
       var video_length = WatchApp.namespace.init.CommonModelInitializer.watchInfoModel.length
       var current_sec = npc.getVpos() / 1000;
@@ -1312,7 +1438,6 @@
       var newVideoId = w.WatchApp.namespace.init.CommonModelInitializer.watchInfoModel.id;
       var newWatchId = w.WatchApp.namespace.init.CommonModelInitializer.watchInfoModel.v;
       if (video_id != newVideoId) {
-//        console.log("video_id=" + newVideoId);
         onVideoChange(newVideoId, newWatchId);
         video_id = newVideoId;
       }
@@ -1328,7 +1453,7 @@
     /**
      *  デフォルトの市場貼付ボタンはなぜかページの一番上までスクロールするという意地悪な仕様だが、
      *  こっちはがんばって見やすい位置に調整して開く
-     */  
+     */
     function ichibaSearch(word, shopCode) {
       var wait = 10, opened = false;
       //shopCode = shopCode || 'az'; // az = amazon
@@ -1362,8 +1487,9 @@
 
     function onVideoChange(newVideoId, newWatchId) {
     }
-    
+
     function setVideoCounter(watchInfoModel) {
+      if (!conf.headerViewCounter) { return; }
       var vc = $('li.#videoCounter');
       if (vc.length < 1) {
         var li = $('<li></li>')[0];
@@ -1378,7 +1504,7 @@
       ].join('');
       vc.html(h);
     }
-    
+
     function onVideoInitialized() {
       watch = WatchApp.namespace.init;
       AnchorHoverPopup.hidePopup().updateNow();
@@ -1392,55 +1518,60 @@
       $('body').toggleClass('w_channel', watch.CommonModelInitializer.watchInfoModel.isChannelVideo());
       setVideoCounter(watch.CommonModelInitializer.watchInfoModel);
 
-      scrollToVideoPlayer();
-      if (conf.autoBrowserFull) setTimeout(function() {
-        changePlayerScreenMode("browserFull");
-        //$(window).resize();
-        onWindowResize();
-      }, 100);
+      if (conf.autoBrowserFull) {
+          setTimeout(function() {
+          changePlayerScreenMode("browserFull");
+          onWindowResize();
+        }, 100);
+      } else
+      if (conf.autoScrollToPlayer) {scrollToVideoPlayer();}
 
-    // - 空っぽになった左になんか表示してみる
-    var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
-    var $leftPanel = $('#ichibaPanel').addClass('leftVideoInfo'), h = $leftPanel.innerHeight() - 100;
-      panelSVC.innerLeftElements = [$('#ichibaPanel')];  
-      panelSVC.refresh();
-      $leftPanel.empty()
-//        .append($('#videoInfoHead .videoPostedAt').clone().css({fontSize: '90%'}))
-        .append($('<div>'+$('#videoInfoHead .videoPostedAt').text()+'</div>').css({textAlign: 'center'})
-                .append($('#videoThumbnailImage').clone(true))
-        )
-        .append(
-          $('.videoDescription').clone(true)
-            .append($('#userProfile .userIconContainer').clone(true)
-              .append($('<span>' + $('#videoInfo .userName').text() + '</span><br>'))
-              .append($('#userProfile .showOtherVideos').clone(true).text('関連動画'))
-            )
-            .append($('#ch_prof').clone(true))
 
-            
-        ).css({fontSize: '90%'});
+      leftPanelJack();
       resetSearchExplorerPos();
       resetHidariue();
     }
+    // - 空っぽになった左になんか表示してみる
+    function leftPanelJack() {
+      if (!conf.leftPanelJack) { return; }
+      var uploaderId = watch.CommonModelInitializer.watchInfoModel.uploaderInfo.id;
+      var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
+      var $leftPanel = $('#ichibaPanel').addClass('leftVideoInfo'), h = $leftPanel.innerHeight() - 100;
+        panelSVC.innerLeftElements = [$('#ichibaPanel')];
+        panelSVC.refresh();
+        $leftPanel.empty()
+          .append($('<div>'+$('#videoInfoHead .videoPostedAt').text()+'</div>').css({textAlign: 'center'})
+                  .append($('#videoThumbnailImage').clone(true))
+          )
+          .append(
+            $('.videoDescription').clone(true)
+              .append($('#userProfile .userIconContainer').clone(true)
+                .append($('<span>' + $('#videoInfo .userName').text() + '</span><br>'))
+                .append($('#userProfile .showOtherVideos').clone(true).text('関連動画').attr('href', '/user/' + uploaderId + '/video'))
+              )
+              .append($('#ch_prof').clone(true))
+
+
+          ).css({fontSize: '90%'});
+    }
     var hidariue = null;
     function resetHidariue() {
+      if (!conf.hidariue) { return; }
       if (!hidariue) {
         $('#videoMenuTopList').append('<li style="position:absolute;top:22px;left:0px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;"><img id="hidariue"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:Q"></a></p><a href="http://nico.ms/sm18845030" class="itemEcoLink">…</a></li>');
         hidariue = $('#hidariue')[0];
       }
-      hidariue.src = 'http://res.nimg.jp/img/base/head/icon/nico/' + 
+      hidariue.src = 'http://res.nimg.jp/img/base/head/icon/nico/' +
               (1000 + Math.floor(Math.random() * 1000)).toString().substr(1) + '.gif';
     }
 
     function onVideoStopped() {
-      console.log("video stopped");
     }
 
     function onVideoEnded() {
       AnchorHoverPopup.hidePopup().updateNow();
-      console.log("video ended");
-      // 原宿までと同じように、動画終了時にフルスクリーンを解除したい 
-      if (conf.autoNotFull) { 
+      // 原宿までと同じように、動画終了時にフルスクリーンを解除したい
+      if (conf.autoNotFull) {
         changePlayerScreenMode("notFull");
       }
 
@@ -1454,22 +1585,22 @@
 
     function onVideoSelectPanelOpening() {
       isSearchOpen = true;
-      $('#searchResultExplorer').css({zIndex: 600});
+      if (conf.videoExplorerHack) { $('#searchResultExplorer').css({zIndex: 600}); }
     }
 
 
     function onVideoSelectPanelClosed() {
       isSearchOpen = false;
       AnchorHoverPopup.hidePopup().updateNow();
-//      setTimeout(function() {
+      if (conf.videoExplorerHack) {
         $('#searchResultExplorer').css({zIndex: 1});
         $('#content').css({zIndex: 2});
-        resetSearchExplorerPos();
-//      }, 500);
-      //scrollToVideoPlayer();
+      }
+      resetSearchExplorerPos();
     }
-    
+
     function resetSearchExplorerPos() {
+      if (!conf.videoExplorerHack) { return; }
       $('#searchResultExplorer').css({
         top: ($('#nicoplayerContainerInner').offset().top + $('#nicoplayerContainerInner').outerHeight()) + 'px'
       });
@@ -1479,7 +1610,7 @@
       var m = $('#content').offset().top + $('#content').outerHeight() - $('#openSearchResultExplorer').offset().top;
       $('#openSearchResultExplorer').css({marginTop: m + 'px'});
     }
-    
+
     function onWatchInfoReset(w) {
     }
 
@@ -1490,12 +1621,11 @@
       if (conf.hideNewsInFull) { $('body').addClass('hideNewsInFull'); }
       setTimeout(function() {
         $('#content').css({zIndex: 2});
-        //$('#searchResultExplorer').css({top: $('#textMarquee').offset().top + 'px'});
         resetSearchExplorerPos();
         $('body').toggleClass('w_setting',   $('#playerSettingPanel').is(':visible'));
 
         // フル画面時プレイリストを閉じる
-        if (conf.autoClosePlaylistInFull && 
+        if (conf.autoClosePlaylistInFull &&
           $('#content .browserFullPlaylistClose').is(':visible')) {
           $('#content .browserFullPlaylistClose').click();
         }
@@ -1514,13 +1644,13 @@
       w.document.body.appendChild(iframe);
       iframe.hide(); // ページの初期化が終わるまでは表示しない
     }
-    
+
     function initSidePanel() {
       function wideCommentPanel(px) {
         var elms = [
-          '#playerCommentPanelOuter', 
+          '#playerCommentPanelOuter',
           '#playerCommentPanel',
-          '#playerCommentPanel .commentTable', 
+          '#playerCommentPanel .commentTable',
           '#playerCommentPanel .commentTable .commentTableContainer'
         ];
         for (var v in elms) {
@@ -1541,15 +1671,14 @@
     function initPager() {
       if (conf.topPager) {
         $("#resultPagination").insertBefore($("#resultlist")); // 検索窓のページャーを上に (好み次第)
-//        $("#resultPagination").css({position: 'fixed'});
       }
-      
+
       $("#resultPagination, #searchResultSortOptions, #searchResultNavigation").mousedown(function() {
         AnchorHoverPopup.hidePopup();
       });
-      
+
     }
-    
+
     function initEvents() {
       pac.addEventListener("onVideoInitialized", watchVideoId);
       pac.addEventListener("onVideoInitialized", onVideoInitialized);
@@ -1568,42 +1697,22 @@
       //watch.ComponentInitializer.videoSelection.contentsAreaVC.addEventListener('deflistFolderClickedEvent', function(){ })
 
       $('body').dblclick(function(){
-        scrollToVideoPlayer();
+        if (conf.doubleClickScroll) { scrollToVideoPlayer();}
       });
       w.$(window).resize(onWindowResize);
 
     }
-    
-    
-    function toggleSearchType() {
-      if ($('.searchText a').hasClass('searchKeywordIcon')) {
-        $('.searchTag a').click();
-      } else {
-        $('.searchKeyword a').click();
-      }
-      $('.searchOption').hide();
-    }
-    
-    function initOther() {
-      //$('#videoInformation').css({position: 'relative', top: '-85px'});
 
-      if (conf.autoTagPin) {
-        tagv.isPinned = true;
-        tagv.onMouseOverTagContainer();
-      }
-      $('#siteHeaderInner').width(
-        $('#siteHeaderInner').width() + 200
-      );
-
-      resetSearchExplorerPos();
-
+    function initAdditionalButtons() {
       var $div = $('<div></div>');
 
       $div.addClass('bottomAccessContainer');
       var $playlistToggle = $('<button alt="プレイリスト表示/非表示">playlist</button>');
       $playlistToggle.addClass('playlistToggle');
+      $('#playlist').toggleClass('w_show', !conf.hidePlaylist);
       $playlistToggle.click(function() {
         $('#playlist').toggleClass('w_show');
+        conf.setValue('hidePlaylist', !$('#playlist').hasClass('w_show'));
         AnchorHoverPopup.hidePopup();
         resetSearchExplorerPos();
       });
@@ -1621,17 +1730,64 @@
 
 
       $('.searchText input').keydown(function(e){
-        if (e.which == 38 || e.which == 40) { 
+        if (e.which == 38 || e.which == 40) {
           toggleSearchType();
         }
       });
+
+      var $conf = $('<button alt="WatchItLaterの設定">config</button>');
+      $conf.addClass('openConfButton');
+      $conf.click(function() {
+        AnchorHoverPopup.hidePopup();
+        ConfigPanel.toggle();
+      });
+      $('#playerContainerWrapper').append($conf);
+    }
+
+
+    function toggleSearchType() {
+      if ($('.searchText a').hasClass('searchKeywordIcon')) {
+        $('.searchTag a').click();
+      } else {
+        $('.searchKeyword a').click();
+      }
+      $('.searchOption').hide();
+    }
+
+    function initOther() {
+      //$('#videoInformation').css({position: 'relative', top: '-85px'});
+
+      if (conf.autoTagPin) {
+        tagv.isPinned = true;
+        tagv.onMouseOverTagContainer();
+      }
+      $('#siteHeaderInner').width(
+        $('#siteHeaderInner').width() + 200
+      );
+
+      resetSearchExplorerPos();
+
+      initAdditionalButtons();
+
 
       $('.showVideoInfoButton').click(function() { // 「動画情報をもっと見る」クリック時
         WatchApp.ns.init.ComponentInitializer.videoSelection.panelOPC.close();
       });
 
+      if (conf.ignoreJumpCommand) {
+        // 連続再生中は@ジャンプ動かない ＝ 動画プレイヤーに「連続再生モードだよ」
+        // という嘘情報を送れば無効にできるんじゃね？作戦 (思わぬ副作用があるかも)
+        var npc = WatchApp.ns.init.PlayerInitializer.nicoPlayerConnector;
+        npc.onPlaybackModeChanged_org = npc.onPlaybackModeChanged;
+        npc.onPlaybackModeChanged = function(mode) {
+          if (mode == 'normal' && conf.ignoreJumpCommand) {
+            mode = 'continuous';
+          }
+          npc.onPlaybackModeChanged_org(mode);
+        };
+      }
     }
-    
+
 
     function hideAds() {
       return;
@@ -1647,12 +1803,12 @@
 
       onWindowResize();
       setTimeout(function() {
-        $('#content').css({zIndex: 2});
-        $('#searchResultExplorer').css({zIndex: 1});
+        if (conf.videoExplorerHack) {
+          $('#content').css({zIndex: 2});
+          $('#searchResultExplorer').css({zIndex: 1}).addClass('wide');
+        }
       }, 3000);
 
-//      $('#videoMenuTopList').append('<li style="position:absolute;top:50px;left:-80px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;">（＾ω＾）</a><a href="http://nico.ms/sm18845030" style="color: black;" class="itemEcoLink">…</a></li>'); // （＾ω＾） …
-      
     } catch(e) {
       w.alert(e);
     }
@@ -1700,7 +1856,7 @@
       // やや古いFirefoxはここらしい
       monkey(true);
     }
-    
+
   } catch(e) {
     // 最近のFirefoxはここに飛んでくる
     monkey(true);
@@ -1708,12 +1864,3 @@
 })();
 
 
-/*
-  メモ
-  
-  WatchApp.ns.init.SidePanelInitializer.panelSlideViewController.innerLeftElements = [$('#ichibaPanel')];  
-  WatchApp.ns.init.SidePanelInitializer.panelSlideViewController.refresh();
-  $('#ichibaPanel').append($('#videoThumbnailImage').clone(true).css({float: 'right'}));
-//  $("#ichibaPanel").append('<iframe scrolling="no" width="312" height="176" frameborder="0" src="http://ext.nicovideo.jp/thumb/sm9" class="nicovideo"></iframe>');
-
-*/
