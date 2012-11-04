@@ -17,8 +17,11 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121103
+// @version        1.121103b
 // ==/UserScript==
+
+// * ver 1.121103b
+// - 動画リンクのポップアップも切れるようにした
 
 // * ver 1.121103
 // - 設定パネルの追加
@@ -115,6 +118,7 @@
       hidePlaylist: true, // プレイリストを閉じる
       hidariue: true, // てれびちゃんメニュー内に、原宿以前のランダム画像復活
       videoExplorerHack: true, // 動画検索画面を広くする
+      enableHoverPopup: true, // 動画リンクのマイリストポップアップを有効にする
 
       fxInterval: 40 // アニメーションのフレームレート 40 = 25fps
     };
@@ -386,6 +390,9 @@
       }\n\n\
       #watchItLaterConfigPanel label:hober{\n\
       }\n\n\
+      #watchItLaterConfigPanel .bottom {\n\
+        text-align: right;padding: 0 12px; \n\
+      }\n\
       #watchItLaterConfigPanel .closeButton{\n\
         cursor: pointer; border: 1px solid;\n\
       }\n\n\
@@ -427,6 +434,8 @@
     var pt = ConfigPanel.prototype;
     var $panel = null;
     var menus = [
+      {description: '動画リンクへのポップアップを有効にする', varName: 'enableHoverPopup',
+        values: {'する': true, 'しない': false}},
       {description: 'プレイヤーを自動で最大化', varName: 'autoBrowserFull',
         values: {'する': true, 'しない': false}},
       {description: '動画終了時に最大化を解除(原宿と同じにする)', varName: 'autoNotFull',
@@ -456,7 +465,7 @@
           var $item = this.createMenuItem(menus[i]);
           $ul.append($item);
         }
-        var $close = w.jQuery('<p><button class="closeButton">閉じる</button>項目によっては再読み込みが必要です</p>'), self = this;
+        var $close = w.jQuery('<p class="bottom">項目によっては再読み込みが必要です<button class="closeButton">閉じる</button></p>'), self = this;
         $close.click(function() {
           self.close();
         });
@@ -1220,6 +1229,7 @@
     var excludeReg = /(news|live|seiga)\..*?nicovideo\.jp/;
 
     function bind(force) {
+      if (!conf.enableHoverPopup) { return; }
       function each(e, watchId) {
         e.mylist_add = "/mylist_add/video/" + watchId;
         var over, out;
@@ -1862,5 +1872,4 @@
     monkey(true);
   }
 })();
-
 
