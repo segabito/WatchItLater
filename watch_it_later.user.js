@@ -17,8 +17,12 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121103b
+// @version        1.121106
 // ==/UserScript==
+
+// * ver 1.121106
+// - タグ検索ページ・キーワード検索ページでのポップアップが出る位置を調整
+// - マイリスト登録成功時のポップアップに、マイリスト編集ページへのリンク追加(QWatch)
 
 // * ver 1.121103b
 // - 動画リンクのポップアップも切れるようにした
@@ -958,7 +962,7 @@
             self.addMylist(_watchId, groupId, function(status, result) {
               self.reloadDefList();
               if (status == 'ok') {
-                Popup.show( name + 'に登録しました');
+                Popup.show( '<a href="/my/mylist/#/' + groupId + '">' + name + '</a>に登録しました');
               } else {
                 Popup.alert(name + 'の登録に失敗: ' + result.error.description);
               }
@@ -1250,6 +1254,12 @@
               var t = $e.text();
               var o = t != "" ? $e.offset() : $e.find('*').offset();
               showPanel(watchId, o.left, o.top);
+            } else
+            if (e.getBoundingClientRect) {
+              var o = (e.firstChild && e.firstChild.tagName == 'IMG') ? e.firstChild.getBoundingClientRect() : e.getBoundingClientRect();
+              var top = Math.max(w.document.documentElement.scrollTop, w.document.body.scrollTop),
+                  left = Math.max(w.document.documentElement.scrollLeft, w.document.body.scrollLeft);
+              showPanel(watchId, left + o.left, top + o.top);
             } else {
               showPanel(watchId, mx + 8, my + 8);
             }
@@ -1872,4 +1882,5 @@
     monkey(true);
   }
 })();
+
 
