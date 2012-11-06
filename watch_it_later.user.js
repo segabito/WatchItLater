@@ -17,8 +17,11 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121106
+// @version        1.121107
 // ==/UserScript==
+
+// * ver 1.121107
+// - 動画検索画面に、お気に入りタグを出せるようにした
 
 // * ver 1.121106
 // - タグ検索ページ・キーワード検索ページでのポップアップが出る位置を調整
@@ -78,6 +81,8 @@
 // - 市場を色々なんとかする
 // - 検索部分を開閉するショートカットキーが欲くなった
 // - 段幕がちょっとだけ邪魔な時「CTRLを押してる間だけコメントが消える」とかやりたい
+// - お気に入りマイリスト取得
+// - 検索のソート順を覚える
 // - いいかげんコード整理
 
 (function() {
@@ -123,6 +128,7 @@
       hidariue: true, // てれびちゃんメニュー内に、原宿以前のランダム画像復活
       videoExplorerHack: true, // 動画検索画面を広くする
       enableHoverPopup: true, // 動画リンクのマイリストポップアップを有効にする
+      enableFavTags: false, // 動画検索画面にお気に入りタグを表示
 
       fxInterval: 40 // アニメーションのフレームレート 40 = 25fps
     };
@@ -402,7 +408,17 @@
       }\n\n\
       #content .openConfButton {\n\
         position: absolute; bottom:0; right: 0;\n\
-      }\n',
+      }\n\
+\
+\
+      /* 動画検索画面に出るお気に入りタグ */\
+      #favoriteTagsContainer {\
+      }\
+      #favoriteTagsContainer .favoriteTag {\
+        font-size: 80%; margin: 0 8px 0 0;\
+      }\
+\
+      ',
     ''].join('');
     //console.log(style);
     GM_addStyle(style);
@@ -433,9 +449,7 @@
   conf.load();
 
   var ConfigPanel = (function(conf) {
-    function ConfigPanel() {
-    }
-    var pt = ConfigPanel.prototype;
+    var pt = function(){};
     var $panel = null;
     var menus = [
       {description: '動画リンクへのポップアップを有効にする', varName: 'enableHoverPopup',
@@ -458,8 +472,13 @@
         values: {'する': true, 'しない': false}},
       {description: '動画検索画面を広くする', varName: 'videoExplorerHack',
         values: {'する': true, 'しない': false}},
+      {description: '動画検索画面にお気に入りタグを表示', varName: 'enableFavTags',
+        values: {'する': true, 'しない': false}},
       {description: '「@ジャンプ」を無効化(※実験中。不具合があるかも)', varName: 'ignoreJumpCommand',
         values: {'する': true, 'しない': false}, className: 'buggy'},
+
+
+
     ];
     pt.createPanelDom = function() {
       if ($panel == null) {
@@ -511,7 +530,7 @@
       }
     };
 
-    return new ConfigPanel();
+    return pt;
   })(conf);
 
 
@@ -520,11 +539,9 @@
    *
    */
   var VideoTags = (function(){
-    function VideoTags() {
-    }
 
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
-    var pt = VideoTags.prototype;
+    var pt = function(){};
     var lastPopup = null;
 
 
@@ -534,7 +551,7 @@
       AnchorHoverPopup.hidePopup();
       setTimeout(function() {
         //w.WatchApp.ns.util.WindowUtil.scrollFitMinimum('#searchResultExplorer', 300);
-        $('#searchResultExplorer .searchText input').focus();
+        w.$('#searchResultExplorer .searchText input').focus();
       }, 500);
     }
 
@@ -615,7 +632,7 @@
         if (uniq === null) {
           uniq = {};
           $history = $('<div><p>タグ履歴</p></div>');
-          $history.css({width: $('#searchResultNavigation').width(), height: '300px', overflowY: 'auto'});
+          $history.css({width: $('#searchResultNavigation').width(), maxHeight: '300px', overflowY: 'auto'});
           $('#searchResultNavigation').append($history);
         }
         if (!uniq[text]) {
@@ -668,7 +685,7 @@
       }
     };
 
-    return new VideoTags();
+    return pt;
   })();
 
 
@@ -1111,9 +1128,7 @@
     var favMylistList = [];
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
     var $ = w.$;
-    function FavMylist() {
-    }
-    var pt = FavMylist.prototype;
+    var pt = function(){};
     pt.loadFavList = loadFavList;
 
     /**
@@ -1136,7 +1151,7 @@
         }
       });
     }
-    return new FavMylist();
+    return pt;
   })();
 
 
@@ -1144,16 +1159,14 @@
     var favTagList = [];
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
     var $ = w.$;
-    function FavTags() {
-    }
-    var pt = FavTags.prototype;
-    pt.loadFavTags = loadFavTags;
+    var pt = function(){};
+    pt.load = load;
 
     /**
      *  お気に入りタグの取得。 jQueryのあるページでしか使えない
      *  マイページを無理矢理パースしてるので突然使えなくなるかも
      */
-    function loadFavTags(callback) {
+    function load(callback) {
       if (!w.jQuery) return; //
       var url = 'http://' + host + '/my/fav/tag';
       GM_xmlhttpRequest({
@@ -1169,7 +1182,7 @@
         }
       });
     }
-    return new FavTags();
+    return pt;
   })();
 
 
@@ -1399,7 +1412,8 @@
 
 
   /**
-   *  ZeroWatch上でのあれこれ
+   *  QWatch上でのあれこれ
+   *  無計画に増築中
    *
    *  watch.jsを解析すればわかる
    *
@@ -1585,6 +1599,34 @@
               (1000 + Math.floor(Math.random() * 1000)).toString().substr(1) + '.gif';
     }
 
+
+    function loadFavTags() {
+      setTimeout(function() {
+        FavTags.load(function(tags) {
+          console.log(tags);
+          var $favtags = $('<div><p>お気に入りタグ</p></div>');
+          $favtags.css({width: $('#searchResultNavigation').width()}).attr('id','favoriteTagsContainer');
+          $('#searchResultNavigation').append($favtags);
+          for (var i = 0, len = tags.length; i < len; i++) {
+            var tag = tags[i],
+              $a = $('<a></a>')
+              .attr({href: tag.href})
+              .text(tag.name)
+              .addClass('favoriteTag')
+              .click(function(e) {
+                e.preventDefault();
+                if (e.button != 0 || e.metaKey) return;
+                watch.ComponentInitializer.videoSelection.searchVideo($(this).text(), 'tag');
+                AnchorHoverPopup.hidePopup();
+              });
+            $favtags.append('<span>▼</span>').append($a);
+          }
+        });
+      }, 100);
+    }
+
+
+
     function onVideoStopped() {
     }
 
@@ -1598,7 +1640,11 @@
       return;
     }
 
+    var videoSelectOpenCount = 0;
     function onVideoSelectPanelOpened() {
+      if (videoSelectOpenCount++ == 0 && conf.enableFavTags) {
+        loadFavTags();
+      }
       isSearchOpen = true;
       AnchorHoverPopup.hidePopup().updateNow();
     }
@@ -1607,7 +1653,6 @@
       isSearchOpen = true;
       if (conf.videoExplorerHack) { $('#searchResultExplorer').css({zIndex: 600}); }
     }
-
 
     function onVideoSelectPanelClosed() {
       isSearchOpen = false;
@@ -1749,10 +1794,11 @@
       $('#playerContainerWrapper').append($div);
 
 
-      $('.searchText input').keydown(function(e){
-        if (e.which == 38 || e.which == 40) {
-          toggleSearchType();
-        }
+      $('.searchText input:first').keydown(function(e){
+        if (e.which == 38 || e.which == 40) { toggleSearchType(':first'); }
+      });
+      $('.searchText input:last').keydown(function(e){
+        if (e.which == 38 || e.which == 40) { toggleSearchType(':last'); }
       });
 
       var $conf = $('<button alt="WatchItLaterの設定">config</button>');
@@ -1765,11 +1811,11 @@
     }
 
 
-    function toggleSearchType() {
-      if ($('.searchText a').hasClass('searchKeywordIcon')) {
-        $('.searchTag a').click();
+    function toggleSearchType(suffix) {
+      if ($('.searchText a' + suffix).hasClass('searchKeywordIcon')) {
+        $('.searchTag a' + suffix).click();
       } else {
-        $('.searchKeyword a').click();
+        $('.searchKeyword a ' + suffix).click();
       }
       $('.searchOption').hide();
     }
