@@ -17,8 +17,11 @@
 // @grant          GM_registerMenuCommand
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121107
+// @version        1.121108
 // ==/UserScript==
+
+// * ver 1.121108
+// - タグが2行以内の時は自動で高さ調節(※ピン留め時しかうまくいかない)
 
 // * ver 1.121107
 // - 動画検索画面に、お気に入りタグを出せるようにした
@@ -129,6 +132,7 @@
       videoExplorerHack: true, // 動画検索画面を広くする
       enableHoverPopup: true, // 動画リンクのマイリストポップアップを有効にする
       enableFavTags: false, // 動画検索画面にお気に入りタグを表示
+      enableAutoTagContainerHeight: false, // タグが2行以内なら自動で高さ調節(ピン留め時のみ
 
       fxInterval: 40 // アニメーションのフレームレート 40 = 25fps
     };
@@ -418,6 +422,19 @@
         font-size: 80%; margin: 0 8px 0 0;\
       }\
 \
+\
+      /* 動画タグが1行以下の時 */\
+      body.w_notFull #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.oneLine {\
+        height: 12px;\
+      }\
+      body.w_notFull #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.oneLine .toggleText{\
+        display: none;\
+      }\
+      /* 動画タグが2行以下の時 */\
+      body.w_notFull #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.twoLines {\
+        height: 36px;\
+      }\
+\
       ',
     ''].join('');
     //console.log(style);
@@ -473,6 +490,8 @@
       {description: '動画検索画面を広くする', varName: 'videoExplorerHack',
         values: {'する': true, 'しない': false}},
       {description: '動画検索画面にお気に入りタグを表示', varName: 'enableFavTags',
+        values: {'する': true, 'しない': false}},
+      {description: 'タグが2行以内なら自動で高さ調節(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
         values: {'する': true, 'しない': false}},
       {description: '「@ジャンプ」を無効化(※実験中。不具合があるかも)', varName: 'ignoreJumpCommand',
         values: {'する': true, 'しない': false}, className: 'buggy'},
@@ -1564,6 +1583,8 @@
       leftPanelJack();
       resetSearchExplorerPos();
       resetHidariue();
+      onTagReset();
+
     }
     // - 空っぽになった左になんか表示してみる
     function leftPanelJack() {
@@ -1603,7 +1624,6 @@
     function loadFavTags() {
       setTimeout(function() {
         FavTags.load(function(tags) {
-          console.log(tags);
           var $favtags = $('<div><p>お気に入りタグ</p></div>');
           $favtags.css({width: $('#searchResultNavigation').width()}).attr('id','favoriteTagsContainer');
           $('#searchResultNavigation').append($favtags);
@@ -1614,8 +1634,8 @@
               .text(tag.name)
               .addClass('favoriteTag')
               .click(function(e) {
-                e.preventDefault();
                 if (e.button != 0 || e.metaKey) return;
+                e.preventDefault();
                 watch.ComponentInitializer.videoSelection.searchVideo($(this).text(), 'tag');
                 AnchorHoverPopup.hidePopup();
               });
@@ -1702,6 +1722,38 @@
       }, 500);
     }
 
+    var $videoHeaderTagEditLinkArea = null, $toggleTagEditText = null, baseTagHeight = 0;
+    function onTagReset() {
+
+      // タグが2行以下だったら自動的に狭くする処理
+      if (conf.enableAutoTagContainerHeight) {
+        if (baseTagHeight === 0) { baseTagHeight = watch.TagInitializer.tagViewController.defaultHeightInNormal;}
+        var h = Math.min(baseTagHeight, $('#videoTagContainer .tagInner').innerHeight());
+
+        if (watch.TagInitializer.tagViewController.defaultHeightInNormal != h) {
+          var $toggle = $('#videoTagContainer .toggleTagEdit');
+          watch.TagInitializer.tagViewController.defaultHeightInNormal = h;
+          $toggle.removeClass('oneLine').removeClass('twoLines');
+
+          if (h < 36) { // 1行以下の時
+            if (!$videoHeaderTagEditLinkArea) {
+              $videoHeaderTagEditLinkArea = $('.toggleTagEditInner .videoHeaderTagEditLinkArea').remove();
+              $toggleTagEditText = $('<span class="toggleText">' + $('.toggleTagEditInner').text() + '</span>');
+              $('.toggleTagEditInner').empty().append($toggleTagEditText).append($videoHeaderTagEditLinkArea);
+            }
+            $toggle.addClass('oneLine');
+          } else {
+            if (h <= 60) { // 2行以下の時
+              $toggle.addClass('twoLines');
+            }
+          }
+          setTimeout(function() {resetSearchExplorerPos();}, 1000); // このやっつけ感
+          watch.TagInitializer.tagViewController.fitTagAreaAndVideoHeader();
+        }
+      }
+    }
+
+
     function initIframe() {
       iframe.id = "mylyst_add_frame";
       iframe.className += " fixed";
@@ -1760,6 +1812,8 @@
       // メモ
       // とりあえずマイリストのオープン
       //watch.ComponentInitializer.videoSelection.contentsAreaVC.addEventListener('deflistFolderClickedEvent', function(){ })
+
+      watch.TagInitializer.tagList.addEventListener('reset', onTagReset);
 
       $('body').dblclick(function(){
         if (conf.doubleClickScroll) { scrollToVideoPlayer();}
