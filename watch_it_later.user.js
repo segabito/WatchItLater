@@ -14,7 +14,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121108
+// @version        1.121108b
 // ==/UserScript==
 
 // * ver 1.121108
@@ -1987,61 +1987,3 @@
   }
 })();
 
-
-/*
-  メモ
-
-  WatchApp.ns.init.SidePanelInitializer.panelSlideViewController.innerLeftElements = [$('#ichibaPanel')];
-  WatchApp.ns.init.SidePanelInitializer.panelSlideViewController.refresh();
-
-// 検索画面に動画やマイリストを流し込む この方法だと2ページ目とかに対応できない
-WatchApp.ns.init.ComponentInitializer.videoSelection.contentsAreaVC.setContents(video, '', pagecount, currentpage, ???);
- var video = {
-  data: {
-    id: "smXXXX",
-    length: "1:23",
-    mylist_counter: "123",
-    num_res: "456",
-    thumbnail_url: "http://tn-skr3.smilevideo.jp/smile?i=XXXXXX",
-    title: "動画タイトル",
-    type: "video",
-    view_counter: "940",
-  },
-  getInfo: function() {
-    return this.data;
-  },
-  getType: function() {
-    return this.data.type; //'uploadVideo', 'deflist', 'mylist', 'suggest'
-  }
- };
- var mylist = {
-  data: {
-    id: '123456',
-    name: 'マイリスト名',
-    type: 'mylist'
-  },
-  getId: function() {
-    return this.data.id;
-  },
-  getName: function() {
-    return this.data.name;
-  },
-  getInfo: function() {
-    return this.data;
-  },
-  getType: function() {
-    return this.data.type; //'uploadVideo', 'deflist', 'mylist', 'suggest'
-  }
- };
-
-
-LoaderAgent.prototype.load(req, onload, onerror);
-
-Object
-params: Object
-page: 1
-user_id: "4"
-__proto__: Object
-type: "uservideo"
-__proto__: Object
-*/
