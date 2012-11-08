@@ -14,8 +14,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121108b
+// @version        1.121109
 // ==/UserScript==
+
+// * ver 1.121109
+// - ポップアップからの検索でも小画面化可能に
 
 // * ver 1.121108
 // - タグが2行以内の時は自動で高さ調節(※ピン留め時しかうまくいかない)
@@ -83,6 +86,7 @@
 // - 段幕がちょっとだけ邪魔な時「CTRLを押してる間だけコメントが消える」とかやりたい
 // - お気に入りマイリスト取得
 // - 検索のソート順を覚える
+// - ニュースの履歴保存
 // - いいかげんコード整理
 
 (function() {
@@ -130,6 +134,7 @@
       enableHoverPopup: true, // 動画リンクのマイリストポップアップを有効にする
       enableFavTags: false, // 動画検索画面にお気に入りタグを表示
       enableAutoTagContainerHeight: false, // タグが2行以内なら自動で高さ調節(ピン留め時のみ
+      autoSmallScreenSearch: false, // ポップアップからのタグ検索でもプレイヤーを小さくする
 
       fxInterval: 40 // アニメーションのフレームレート 40 = 25fps
     };
@@ -439,6 +444,15 @@
         margin-top: -8px;\
       }\
 \
+      body.w_small #playerContainerWrapper {\
+        padding: 0;\
+      }\
+      #searchResultExplorer #resultPagination {\
+        padding-top: 0;margin-top: -10px;\
+      }\
+      #searchResultExplorer #searchResultOptions {\
+        margin: 0 auto;\
+      }\
       ',
     ''].join('');
     //console.log(style);
@@ -497,6 +511,9 @@
         values: {'する': true, 'しない': false}},
       {description: 'タグが2行以内なら自動で高さ調節(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
         values: {'する': true, 'しない': false}},
+      {description: 'ポップアップからのタグ検索でもプレイヤーを小さくする', varName: 'autoSmallScreenSearch',
+        values: {'する': true, 'しない': false}},
+
       {description: '「@ジャンプ」を無効化(※実験中。不具合があるかも)', varName: 'ignoreJumpCommand',
         values: {'する': true, 'しない': false}, className: 'buggy'},
 
@@ -568,15 +585,6 @@
     var lastPopup = null;
 
 
-    function nicoSearch(word, search_type) {
-      search_type = search_type || 'tag';
-      w.WatchApp.ns.init.ComponentInitializer.videoSelection.searchVideo(word, search_type);
-      AnchorHoverPopup.hidePopup();
-      setTimeout(function() {
-        //w.WatchApp.ns.util.WindowUtil.scrollFitMinimum('#searchResultExplorer', 300);
-        w.$('#searchResultExplorer .searchText input').focus();
-      }, 500);
-    }
 
     pt.get = function(watchId, callback) {
       var url = 'http://' + host + '/tag_edit/' + watchId + '/?res_type=json&cmd=tags';
@@ -661,7 +669,7 @@
         if (!uniq[text]) {
           var a = $(dom).clone().css({marginRight: '8px', fontSize: '80%'}).click(function(e) {
             if (e.button != 0 || e.metaKey) return;
-            nicoSearch(text);
+            WatchController.nicoSearch(text);
             e.preventDefault();
           });
           dic.style.marginRight = '0';
@@ -684,7 +692,7 @@
         a.addEventListener('click', function(e) {
           if (e.button != 0 || e.metaKey) return;
           if (w.WatchApp) {
-            nicoSearch(text);
+            WatchController.nicoSearch(text);
             e.preventDefault();
             appendTagHistory(a, text, dic);
           }
@@ -1433,6 +1441,52 @@
   //===================================================
   //===================================================
 
+  var WatchController = (function(w) {
+    var WatchApp = w.WatchApp, watch = WatchApp.ns.init, $ = w.$, WatchJsApi = w.WatchJsApi;
+    return {nicoSearch: function(word, search_type) {
+      search_type = search_type || 'tag';
+      watch.ComponentInitializer.videoSelection.searchVideo(word, search_type);
+      if (conf.autoSmallScreenSearch) { this.changeScreenMode('small'); }
+      AnchorHoverPopup.hidePopup();
+//      setTimeout(function() {
+//        $('#searchResultExplorer .searchText input').focus();
+//      }, 500);
+      },
+      changeScreenMode: function(mode) {
+        WatchJsApi.player.changePlayerScreenMode(mode);
+        setTimeout(function(){$(window).resize();}, 3000);
+      },
+      scrollToVideoPlayer: function(force) {
+        // 縦解像度がタグ+プレイヤーより大きいならタグの開始位置、そうでないならプレイヤーの位置にスクロール
+        // ただし、該当部分が画面内に納まっている場合は、勝手にスクロールすると帰ってうざいのでなにもしない
+        var h = $('#playerContainer').outerHeight() + $('#videoTagContainer').outerHeight();
+        var top = $(window).height() >= h ? '#videoTagContainer, #playerContainer' : '#playerContainer';
+
+        if (force) {
+          // 要素が画面内に納まっている場合でも、その要素の位置までスクロール
+          WatchApp.ns.util.WindowUtil.scrollFit(top, 600);
+        } else {
+          // 要素が画面内に収まっている場合はスクロールしない
+          WatchApp.ns.util.WindowUtil.scrollFitMinimum(top, 600);
+        }
+      },
+      changeCommentPanelWidth: function(target) {
+        var px = target - $('#playerCommentPanelOuter').outerWidth();
+        var elms = [
+          '#playerCommentPanelOuter',
+          '#playerCommentPanel',
+          '#playerCommentPanel .commentTable',
+          '#playerCommentPanel .commentTable .commentTableContainer'
+        ];
+        for (var v in elms) {
+          var $e = $(elms[v]);
+          $e.width($e.width() + px);
+        }
+        $('#playerCommentPanelOuter').css({'right': - $('#playerCommentPanelOuter').outerWidth() + 'px'});
+      }
+    }
+  })(w);
+
 
   /**
    *  QWatch上でのあれこれ
@@ -1460,11 +1514,6 @@
     var isSearchOpen = false;
   //  var flashVars = pim.playerInitializeModel.flashVars;
   //  flashVars.isBackComment = 0;
-
-    function changePlayerScreenMode(mode) {
-      WatchJsApi.player.changePlayerScreenMode(mode);
-      setTimeout(function(){$(window).resize();}, 3000);
-    }
 
     var initialExplorerWidth = null;
     function onWindowResize() {
@@ -1577,11 +1626,11 @@
 
       if (conf.autoBrowserFull) {
           setTimeout(function() {
-          changePlayerScreenMode("browserFull");
+          WatchController.changeScreenMode('browserFull');
           onWindowResize();
         }, 100);
       } else
-      if (conf.autoScrollToPlayer) {scrollToVideoPlayer();}
+      if (conf.autoScrollToPlayer) { WatchController.scrollToVideoPlayer();}
 
 
       leftPanelJack();
@@ -1640,8 +1689,7 @@
               .click(function(e) {
                 if (e.button != 0 || e.metaKey) return;
                 e.preventDefault();
-                watch.ComponentInitializer.videoSelection.searchVideo($(this).text(), 'tag');
-                AnchorHoverPopup.hidePopup();
+                WatchController.nicoSearch($(this).text());
               });
             $favtags.append('<span>▼</span>').append($a);
           }
@@ -1658,7 +1706,7 @@
       AnchorHoverPopup.hidePopup().updateNow();
       // 原宿までと同じように、動画終了時にフルスクリーンを解除したい
       if (conf.autoNotFull) {
-        changePlayerScreenMode("notFull");
+        WatchController.changeScreenMode('notFull');
       }
 
       return;
@@ -1767,24 +1815,11 @@
     }
 
     function initSidePanel() {
-      function wideCommentPanel(px) {
-        var elms = [
-          '#playerCommentPanelOuter',
-          '#playerCommentPanel',
-          '#playerCommentPanel .commentTable',
-          '#playerCommentPanel .commentTable .commentTableContainer'
-        ];
-        for (var v in elms) {
-          var $e = $(elms[v]);
-          $e.width($e.width() + px);
-        }
-        $('#playerCommentPanelOuter').css({'right': - $('#playerCommentPanelOuter').outerWidth() + 'px'});
-      }
       if (conf.wideCommentPanel) {
 //      完全に横スクロール不要にしたい場合はこっち
 //        var tarinaiWidth = $('#commentDefault .commentTableContainer').innerWidth() - $('#commentDefault .commentTableContainerInner').outerWidth();
-//        wideCommentPanel(tarinaiWidth - 10);
-        wideCommentPanel(420 - $('#playerCommentPanelOuter').outerWidth());
+//      WatchController.changeCommentPanelWidth(tarinaiWidth - 10);
+        WatchController.changeCommentPanelWidth(420);
       }
 
     }
@@ -1816,11 +1851,14 @@
       // メモ
       // とりあえずマイリストのオープン
       //watch.ComponentInitializer.videoSelection.contentsAreaVC.addEventListener('deflistFolderClickedEvent', function(){ })
+      // ニュースチェンジ
+      // WatchApp.ns.init.TextMarqueeInitializer.textMarqueeViewController.scheduler.addEventListener('schedule', function() {console.log(JSON.stringify(arguments[0]))})
+
 
       watch.TagInitializer.tagList.addEventListener('reset', onTagReset);
 
       $('body').dblclick(function(){
-        if (conf.doubleClickScroll) { scrollToVideoPlayer();}
+        if (conf.doubleClickScroll) { WatchController.scrollToVideoPlayer(true);}
       });
       w.$(window).resize(onWindowResize);
 
@@ -1986,4 +2024,5 @@
     monkey(true);
   }
 })();
+
 
