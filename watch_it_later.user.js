@@ -14,8 +14,12 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121111
+// @version        1.121112
 // ==/UserScript==
+
+// * ver 1.121112
+// - 自動全画面化オンの設定でも、ユーザーニコ割があるときは全画面化しない設定を追加
+//   ユーザーニコ割を見逃したくない人のため。
 
 // * ver 1.121111
 // - ニコニコニュースの履歴表示機能
@@ -118,13 +122,14 @@
     }
 
     var conf = {
-      autoBrowserFull: false, // 再生開始時に自動最大化
+      autoBrowserFull: false, // 再生開始時に自動全画面化
+      disableAutoBrowserFullIfNicowari: false, // ユーザーニコ割があるときは自動全画面化しない
       autoNotFull: true, // 再生完了時にフルスクリーン解除(原宿と同じにする)
       autoTagPin: false,
       topPager: true, // 検索ボックスのページャを上にする
       hideLeftIchiba: false,
       autoClosePlaylistInFull: true, // 全画面時にプレイリストを自動で閉じる
-      autoScrollToPlayer: true, // プレイヤー位置に自動スクロール(自動最大化オフ時)
+      autoScrollToPlayer: true, // プレイヤー位置に自動スクロール(自動全画面化オフ時)
       hideNewsInFull: true, // 全画面時にニュースを閉じる
       wideCommentPanel: true, // コメントパネルをワイドにする
       leftPanelJack: true, // 左パネルに動画情報を表示
@@ -382,13 +387,13 @@
         margin: 0 4px 0;\n\
       }\n\n\
 \
-      body.w_setting #searchResultExplorer.wide {\n\ /* 設定パネルと検索ウィンドウが被るのを防止 */\
+      body.w_setting #searchResultExplorer.wide {\n\ /* QWatch設定パネルと検索ウィンドウが被るのを防止 */\
         top: auto !important;\n\
       }\n\n\
       body.w_channel #ichibaPanel .userIconContainer{\n\
         display: none;\n\
       }\n\n\
-      /* 設定パネル */\
+      /* QWatch設定パネル */\
       #watchItLaterConfigPanel {\n\
         position: fixed; bottom:0; right:0; z-index: 10001; display: none;\n\
         width: 400px; padding: 4px;\n\
@@ -402,6 +407,9 @@
       }\n\n\
       #watchItLaterConfigPanel li{\n\
         margin: 4px auto;\n\
+      }\n\n\
+      #watchItLaterConfigPanel li:hover{\n\
+        background: #dff;\
       }\n\n\
       #watchItLaterConfigPanel li.buggy{\n\
         color: #888;\n\
@@ -419,6 +427,12 @@
       #watchItLaterConfigPanel .closeButton{\n\
         cursor: pointer; border: 1px solid;\n\
       }\n\n\
+      #watchItLaterConfigPanel.autoBrowserFull_false .disableAutoBrowserFullIfNicowari {\
+        color: #ccc;\
+      }\
+      #watchItLaterConfigPanel.autoBrowserFull_true .autoScrollToPlayer {\
+        color: #ccc;\
+      }\
       #content .openConfButton {\n\
         position: absolute; bottom:0; right: 0;\n\
       }\n\
@@ -536,11 +550,13 @@
     var menus = [
       {description: '動画リンクへのポップアップを有効にする', varName: 'enableHoverPopup',
         values: {'する': true, 'しない': false}},
-      {description: 'プレイヤーを自動で最大化', varName: 'autoBrowserFull',
+      {description: 'プレイヤーを自動で全画面化', varName: 'autoBrowserFull',
         values: {'する': true, 'しない': false}},
-      {description: '動画終了時に最大化を解除(原宿と同じにする)', varName: 'autoNotFull',
+      {description: '自動全画面化オンでも、ユーザーニコ割のある動画は', varName: 'disableAutoBrowserFullIfNicowari',
+        values: {'全画面化しない': true, '全画面化する': false}},
+      {description: '動画終了時に全画面化を解除(原宿と同じにする)', varName: 'autoNotFull',
         values: {'する': true, 'しない': false}},
-      {description: 'プレイヤー位置に自動スクロール(自動最大化オフ時)', varName: 'autoScrollToPlayer',
+      {description: 'プレイヤー位置に自動スクロール(自動全画面化オフ時)', varName: 'autoScrollToPlayer',
         values: {'する': true, 'しない': false}},
       {description: 'コメントパネルのワイド化', varName: 'wideCommentPanel',
         values: {'する': true, 'しない': false}},
@@ -592,6 +608,8 @@
       var $menu = w.jQuery('<li><p class="description">' + description + '</p></li>');
       if (menu.className) { $menu.addClass(menu.className);}
       var currentValue = conf.getValue(varName);
+      $menu.addClass(menu.varName);
+      $panel.addClass(menu.varName + '_' + menu.currentValue);
       for (var k in values) {
         var v = values[k];
         var $label = w.jQuery('<label></label>');
@@ -602,11 +620,12 @@
           $chk.attr('checked', 'checked');
         }
         $chk.click(function() {
-          var newValue = JSON.parse(this.value);
-          if (conf[this.name] !== newValue) {
+          var newValue = JSON.parse(this.value), oldValue = conf[this.name];
+          if (oldValue !== newValue) {
+            $panel.removeClass(menu.varName + '_' + oldValue).addClass(menu.varName + '_' + newValue);
             conf.setValue(this.name, newValue);
             if (typeof menu.onchange === 'function') {
-              menu.onchange(newValue);
+              menu.onchange(newValue, oldValue);
             }
           }
         });
@@ -1761,7 +1780,11 @@
       setVideoCounter(watch.CommonModelInitializer.watchInfoModel);
 
       if (conf.autoBrowserFull) {
-          setTimeout(function() {
+        setTimeout(function() {
+          if ($('body').hasClass('up_marquee') && conf.disableAutoBrowserFullIfNicowari) {
+            // ユーザーニコ割があるときは自動全画面にしない
+            return;
+          }
           WatchController.changeScreenMode('browserFull');
           onWindowResize();
         }, 100);
@@ -2164,4 +2187,5 @@
     monkey(true);
   }
 })();
+
 
