@@ -14,8 +14,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121109
+// @version        1.121111
 // ==/UserScript==
+
+// * ver 1.121111
+// - ニコニコニュースの履歴表示機能
 
 // * ver 1.121109
 // - ポップアップからの検索でも小画面化可能に
@@ -135,6 +138,7 @@
       enableFavTags: false, // 動画検索画面にお気に入りタグを表示
       enableAutoTagContainerHeight: false, // タグが2行以内なら自動で高さ調節(ピン留め時のみ
       autoSmallScreenSearch: false, // ポップアップからのタグ検索でもプレイヤーを小さくする
+      enableNewsHistory: false, // ニコニコニュースの履歴を保持する
 
       fxInterval: 40 // アニメーションのフレームレート 40 = 25fps
     };
@@ -343,6 +347,9 @@
       #content .bottomAccessContainer {\n\
         position: absolute; bottom: 0;\n\
       }\n\n\
+      body.w_searchOpen .bottomAccessContainer, body.w_searchOpen #content .openConfButton{\
+        display: none;\
+      }\
       /* プレイリスト出したり隠したり */\
       body.w_notFull #playlist{\n\
         position: absolute; top: -9999px;\n\
@@ -453,6 +460,46 @@
       #searchResultExplorer #searchResultOptions {\
         margin: 0 auto;\
       }\
+\
+      /* ニュース履歴 */\
+      body.w_searchOpen #textMarquee .openNewsHistory, body.w_searchOpen #textMarquee .newsHistory {\
+        display: none !important;\
+      }\
+      #textMarquee .openNewsHistory {\
+        position: absolute; width: 30px;left: -30px; top: 0;\
+        font-size: 13px; padding: 0; margin: 0; height: 28px;\
+        cursor: pointer;\
+      }\
+      #textMarquee .newsHistory {\
+        position: absolute;\
+        bottom: -2px; left: 0px; width: 100%;\
+        max-height: 132px;\
+        min-height: 28px;\
+        overflow-y: auto;\
+        overflow-x: hidden;\
+        z-index: 1;\
+        padding: 4px;\
+        display: none;\
+        background: #333;\
+        text-align: left;\
+        font-size: 14px;\
+        box-shadow: 2px 2px #000;\
+        padding: 0;\
+        margin: 0;\
+      }\
+      #textMarquee .newsHistory li{\
+        padding: 0 2px;\
+      }\
+      #textMarquee .newsHistory li:nth-child(odd){\
+        background: #444;\
+      }\
+      #textMarquee .newsHistory li:nth-child(even){\
+        background: #333;\
+      }\
+      body.full_in_browser.hideNewsInFull #textMarquee .newsHistory {\
+        display: none !important;\
+      }\
+\
       ',
     ''].join('');
     //console.log(style);
@@ -483,7 +530,7 @@
   };
   conf.load();
 
-  var ConfigPanel = (function(conf) {
+  var ConfigPanel = (function(conf, w) {
     var pt = function(){};
     var $panel = null;
     var menus = [
@@ -510,15 +557,19 @@
       {description: '動画検索画面にお気に入りタグを表示', varName: 'enableFavTags',
         values: {'する': true, 'しない': false}},
       {description: 'タグが2行以内なら自動で高さ調節(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
-        values: {'する': true, 'しない': false}},
+        values: {'する': true, 'しない': false},
+          onchange: function(v) {
+            // ピン留めする
+            if (v) { w.WatchApp.ns.init.TagInitializer.tagViewController.setIsPinned(true); }
+          }
+       },
       {description: 'ポップアップからのタグ検索でもプレイヤーを小さくする', varName: 'autoSmallScreenSearch',
+        values: {'する': true, 'しない': false}},
+      {description: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory',
         values: {'する': true, 'しない': false}},
 
       {description: '「@ジャンプ」を無効化(※実験中。不具合があるかも)', varName: 'ignoreJumpCommand',
-        values: {'する': true, 'しない': false}, className: 'buggy'},
-
-
-
+        values: {'する': true, 'しない': false}, className: 'buggy'}
     ];
     pt.createPanelDom = function() {
       if ($panel == null) {
@@ -551,7 +602,13 @@
           $chk.attr('checked', 'checked');
         }
         $chk.click(function() {
-          conf.setValue(this.name, JSON.parse(this.value));
+          var newValue = JSON.parse(this.value);
+          if (conf[this.name] !== newValue) {
+            conf.setValue(this.name, newValue);
+            if (typeof menu.onchange === 'function') {
+              menu.onchange(newValue);
+            }
+          }
         });
         $label.append($chk).append(w.jQuery('<span>' + k + '</span>'));
         $menu.append($label);
@@ -571,7 +628,7 @@
     };
 
     return pt;
-  })(conf);
+  })(conf, w);
 
 
   /**
@@ -1443,14 +1500,21 @@
 
   var WatchController = (function(w) {
     var WatchApp = w.WatchApp, watch = WatchApp.ns.init, $ = w.$, WatchJsApi = w.WatchJsApi;
-    return {nicoSearch: function(word, search_type) {
-      search_type = search_type || 'tag';
-      watch.ComponentInitializer.videoSelection.searchVideo(word, search_type);
-      if (conf.autoSmallScreenSearch) { this.changeScreenMode('small'); }
-      AnchorHoverPopup.hidePopup();
-//      setTimeout(function() {
-//        $('#searchResultExplorer .searchText input').focus();
-//      }, 500);
+    return {
+      nicoSearch: function(word, search_type) {
+        search_type = search_type || 'tag';
+        // こっちだと勝手にスクロールしてしまうようになったので
+        //watch.ComponentInitializer.videoSelection.searchVideo(word, search_type);
+        //
+        watch.ComponentInitializer.videoSelection._searchVideo(
+          word,
+          WatchApp.ns.components.selection.type.SearchType.valueOf("search_type")
+        );
+        if (conf.autoSmallScreenSearch) { this.changeScreenMode('small'); }
+        AnchorHoverPopup.hidePopup();
+        setTimeout(function() {
+          $('#searchResultExplorer .searchText input').focus();
+        }, 500);
       },
       changeScreenMode: function(mode) {
         WatchJsApi.player.changePlayerScreenMode(mode);
@@ -1487,6 +1551,78 @@
     }
   })(w);
 
+  var NicoNews = (function() {
+    var WatchApp = null, watch = null, $ = null, WatchJsApi = null, initialized = false;
+    var $button = null, $history = null, $ul = null, deteru = {}, $textMarqueeInner;
+    var isHover = false;
+
+    function onNewsUpdate(news) {
+      var id = news.data.id, type = news.data.type, $current = null,
+          newsText = $textMarqueeInner.text(),
+          newsHref = $textMarqueeInner.find('a').attr('href');
+      if (deteru[newsHref]) {
+        $current = deteru[newsHref].remove();
+      } else {
+        $current = deteru[newsHref] = makeTopic(newsText, newsHref, type);
+      }
+      $ul.append($current);
+      $current.show(200, scrollToBottom);
+    }
+    function makeTopic(title, url, type) {
+      return $([
+        '<li style="display: none;">',
+        '<a href="', url , '" target="_blank" class="', type, ' title="', escape(title),'">', title, '</a>',
+        '</li>',
+      ''].join(''));
+    }
+    function scrollToBottom() {
+      if (!isHover) {
+        $history.animate({scrollTop: $('.newsHistory ul').innerHeight()}, 200);
+      }
+    }
+
+    var self = {
+      initialize: function(w) {
+        WatchApp = w.WatchApp;
+        if (!WatchApp || initialized) { return; }
+        watch = WatchApp.ns.init;
+        $ = w.$;
+        WatchJsApi = w.WatchJsApi;
+        $textMarqueeInner = $('#textMarquee .textMarqueeInner');
+
+        watch.TextMarqueeInitializer.textMarqueeViewController.scheduler.addEventListener(
+          'schedule',
+          onNewsUpdate);
+
+        $button = $('<button class="openNewsHistory" title="ニコニコニュースの履歴を開く">▲</button>');
+        $history = $('<div class="newsHistory"><ul></ul></div>');
+        $history.hover(
+          function() { isHover = true; },
+          function() { isHover = false; }
+        );
+        $ul = $history.find('ul');
+        $button.click(function() { self.toggle(); });
+
+        $('#textMarquee .textMarqueeOuter').append($button).append($history);
+        initialized = true;
+      },
+      open: function() {
+        $history.show(200, scrollToBottom);
+      },
+      close: function() {
+        $history.hide(200);
+        isHover = false;
+      },
+      toggle: function() {
+        if ($history.is(':visible')) {
+          this.close();
+        } else {
+          this.open();
+        }
+      }
+    };
+    return self;
+  })();
 
   /**
    *  QWatch上でのあれこれ
@@ -1723,6 +1859,7 @@
 
     function onVideoSelectPanelOpening() {
       isSearchOpen = true;
+      $('body').addClass('w_searchOpen');
       if (conf.videoExplorerHack) { $('#searchResultExplorer').css({zIndex: 600}); }
     }
 
@@ -1733,6 +1870,7 @@
         $('#searchResultExplorer').css({zIndex: 1});
         $('#content').css({zIndex: 2});
       }
+      $('body').removeClass('w_searchOpen');
       resetSearchExplorerPos();
     }
 
@@ -1948,6 +2086,8 @@
           npc.onPlaybackModeChanged_org(mode);
         };
       }
+
+      if (conf.enableNewsHistory) {NicoNews.initialize(w);}
     }
 
 
@@ -2024,5 +2164,4 @@
     monkey(true);
   }
 })();
-
 
