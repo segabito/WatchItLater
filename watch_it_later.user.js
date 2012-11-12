@@ -14,8 +14,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121112
+// @version        1.121113
 // ==/UserScript==
+
+// * ver 1.121113
+// - お気に入りタグの表示がやっつけだったのを修正
 
 // * ver 1.121112
 // - 自動全画面化オンの設定でも、ユーザーニコ割があるときは全画面化しない設定を追加
@@ -141,6 +144,7 @@
       videoExplorerHack: true, // 動画検索画面を広くする
       enableHoverPopup: true, // 動画リンクのマイリストポップアップを有効にする
       enableFavTags: false, // 動画検索画面にお気に入りタグを表示
+      enableFavMylists: false, // 動画検索画面にお気に入りマイリストを表示
       enableAutoTagContainerHeight: false, // タグが2行以内なら自動で高さ調節(ピン留め時のみ
       autoSmallScreenSearch: false, // ポップアップからのタグ検索でもプレイヤーを小さくする
       enableNewsHistory: false, // ニコニコニュースの履歴を保持する
@@ -439,11 +443,24 @@
 \
 \
       /* 動画検索画面に出るお気に入りタグ */\
-      #favoriteTagsContainer {\
+      #favoriteTagsMenu, #favoriteMylistsMenu {\
       }\
-      #favoriteTagsContainer .favoriteTag {\
-        font-size: 80%; margin: 0 8px 0 0;\
+      #searchResultNavigation .favTagsPopup,       #searchResultNavigation .favMylistsPopup {\
+        width: 100%;\
+        max-height: 200px;\
+        overflow-x: hidden;\
+        overflow-y: auto;\
+        padding: 0;\
+        background: #f6f6f6;\
+        display: none; \
       }\
+      #searchResultNavigation .favTagsPopup.open,  #searchResultNavigation .favMylistsPopup.open{\
+      }\n\
+      #searchResultNavigation .favTagsPopup ul,    #searchResultNavigation .favMylistsPopup ul{\
+      }\n\
+      #searchResultNavigation .favTagsPopup ul li, #searchResultNavigation .favMylistsPopup ul li{\
+        background: #f6f6f6; padding: 0; border: 0;\
+      }\n\
 \
 \
       /* 動画タグが1行以下の時 */\
@@ -572,6 +589,8 @@
         values: {'する': true, 'しない': false}},
       {description: '動画検索画面にお気に入りタグを表示', varName: 'enableFavTags',
         values: {'する': true, 'しない': false}},
+//      {description: '動画検索画面にお気に入りマイリストを表示', varName: 'enableFavMylists',
+//        values: {'する': true, 'しない': false}},
       {description: 'タグが2行以内なら自動で高さ調節(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
         values: {'する': true, 'しない': false},
           onchange: function(v) {
@@ -609,7 +628,7 @@
       if (menu.className) { $menu.addClass(menu.className);}
       var currentValue = conf.getValue(varName);
       $menu.addClass(menu.varName);
-      $panel.addClass(menu.varName + '_' + menu.currentValue);
+      $panel.addClass(menu.varName + '_' + currentValue);
       for (var k in values) {
         var v = values[k];
         var $label = w.jQuery('<label></label>');
@@ -1231,34 +1250,35 @@
     return new Mylist();
   })();
 
-  var FavMylist = (function() {
+  var FavMylists = (function() {
     var favMylistList = [];
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
     var $ = w.$;
-    var pt = function(){};
-    pt.loadFavList = loadFavList;
 
     /**
      *  お気に入りマイリストの取得。 jQueryのあるページでしか使えない
      *  マイページを無理矢理パースしてるので突然使えなくなるかも
      */
-    function loadFavList(callback) {
-      if (!w.jQuery) return; //
-      var url = 'http://' + host + '/my/fav/mylist';
-      GM_xmlhttpRequest({
-        url: url,
-        onload: function(resp) {
-          var $result = $(resp.responseText).find('#favMylist');
-          if ($result.length < 1) return;
-          $result.find('.outer').each(function() {
-            var $a = $(this).find('h5 a'), $desc = $(this).find('.mylistDescription');
-            favMylistList.push({href: $a.attr('href'), name: $a.text(), description: $desc.text()});
-          });
-          if (typeof callback === 'function') { callback(favMylistList); }
-        }
-      });
-    }
-    return pt;
+    var self = {
+      load: function(callback) {
+        if (!w.jQuery) return; //
+        var url = 'http://' + host + '/my/fav/mylist';
+        GM_xmlhttpRequest({
+          url: url,
+          onload: function(resp) {
+            var $result = $(resp.responseText).find('#favMylist');
+            if ($result.length < 1) return;
+            $result.find('.outer').each(function() {
+              var $a = $(this).find('h5 a'), $desc = $(this).find('.mylistDescription'),
+                  id = ($a.attr('href').split('/').reverse())[0];
+              favMylistList.push({id: id, name: $a.text(), description: $desc.text()});
+            });
+            if (typeof callback === 'function') { callback(favMylistList); }
+          }
+        });
+      }
+    };
+    return self;
   })();
 
 
@@ -1833,15 +1853,72 @@
     }
 
 
+    function loadFavMylists() {
+      setTimeout(function() {
+        var $favmylists = $('<li style="display:none;"></li>'),
+            $a = $('<a>▼お気に入りマイリスト</a>'),
+            $popup = $('<li><ul></ul></li>'), $ul = $popup.find('ul');
+        $favmylists.attr('id','favoriteMylistsMenu');
+        $a.attr('href', '/my/fav/mylist').click(function(e) {
+          if (e.button != 0 || e.metaKey) return;
+          e.preventDefault();
+          // TODO:マイリスト開く処理
+          $popup.toggleClass('open').toggle(200);
+          return;
+        });
+        $popup.addClass('favMylistsPopup')
+        $favmylists.append($a);//.append($popup)
+        $('#searchResultNavigation ul:first').append($favmylists).append($popup);
+
+        FavMylists.load(function(mylists) {
+          if (mylists.length < 1) {
+            $favmylists.remove();
+            return;
+          }
+          for (var i = 0, len = mylists.length; i < len; i++) {
+            var mylist = mylists[i], $li = $('<li/>'),
+              $a = $('<a/>')
+              .attr({href: '/mylist/' + mylist.id, title: mylist.description})
+              .text(mylist.name)
+              .addClass('favoriteMylist')
+              .click(function(e) {
+                if (e.button != 0 || e.metaKey) return;
+                e.preventDefault();
+                //WatchController.nicoSearch($(this).text());
+              });
+            $ul.append($li.append($a));
+          }
+          $favmylists.show();
+        });
+      }, 100);
+    }
+
+
+
     function loadFavTags() {
       setTimeout(function() {
+        var $favtags = $('<li style="display:none;"></li>'),
+            $a = $('<a>▼お気に入りタグ</a>'),
+            $popup = $('<li><ul></ul></li>'), $ul = $popup.find('ul');
+        $favtags.attr('id', 'favoriteTagsMenu');
+        $a.attr('href', '/my/fav/tags').click(function(e) {
+          if (e.button != 0 || e.metaKey) return;
+          e.preventDefault();
+          $popup.toggleClass('open').toggle(200);
+          return;
+        });
+        $popup.addClass('favTagsPopup')
+        $favtags.append($a);
+        $('#searchResultNavigation ul:first').append($favtags).append($popup);
+
         FavTags.load(function(tags) {
-          var $favtags = $('<div><p>お気に入りタグ</p></div>');
-          $favtags.css({width: $('#searchResultNavigation').width()}).attr('id','favoriteTagsContainer');
-          $('#searchResultNavigation').append($favtags);
+          if (tags.length < 1) {
+            $favtags.remove();
+            return;
+          }
           for (var i = 0, len = tags.length; i < len; i++) {
-            var tag = tags[i],
-              $a = $('<a></a>')
+            var tag = tags[i], $li = $('<li/>'),
+              $a = $('<a/>')
               .attr({href: tag.href})
               .text(tag.name)
               .addClass('favoriteTag')
@@ -1850,12 +1927,12 @@
                 e.preventDefault();
                 WatchController.nicoSearch($(this).text());
               });
-            $favtags.append('<span>▼</span>').append($a);
+            $ul.append($li.append($a));
           }
+          $favtags.show();
         });
       }, 100);
     }
-
 
 
     function onVideoStopped() {
@@ -1873,8 +1950,13 @@
 
     var videoSelectOpenCount = 0;
     function onVideoSelectPanelOpened() {
-      if (videoSelectOpenCount++ == 0 && conf.enableFavTags) {
-        loadFavTags();
+      if (videoSelectOpenCount++ == 0) {
+        if (conf.enableFavMylists) {
+          loadFavMylists();
+        }
+        if (conf.enableFavTags) {
+          loadFavTags();
+        }
       }
       isSearchOpen = true;
       AnchorHoverPopup.hidePopup().updateNow();
@@ -2187,5 +2269,4 @@
     monkey(true);
   }
 })();
-
 
