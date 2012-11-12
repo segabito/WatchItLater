@@ -14,10 +14,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121113
+// @version        1.121113b
 // ==/UserScript==
 
-// * ver 1.121113
+// * ver 1.121113b
+// - お気に入りマイリストの表示に対応。 これで気になるシリーズの新着が素早く確認できる！
 // - お気に入りタグの表示がやっつけだったのを修正
 
 // * ver 1.121112
@@ -443,7 +444,9 @@
 \
 \
       /* 動画検索画面に出るお気に入りタグ */\
-      #favoriteTagsMenu, #favoriteMylistsMenu {\
+      #favoriteTagsMenu.open, #favoriteMylistsMenu.open {\
+        background: -moz-linear-gradient(center top , #D1D1D1, #FDFDFD) repeat scroll 0 0 transparent !important;\
+        border-bottom: 0 !important;\
       }\
       #searchResultNavigation .favTagsPopup,       #searchResultNavigation .favMylistsPopup {\
         width: 100%;\
@@ -451,7 +454,7 @@
         overflow-x: hidden;\
         overflow-y: auto;\
         padding: 0;\
-        background: #f6f6f6;\
+        background: #fdfdfd;\
         display: none; \
       }\
       #searchResultNavigation .favTagsPopup.open,  #searchResultNavigation .favMylistsPopup.open{\
@@ -459,7 +462,7 @@
       #searchResultNavigation .favTagsPopup ul,    #searchResultNavigation .favMylistsPopup ul{\
       }\n\
       #searchResultNavigation .favTagsPopup ul li, #searchResultNavigation .favMylistsPopup ul li{\
-        background: #f6f6f6; padding: 0; border: 0;\
+        background: #fdfdfd; padding: 0; border: 0;\
       }\n\
 \
 \
@@ -589,8 +592,8 @@
         values: {'する': true, 'しない': false}},
       {description: '動画検索画面にお気に入りタグを表示', varName: 'enableFavTags',
         values: {'する': true, 'しない': false}},
-//      {description: '動画検索画面にお気に入りマイリストを表示', varName: 'enableFavMylists',
-//        values: {'する': true, 'しない': false}},
+      {description: '動画検索画面にお気に入りマイリストを表示', varName: 'enableFavMylists',
+        values: {'する': true, 'しない': false}},
       {description: 'タグが2行以内なら自動で高さ調節(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
         values: {'する': true, 'しない': false},
           onchange: function(v) {
@@ -1269,8 +1272,9 @@
             var $result = $(resp.responseText).find('#favMylist');
             if ($result.length < 1) return;
             $result.find('.outer').each(function() {
-              var $a = $(this).find('h5 a'), $desc = $(this).find('.mylistDescription'),
+              var $this = $(this), $a = $this.find('h5 a'), $desc = $this.find('.mylistDescription'),
                   id = ($a.attr('href').split('/').reverse())[0];
+
               favMylistList.push({id: id, name: $a.text(), description: $desc.text()});
             });
             if (typeof callback === 'function') { callback(favMylistList); }
@@ -1554,6 +1558,9 @@
         setTimeout(function() {
           $('#searchResultExplorer .searchText input').focus();
         }, 500);
+      },
+      showMylist: function(mylistId) {
+        watch.ComponentInitializer.videoSelection.showMylistgroup(mylistId);
       },
       changeScreenMode: function(mode) {
         WatchJsApi.player.changePlayerScreenMode(mode);
@@ -1862,8 +1869,8 @@
         $a.attr('href', '/my/fav/mylist').click(function(e) {
           if (e.button != 0 || e.metaKey) return;
           e.preventDefault();
-          // TODO:マイリスト開く処理
           $popup.toggleClass('open').toggle(200);
+          $favmylists.toggleClass('open');
           return;
         });
         $popup.addClass('favMylistsPopup')
@@ -1878,14 +1885,18 @@
           for (var i = 0, len = mylists.length; i < len; i++) {
             var mylist = mylists[i], $li = $('<li/>'),
               $a = $('<a/>')
-              .attr({href: '/mylist/' + mylist.id, title: mylist.description})
+              .attr({href: '/mylist/' + mylist.id, title: "/mylist/" + mylist.id + "\n" + mylist.description})
               .text(mylist.name)
               .addClass('favoriteMylist')
-              .click(function(e) {
-                if (e.button != 0 || e.metaKey) return;
-                e.preventDefault();
-                //WatchController.nicoSearch($(this).text());
-              });
+              .click(
+                (function(id) {
+                  return function(e) {
+                    if (e.button != 0 || e.metaKey) return;
+                    e.preventDefault();
+                    WatchController.showMylist(id);
+                  };
+                })(mylist.id)
+              );
             $ul.append($li.append($a));
           }
           $favmylists.show();
@@ -1905,6 +1916,7 @@
           if (e.button != 0 || e.metaKey) return;
           e.preventDefault();
           $popup.toggleClass('open').toggle(200);
+          $favtags.toggleClass('open');
           return;
         });
         $popup.addClass('favTagsPopup')
