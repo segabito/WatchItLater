@@ -1527,7 +1527,7 @@
         //
         watch.ComponentInitializer.videoSelection._searchVideo(
           word,
-          WatchApp.ns.components.selection.type.SearchType.valueOf("search_type")
+          WatchApp.ns.components.selection.type.SearchType.valueOf(search_type)
         );
         if (conf.autoSmallScreenSearch) { this.changeScreenMode('small'); }
         AnchorHoverPopup.hidePopup();
