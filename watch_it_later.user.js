@@ -14,7 +14,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121114
+// @version        1.121114b
 // ==/UserScript==
 
 // * ver 1.121114
@@ -2065,7 +2065,8 @@
 
           if (h < 36) { // 1行以下の時
             if (!$videoHeaderTagEditLinkArea) {
-              $videoHeaderTagEditLinkArea = $('.toggleTagEditInner .videoHeaderTagEditLinkArea').remove();
+              $videoHeaderTagEditLinkArea = $('.toggleTagEditInner .videoHeaderTagEditLinkArea');
+              $('.toggleTagEdit').append($videoHeaderTagEditLinkArea);
               $toggleTagEditText = $('<span class="toggleText">' + $('.toggleTagEditInner').text() + '</span>');
               $('.toggleTagEditInner').empty().append($toggleTagEditText).append($videoHeaderTagEditLinkArea);
             }
