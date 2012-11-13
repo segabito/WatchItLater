@@ -14,8 +14,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121113b
+// @version        1.121114
 // ==/UserScript==
+
+// * ver 1.121114
+// - ESCまたはXキーでポップアップが消えるようにした
 
 // * ver 1.121113b
 // - お気に入りマイリストの表示に対応。 これで気になるシリーズの新着が素早く確認できる！
@@ -347,7 +350,7 @@
       }\n\n\
       /* 左に表示する動画情報 */\
       #ichibaPanel.leftVideoInfo {\n\
-        background: #bbb; text-Align: left; overflow-Y: auto;\n\
+        background: #bbb; text-Align: left; overflow-Y: auto; box-shadow: none;\n\
       }\n\n\
       #ichibaPanel.leftVideoInfo .userIconContainer{\n\
         background: #ccc; width: 100%;\n\
@@ -443,9 +446,10 @@
       }\n\
 \
 \
-      /* 動画検索画面に出るお気に入りタグ */\
+      /* 動画検索画面に出るお気に入りタグ・お気に入りマイリスト */\
       #favoriteTagsMenu.open, #favoriteMylistsMenu.open {\
         background: -moz-linear-gradient(center top , #D1D1D1, #FDFDFD) repeat scroll 0 0 transparent !important;\
+        background: -webkit-gradient(linear, left top, left bottom, from(#D1D1D1), to(#FDFDFD)) !important;\
         border-bottom: 0 !important;\
       }\
       #searchResultNavigation .favTagsPopup,       #searchResultNavigation .favMylistsPopup {\
@@ -462,7 +466,7 @@
       #searchResultNavigation .favTagsPopup ul,    #searchResultNavigation .favMylistsPopup ul{\
       }\n\
       #searchResultNavigation .favTagsPopup ul li, #searchResultNavigation .favMylistsPopup ul li{\
-        background: #fdfdfd; padding: 0; border: 0;\
+        background: #fdfdfd; padding: 0; border: 0;font-size: 90%;\
       }\n\
 \
 \
@@ -956,7 +960,7 @@
       // 他の動画を追加していけば、そのうち押し出されて消えてしまう。
       // なので、重複時にエラーを出すのではなく、「消してから追加」することによって先頭に持ってくる。
       // 「重複してたら先頭に持ってきて欲しいな～」って要望掲示板にこっそり書いたりしたけど相手にされないので自分で実装した。
-      var data = "item_id=" + watchId + "&token=" + token;
+      var data = "item_id=" + watchId + "&token=" + token, replaced = true;
 
       var _add = function(status, resp) {
         var req = {
@@ -966,13 +970,16 @@
           headers: {'Content-Type': 'application/x-www-form-urlencoded' }, // これを忘れて小一時間はまった
           onload: function(resp) {
             var result = JSON.parse(resp.responseText);
-            if (typeof callback == "function") callback(result.status, result);
+            if (typeof callback == "function") callback(result.status, result, replaced);
           }
         };
         GM_xmlhttpRequest(req);
       }
       // とりあえずマイリストにある場合はdeleteDefList()のcallbackで追加、ない場合は即時追加
-      if (!this.deleteDefList(watchId, _add)) _add();
+      if (!this.deleteDefList(watchId, _add)) {
+        replaced = false;
+        _add();
+      }
     };
 
     pt.addMylist = function(watchId, groupId, callback) {
@@ -1096,12 +1103,16 @@
           setTimeout(function() {btn.disabled = false;}, 1000);
           var groupId = sel.value, name = sel.options[sel.selectedIndex].textContent;
           if (groupId == 'default') {
-            self.addDefList(_watchId, function(status, result) {
+            self.addDefList(_watchId, function(status, result, replaced) {
               self.reloadDefList();
               if (status != "ok") {
                 Popup.alert('とりあえずマイリストの登録に失敗: ' + result.error.description);
               } else {
-                Popup.show('とりあえずマイリストに登録しました');
+                var torimai = '<a href="/my/mylist">とりあえずマイリスト</a>';
+                Popup.show(
+                  torimai +
+                  (replaced ? 'の先頭に移動しました' : 'に登録しました')
+                );
               }
             });
           } else {
@@ -1423,12 +1434,12 @@
         for (var i = 0, len = a.length; i < len; i++) {
           var e = a[i];
           try {
-            var m;// = videoReg.test(e.href);
+            var m, href= e.href;
             if (
+              href &&
               !e.added &&
-              e.href &&
-              (m = videoReg.exec(e.href)) != null &&
-              !excludeReg.test(e.href) &&
+              (m = videoReg.exec(href)) != null &&
+              !excludeReg.test(href) &&
               e.className != "itemEcoLink" &&
               true
             ) {
@@ -1441,18 +1452,7 @@
 
 
     }
-
-    if (location.host == "ext.nicovideo.jp") {
-      bind();
-    } else {
-      bind();
-      setInterval(
-        function() { bind(); }, 3000
-      );
-      //w.Event.observe(w, 'load', function() { add_btn('a[href*="watch/"]'); }, false);
-    }
-
-    return {
+    var self = {
       hidePopup: function() {
         VideoTags.hidePopup();
         mylistPanel.hide();
@@ -1464,10 +1464,18 @@
         return this;
       }
     };
+
+    if (location.host == "ext.nicovideo.jp") {
+      bind();
+    } else {
+      bind();
+      setInterval(
+        function() { bind(); }, 3000
+      );
+      //w.Event.observe(w, 'load', function() { add_btn('a[href*="watch/"]'); }, false);
+    }
+    return self;
   })();
-
-
-
 
 
   //===================================================
@@ -1694,6 +1702,7 @@
     var pac  = watch.PlayerInitializer.playerAreaConnector;
     var vs   = watch.ComponentInitializer.videoSelection;
     var isSearchOpen = false;
+    var $leftPanel = $('#ichibaPanel'), $rightPanel = $('#playerCommentPanelOuter');
   //  var flashVars = pim.playerInitializeModel.flashVars;
   //  flashVars.isBackComment = 0;
 
@@ -1793,6 +1802,7 @@
       vc.html(h);
     }
 
+    var isFirst = true;
     function onVideoInitialized() {
       watch = WatchApp.namespace.init;
       AnchorHoverPopup.hidePopup().updateNow();
@@ -1816,29 +1826,39 @@
           onWindowResize();
         }, 100);
       } else
-      if (conf.autoScrollToPlayer) { WatchController.scrollToVideoPlayer();}
+      if (conf.autoScrollToPlayer) {
+        // 初回のみ、プレイヤーが画面内に納まっていてもタグの位置まで自動スクロールさせる。(ファーストビューを固定するため)
+        // 二回目以降は説明文や検索結果からの遷移なので、必要最小限の動きにとどめる
+        WatchController.scrollToVideoPlayer(isFirst);
+      }
 
 
-      leftPanelJack();
+      leftPanelJack($leftPanel);
       resetSearchExplorerPos();
       resetHidariue();
       onTagReset();
-
+      if (!isFirst) {
+      }
+      isFirst = false;
     }
+    function onVideoChangeStatusUpdated() {
+      if (!isFirst) {
+        $leftPanel.find('div').animate({opacity: 0}, 800, function() { $leftPanel.empty(); });
+      }
+    }
+
     // - 空っぽになった左になんか表示してみる
-    function leftPanelJack() {
+    function leftPanelJack($leftPanel) {
       if (!conf.leftPanelJack) { return; }
       var uploaderId = watch.CommonModelInitializer.watchInfoModel.uploaderInfo.id;
       var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
-      var $leftPanel = $('#ichibaPanel').addClass('leftVideoInfo'), h = $leftPanel.innerHeight() - 100;
-        panelSVC.innerLeftElements = [$('#ichibaPanel')];
-        panelSVC.refresh();
-        $leftPanel.empty()
-          .append($('<div>'+$('#videoInfoHead .videoPostedAt').text()+'</div>').css({textAlign: 'center'})
+      var h = $leftPanel.innerHeight() - 100;
+        $leftPanel
+          .append($('<div>'+$('#videoInfoHead .videoPostedAt').text()+'</div>').css({textAlign: 'center', opacity: 0})
                   .append($('#videoThumbnailImage').clone(true))
           )
           .append(
-            $('.videoDescription').clone(true)
+            $('.videoDescription').clone(true).css('opacity', 0)
               .append($('#userProfile .userIconContainer').clone(true)
                 .append($('<span>' + $('#videoInfo .userName').text() + '</span><br>'))
                 .append($('#userProfile .showOtherVideos').clone(true).text('関連動画').attr('href', '/user/' + uploaderId + '/video'))
@@ -1846,7 +1866,8 @@
               .append($('#ch_prof').clone(true))
 
 
-          ).css({fontSize: '90%'});
+          ).css({fontSize: '90%'})
+          .find('div').animate({opacity: 1}, 800);
     }
     var hidariue = null;
     function resetHidariue() {
@@ -2075,6 +2096,7 @@
 //        var tarinaiWidth = $('#commentDefault .commentTableContainer').innerWidth() - $('#commentDefault .commentTableContainerInner').outerWidth();
 //      WatchController.changeCommentPanelWidth(tarinaiWidth - 10);
         WatchController.changeCommentPanelWidth(420);
+        $rightPanel.css('right', 2000);
       }
 
     }
@@ -2095,6 +2117,9 @@
       pac.addEventListener("onVideoInitialized", onVideoInitialized);
       pac.addEventListener("onVideoEnded", onVideoEnded);
       pac.addEventListener("onVideoStopped", onVideoStopped);
+      pac.addEventListener('onVideoChangeStatusUpdated', onVideoChangeStatusUpdated);
+      // pac.addEventListener('onSystemMessageFatalErrorSended', onSystemMessageFatalErrorSended);
+      // watch.WatchInitializer.watchModel.addEventListener('error', function() {console.log(arguments);});
 
       watch.CommonModelInitializer.watchInfoModel.addEventListener("reset", onWatchInfoReset);
       watch.PlayerInitializer.playerScreenMode.addEventListener("change", onScreenModeChange);
@@ -2106,8 +2131,6 @@
       // メモ
       // とりあえずマイリストのオープン
       //watch.ComponentInitializer.videoSelection.contentsAreaVC.addEventListener('deflistFolderClickedEvent', function(){ })
-      // ニュースチェンジ
-      // WatchApp.ns.init.TextMarqueeInitializer.textMarqueeViewController.scheduler.addEventListener('schedule', function() {console.log(JSON.stringify(arguments[0]))})
 
 
       watch.TagInitializer.tagList.addEventListener('reset', onTagReset);
@@ -2173,6 +2196,12 @@
 
     function initOther() {
       //$('#videoInformation').css({position: 'relative', top: '-85px'});
+      if (conf.leftPanelJack) {
+        $leftPanel.addClass('leftVideoInfo');
+        var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
+        panelSVC.innerLeftElements = [$leftPanel];
+        panelSVC.refresh(true);
+      }
 
       if (conf.autoTagPin) {
         tagv.isPinned = true;
@@ -2203,7 +2232,9 @@
           npc.onPlaybackModeChanged_org(mode);
         };
       }
-
+      $('#playlistContainer a').click(function() {
+        AnchorHoverPopup.hidePopup();
+      });
       if (conf.enableNewsHistory) {NicoNews.initialize(w);}
     }
 
@@ -2251,6 +2282,19 @@
     document.body.appendChild(iframe);
     iframe.watchId(watchId, videoId);
   })();
+
+
+  /**
+   *  キーボードイベント
+   *
+   */
+  (function() {
+    w.document.body.addEventListener('keydown', function(e) {
+      if (e.keyCode === 27 || e.keyCode === 88) { // ESC or x
+        AnchorHoverPopup.hidePopup();
+      }
+    });
+  })(w);
 
   //===================================================
   //===================================================
