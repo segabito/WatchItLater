@@ -14,8 +14,12 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121114b
+// @version        1.121115
 // ==/UserScript==
+
+// * ver 1.121115
+// - 左パネルのファーストビューで投稿者アイコンが大きく出すように工夫
+//   投稿者あってのニコニコ動画
 
 // * ver 1.121114
 // - ESCまたはXキーでポップアップが消えるようにした
@@ -153,8 +157,11 @@
       autoSmallScreenSearch: false, // ポップアップからのタグ検索でもプレイヤーを小さくする
       enableNewsHistory: false, // ニコニコニュースの履歴を保持する
 
+      enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
+
       fxInterval: 40 // アニメーションのフレームレート 40 = 25fps
     };
+
 
   //===================================================
   //===================================================
@@ -350,10 +357,19 @@
       }\n\n\
       /* 左に表示する動画情報 */\
       #ichibaPanel.leftVideoInfo {\n\
-        background: #bbb; text-Align: left; overflow-Y: auto; box-shadow: none;\n\
+        background: #bbb; text-Align: left; overflow-Y: auto; box-shadow: none; font-size: 90%;\n\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .userIconContainer{\n\
-        background: #ccc; width: 100%;\n\
+      #ichibaPanel.leftVideoInfo .videoPostedAt{\n\
+        background: #ccc; text-align: center;  color: #000; border-radius: 4px 4px 0 0;\n\
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .videoDescription a{\n\
+        margin: auto 4px;\
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .userIconContainer, #ichibaPanel.leftVideoInfo .ch_profile{\n\
+        background: #ccc; width: 100%; text-align: center; border-radius: 0 0 4px 4px;\n\
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .userIconContainer .usericon, #ichibaPanel.leftVideoInfo .ch_profile img{\n\
+        max-width: 130px; width: auto; height: auto;\n\
       }\n\n\
 \
 \
@@ -610,6 +626,8 @@
       {description: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory',
         values: {'する': true, 'しない': false}},
 
+//      {description: '動画切り替え時にスライドするエフェクト(ただのお遊びです)', varName: 'enableSlideEffect',
+//        values: {'する': true, 'しない': false}},
       {description: '「@ジャンプ」を無効化(※実験中。不具合があるかも)', varName: 'ignoreJumpCommand',
         values: {'する': true, 'しない': false}, className: 'buggy'}
     ];
@@ -1795,9 +1813,9 @@
         vc = $('li.#videoCounter');
       }
       var h = [
-        'v:', watchInfoModel.viewCount,
-        ' c:', watchInfoModel.commentCount,
-        ' m:', watchInfoModel.mylistCount
+        '再生:', watchInfoModel.viewCount,
+        ' コメント:', watchInfoModel.commentCount,
+        ' マイリスト:', watchInfoModel.mylistCount
       ].join('');
       vc.html(h);
     }
@@ -1813,8 +1831,8 @@
       var newWatchId = watch.CommonModelInitializer.watchInfoModel.v;
       iframe.watchId(newVideoId, newWatchId);
       iframe.show();
-      $('body').toggleClass('w_channel', watch.CommonModelInitializer.watchInfoModel.isChannelVideo());
-      setVideoCounter(watch.CommonModelInitializer.watchInfoModel);
+//      $('body').toggleClass('w_channel', watch.CommonModelInitializer.watchInfoModel.isChannelVideo());
+//      setVideoCounter(watch.CommonModelInitializer.watchInfoModel);
 
       if (conf.autoBrowserFull) {
         setTimeout(function() {
@@ -1841,9 +1859,36 @@
       }
       isFirst = false;
     }
-    function onVideoChangeStatusUpdated() {
+
+
+    function onVideoChangeStatusUpdated(f) {
       if (!isFirst) {
-        $leftPanel.find('div').animate({opacity: 0}, 800, function() { $leftPanel.empty(); });
+          $leftPanel;//animate({opacity: 0}, 800, function() { $leftPanel.empty(); });
+        if (conf.enableSlideEffect) {
+          var dur = 500, width = $(window).innerWidth() * 0.5,
+              $panel = $leftPanel,
+              baseLeft = -$panel.outerWidth(),
+              left = -($panel.offset().left - baseLeft * 2);
+          if (f) {
+            $panel.animate({left: left + 'px'}, dur, 'swing', function() { $leftPanel.empty(); });
+          } else {
+            setTimeout(function() {
+              $panel.animate({left: baseLeft + 'px'}, dur * 2, 'swing');
+            }, dur);
+          }
+        } else {
+          if (f) {
+            var $description = $leftPanel.find('.videoDescription');
+            $description.css({maxHeight: $description.outerHeight()})
+              .animate({maxHeight: 0}, 800, function() {
+                $description.empty();
+                $leftPanel.find('.leftVideoInfoInner')
+                  .animate({opacity: 0}, 800,
+                    function() { }
+                  )
+              });
+          }
+        }
       }
     }
 
@@ -1852,22 +1897,32 @@
       if (!conf.leftPanelJack) { return; }
       var uploaderId = watch.CommonModelInitializer.watchInfoModel.uploaderInfo.id;
       var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
-      var h = $leftPanel.innerHeight() - 100;
-        $leftPanel
-          .append($('<div>'+$('#videoInfoHead .videoPostedAt').text()+'</div>').css({textAlign: 'center', opacity: 0})
-                  .append($('#videoThumbnailImage').clone(true))
+      var h = $leftPanel.innerHeight() - 100, $inner = $('<div/>');
+      $leftPanel.empty();
+        $inner
+          .addClass('leftVideoInfoInner').css({opacity: 0})
+          .append($('<div>'+$('#videoInfoHead .videoPostedAt').text()+'</div>')
+            .addClass('videoPostedAt')
+            .append($('#videoThumbnailImage').clone(true))
           )
           .append(
-            $('.videoDescription').clone(true).css('opacity', 0)
-              .append($('#userProfile .userIconContainer').clone(true)
-                .append($('<span>' + $('#videoInfo .userName').text() + '</span><br>'))
-                .append($('#userProfile .showOtherVideos').clone(true).text('関連動画').attr('href', '/user/' + uploaderId + '/video'))
-              )
-              .append($('#ch_prof').clone(true))
-
-
-          ).css({fontSize: '90%'})
-          .find('div').animate({opacity: 1}, 800);
+            $('.videoDescription').clone(true).css({maxHeight: 0, overflowY: 'hidden', minHeight: 0})
+          )
+          .append(
+            $('#userProfile .userIconContainer').clone(true)
+            .append($('<br/><span class="userName">' + $('#videoInfo .userName').text() + '</span><br/>'))
+            .append($('#userProfile .showOtherVideos').clone(true).text('関連動画').attr('href', '/user/' + uploaderId + '/video')
+            )
+          ).append($('#ch_prof').clone().attr('id', '').addClass('ch_profile'));
+        $leftPanel.append($inner);
+        // なんのためのアニメーション？ → 最初に投稿者アイコンをよく見せるため
+        $inner.animate({opacity: 1}, 800, function() {
+          var $description = $inner.find('.videoDescription');
+          $description
+            .animate({maxHeight: 500}, 1000,
+              function() { $description.css({maxHeight: ''}); }
+            );
+        });
     }
     var hidariue = null;
     function resetHidariue() {
@@ -2024,7 +2079,9 @@
       $('#openSearchResultExplorer').css({marginTop: m + 'px'});
     }
 
-    function onWatchInfoReset(w) {
+    function onWatchInfoReset(watchInfo) {
+      $('body').toggleClass('w_channel', watchInfo.isChannelVideo());
+      setVideoCounter(watchInfo);
     }
 
     function onScreenModeChange(sc) {
@@ -2122,8 +2179,9 @@
       // pac.addEventListener('onSystemMessageFatalErrorSended', onSystemMessageFatalErrorSended);
       // watch.WatchInitializer.watchModel.addEventListener('error', function() {console.log(arguments);});
 
-      watch.CommonModelInitializer.watchInfoModel.addEventListener("reset", onWatchInfoReset);
-      watch.PlayerInitializer.playerScreenMode.addEventListener("change", onScreenModeChange);
+
+      watch.CommonModelInitializer.watchInfoModel.addEventListener('reset', onWatchInfoReset);
+      watch.PlayerInitializer.playerScreenMode.addEventListener('change', onScreenModeChange);
 
       vs.addEventListener("videoSelectPanelOpeningEvent", onVideoSelectPanelOpening);
       vs.addEventListener("videoSelectPanelClosedEvent", onVideoSelectPanelClosed);
@@ -2237,6 +2295,8 @@
         AnchorHoverPopup.hidePopup();
       });
       if (conf.enableNewsHistory) {NicoNews.initialize(w);}
+
+      onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
     }
 
 
