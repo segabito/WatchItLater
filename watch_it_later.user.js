@@ -14,8 +14,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121115
+// @version        1.121116
 // ==/UserScript==
+
+// * ver 1.121116
+// - 全画面時、動画が切りかわったら左下にタイトルと再生数をポップアップ表示する機能
 
 // * ver 1.121115
 // - 左パネルのファーストビューで投稿者アイコンが大きく出すように工夫
@@ -132,6 +135,7 @@
 
     }
 
+
     var conf = {
       autoBrowserFull: false, // 再生開始時に自動全画面化
       disableAutoBrowserFullIfNicowari: false, // ユーザーニコ割があるときは自動全画面化しない
@@ -144,7 +148,8 @@
       hideNewsInFull: true, // 全画面時にニュースを閉じる
       wideCommentPanel: true, // コメントパネルをワイドにする
       leftPanelJack: true, // 左パネルに動画情報を表示
-      headerViewCounter: true, // ヘッダにコメントパネルを表示
+      headerViewCounter: false, // ヘッダに再生数コメント数を表示
+      popupViewCounter: 'full', // 動画切り替わり時にポップアップで再生数を表示
       ignoreJumpCommand: false, // @ジャンプ無効化(不具合があるかも)
       doubleClickScroll: true, // 空白部分ををダブルクリックで動画の位置にスクロールする
       hidePlaylist: true, // プレイリストを閉じる
@@ -359,14 +364,35 @@
       #ichibaPanel.leftVideoInfo {\n\
         background: #bbb; text-Align: left; overflow-Y: auto; box-shadow: none; font-size: 90%;\n\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoPostedAt{\n\
+      #ichibaPanel.leftVideoInfo .videoThumbnailContainer{\n\
         background: #ccc; text-align: center;  color: #000; border-radius: 4px 4px 0 0;\n\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoDescription a{\n\
+      #ichibaPanel.leftVideoInfo .videoTitle{\n\
+        \
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .videoPostedAt{\n\
+        color: #333;\
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .videoStats{\n\
+        font-size:90%;\
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .videoStats li{\n\
+        display: inline-block;\
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .videoStats .ranking{\n\
+        display: none !important;\
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .videoInfo{\n\
+        background: #ccc; text-align: center;\
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .videoDetails{\n\
+        background: #bbb;\
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .videoDetails a{\n\
         margin: auto 4px;\
       }\n\n\
       #ichibaPanel.leftVideoInfo .userIconContainer, #ichibaPanel.leftVideoInfo .ch_profile{\n\
-        background: #ccc; width: 100%; text-align: center; border-radius: 0 0 4px 4px;\n\
+        background: #ccc; width: 100%; text-align: center; border-radius: 0 0 4px 4px; float: none; \n\
       }\n\n\
       #ichibaPanel.leftVideoInfo .userIconContainer .usericon, #ichibaPanel.leftVideoInfo .ch_profile img{\n\
         max-width: 130px; width: auto; height: auto;\n\
@@ -550,10 +576,16 @@
       #textMarquee .newsHistory li:nth-child(even){\
         background: #333;\
       }\
-      body.full_in_browser.hideNewsInFull #textMarquee .newsHistory {\
+      body.full_with_browser.hideNewsInFull #textMarquee .newsHistory {\
         display: none !important;\
       }\
-\
+      /* 半透明だとflashの上に来ると描画されないので強制的に黒にする(Chromeは平気) */\
+      body.full_with_browser #popupMarquee.popupMarqueeBottomLeft {\
+        background: #000 !important;left: 8px; bottom: 8px; width: 400px;\
+      }\
+      body.full_with_browser #playerContainer {\
+        margin-left: 0 !important;\
+      }\
       ',
     ''].join('');
     //console.log(style);
@@ -604,6 +636,9 @@
         values: {'する': true, 'しない': false}},
       {description: 'ヘッダに再生数表示', varName: 'headerViewCounter',
         values: {'する': true, 'しない': false}},
+      {description: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
+        values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
+
       {description: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
         values: {'する': true, 'しない': false}},
       {description: 'てれびちゃんメニュー内に、原宿以前のランダム画像復活', varName: 'hidariue',
@@ -1724,7 +1759,7 @@
   //  var flashVars = pim.playerInitializeModel.flashVars;
   //  flashVars.isBackComment = 0;
 
-    var initialExplorerWidth = null;
+    var initialExplorerWidth = null, resizeWatchTimer = null;
     function onWindowResize() {
       function expandSearchResult(target) {
         if (!conf.videoExplorerHack) { return; }
@@ -1740,7 +1775,12 @@
           $(elms[v]).width(initialExplorerWidth[elms[v]] + px);
         }
       }
-      expandSearchResult($('body').innerWidth());
+      if (resizeWatchTimer != null) {
+        clearTimeout(resizeWatchTimer);
+      }
+      resizeWatchTimer = setTimeout(function() {
+        expandSearchResult($('body').innerWidth());
+      }, 10);
     }
 
     function watchVideoStatus() {
@@ -1804,20 +1844,29 @@
     }
 
     function setVideoCounter(watchInfoModel) {
-      if (!conf.headerViewCounter) { return; }
-      var vc = $('li.#videoCounter');
-      if (vc.length < 1) {
-        var li = $('<li></li>')[0];
-        li.id = 'videoCounter';
-        $('#siteHeaderLeftMenu').after(li);
-        vc = $('li.#videoCounter');
-      }
       var h = [
-        '再生:', watchInfoModel.viewCount,
-        ' コメント:', watchInfoModel.commentCount,
-        ' マイリスト:', watchInfoModel.mylistCount
+        '再生: ', watchInfoModel.viewCount,
+        ' | コメント: ', watchInfoModel.commentCount,
+        ' | マイリスト: ', watchInfoModel.mylistCount
       ].join('');
-      vc.html(h);
+      if ((conf.popupViewCounter === 'always') ||
+          (conf.popupViewCounter === 'full' && $('body').hasClass('full_with_browser'))
+      ) {
+        Popup.show(
+          $('<div/>').append($('<a/>').text(watchInfoModel.title).attr('href', 'http://nico.ms/' + watchInfoModel.v)).html() +
+          '<br/><span style="margin-left:10px; font-size: 90%;">'+ h + '</span>'
+        );
+      }
+      if (conf.headerViewCounter) {
+        var vc = $('li.#videoCounter');
+        if (vc.length < 1) {
+          var li = $('<li></li>')[0];
+          li.id = 'videoCounter';
+          $('#siteHeaderLeftMenu').after(li);
+          vc = $('li.#videoCounter');
+        }
+        vc.html(h);
+      }
     }
 
     var isFirst = true;
@@ -1878,8 +1927,8 @@
           }
         } else {
           if (f) {
-            var $description = $leftPanel.find('.videoDescription');
-            $description.css({maxHeight: $description.outerHeight()})
+            var $description = $leftPanel.find('.videoDetails');
+            $description.css({maxHeight: $description.outerHeight(), minHeight: 0})
               .animate({maxHeight: 0}, 800, function() {
                 $description.empty();
                 $leftPanel.find('.leftVideoInfoInner')
@@ -1901,25 +1950,40 @@
       $leftPanel.empty();
         $inner
           .addClass('leftVideoInfoInner').css({opacity: 0})
-          .append($('<div>'+$('#videoInfoHead .videoPostedAt').text()+'</div>')
-            .addClass('videoPostedAt')
-            .append($('#videoThumbnailImage').clone(true))
+          .append(
+            $('<div/>')
+              .addClass('videoThumbnailContainer')
+                .append($('#videoInfo #videoTitle').clone().attr('id', null).addClass('videoTitle'))
+                .append($('#videoThumbnailImage').clone(true))
           )
           .append(
-            $('.videoDescription').clone(true).css({maxHeight: 0, overflowY: 'hidden', minHeight: 0})
+            $('<div class="videoDetails"/>')
+              .css({maxHeight: 0, overflowY: 'hidden', minHeight: 0})
+                .append(
+                  $('<div class="videoInfo"/>')
+                      .append($('<span/>').text($('#videoInfoHead .videoPostedAt').text())).addClass('videoPostedAt')
+                      .append($('#videoInfo #videoStats').clone().attr('id', null).addClass('videoStats'))
+                )
+              .append($('.videoDescription').clone(true))
           )
           .append(
             $('#userProfile .userIconContainer').clone(true)
-            .append($('<br/><span class="userName">' + $('#videoInfo .userName').text() + '</span><br/>'))
-            .append($('#userProfile .showOtherVideos').clone(true).text('関連動画').attr('href', '/user/' + uploaderId + '/video')
-            )
-          ).append($('#ch_prof').clone().attr('id', '').addClass('ch_profile'));
+              .append(
+                $('<br/><span class="userName">' + $('#videoInfo .userName').text() + '</span><br/>'))
+              .append(
+                $('#userProfile .showOtherVideos').clone(true).text('関連動画').attr('href', '/user/' + uploaderId + '/video')
+              )
+          ).append(
+            $('#ch_prof').clone(true).attr('id', null)
+              .addClass('ch_profile')
+          );
         $leftPanel.append($inner);
         // なんのためのアニメーション？ → 最初に投稿者アイコンをよく見せるため
         $inner.animate({opacity: 1}, 800, function() {
-          var $description = $inner.find('.videoDescription');
+          var $description = $inner.find('.videoDetails');
+          var mh = $leftPanel.innerHeight() - $inner.outerHeight() - 16;
           $description
-            .animate({maxHeight: 500}, 1000,
+            .animate({maxHeight: 500, minHeight: mh}, 1000,
               function() { $description.css({maxHeight: ''}); }
             );
         });
