@@ -391,6 +391,9 @@
       #ichibaPanel.leftVideoInfo .videoDetails a{\n\
         margin: auto 4px;\
       }\n\n\
+      #ichibaPanel.leftVideoInfo .userIconContainer a, #ichibaPanel.leftVideoInfo .ch_profile a{\n\
+        display: block;\
+      }\n\n\
       #ichibaPanel.leftVideoInfo .userIconContainer, #ichibaPanel.leftVideoInfo .ch_profile{\n\
         background: #ccc; width: 100%; text-align: center; border-radius: 0 0 4px 4px; float: none; \n\
       }\n\n\
@@ -1969,7 +1972,7 @@
           .append(
             $('#userProfile .userIconContainer').clone(true)
               .append(
-                $('<br/><span class="userName">' + $('#videoInfo .userName').text() + '</span><br/>'))
+                $('<span class="userName">' + $('#videoInfo .userName').text() + '</span><br/>'))
               .append(
                 $('#userProfile .showOtherVideos').clone(true).text('関連動画').attr('href', '/user/' + uploaderId + '/video')
               )
@@ -2450,4 +2453,5 @@
     monkey(true);
   }
 })();
+
 
