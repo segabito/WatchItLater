@@ -14,8 +14,12 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121116
+// @version        1.121119
 // ==/UserScript==
+
+// * ver 1.121119
+// - 検索のデフォルトパラメータ指定機能
+// - マイナーなバグ修正
 
 // * ver 1.121116
 // - 全画面時、動画が切りかわったら左下にタイトルと再生数をポップアップ表示する機能
@@ -161,6 +165,7 @@
       enableAutoTagContainerHeight: false, // タグが2行以内なら自動で高さ調節(ピン留め時のみ
       autoSmallScreenSearch: false, // ポップアップからのタグ検索でもプレイヤーを小さくする
       enableNewsHistory: false, // ニコニコニュースの履歴を保持する
+      defaultSearchOption: '', // 検索時のデフォルトオプション
 
       enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
 
@@ -377,7 +382,10 @@
         font-size:90%;\
       }\n\n\
       #ichibaPanel.leftVideoInfo .videoStats li{\n\
-        display: inline-block;\
+        display: inline-block; margin: 0 2px;\
+      }\n\n\
+      #ichibaPanel.leftVideoInfo .videoStats li span{\n\
+        font-weight: bolder;\
       }\n\n\
       #ichibaPanel.leftVideoInfo .videoStats .ranking{\n\
         display: none !important;\
@@ -623,50 +631,52 @@
     var pt = function(){};
     var $panel = null;
     var menus = [
-      {description: '動画リンクへのポップアップを有効にする', varName: 'enableHoverPopup',
+      {title: '動画リンクへのポップアップを有効にする', varName: 'enableHoverPopup',
         values: {'する': true, 'しない': false}},
-      {description: 'プレイヤーを自動で全画面化', varName: 'autoBrowserFull',
+      {title: 'プレイヤーを自動で全画面化', varName: 'autoBrowserFull',
         values: {'する': true, 'しない': false}},
-      {description: '自動全画面化オンでも、ユーザーニコ割のある動画は', varName: 'disableAutoBrowserFullIfNicowari',
+      {title: '自動全画面化オンでも、ユーザーニコ割のある動画は', varName: 'disableAutoBrowserFullIfNicowari',
         values: {'全画面化しない': true, '全画面化する': false}},
-      {description: '動画終了時に全画面化を解除(原宿と同じにする)', varName: 'autoNotFull',
+      {title: '動画終了時に全画面化を解除(原宿と同じにする)', varName: 'autoNotFull',
         values: {'する': true, 'しない': false}},
-      {description: 'プレイヤー位置に自動スクロール(自動全画面化オフ時)', varName: 'autoScrollToPlayer',
+      {title: 'プレイヤー位置に自動スクロール(自動全画面化オフ時)', varName: 'autoScrollToPlayer',
         values: {'する': true, 'しない': false}},
-      {description: 'コメントパネルのワイド化', varName: 'wideCommentPanel',
+      {title: 'コメントパネルのワイド化', varName: 'wideCommentPanel',
         values: {'する': true, 'しない': false}},
-      {description: '左のパネルに動画情報を表示', varName: 'leftPanelJack',
+      {title: '左のパネルに動画情報を表示', varName: 'leftPanelJack',
         values: {'する': true, 'しない': false}},
-      {description: 'ヘッダに再生数表示', varName: 'headerViewCounter',
+      {title: 'ヘッダに再生数表示', varName: 'headerViewCounter',
         values: {'する': true, 'しない': false}},
-      {description: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
+      {title: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
         values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
 
-      {description: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
+      {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
         values: {'する': true, 'しない': false}},
-      {description: 'てれびちゃんメニュー内に、原宿以前のランダム画像復活', varName: 'hidariue',
+      {title: 'てれびちゃんメニュー内に、原宿以前のランダム画像復活', varName: 'hidariue',
         values: {'する': true, 'しない': false}},
-      {description: '動画検索画面を広くする', varName: 'videoExplorerHack',
+      {title: '動画検索画面を広くする', varName: 'videoExplorerHack',
         values: {'する': true, 'しない': false}},
-      {description: '動画検索画面にお気に入りタグを表示', varName: 'enableFavTags',
+      {title: '動画検索画面にお気に入りタグを表示', varName: 'enableFavTags',
         values: {'する': true, 'しない': false}},
-      {description: '動画検索画面にお気に入りマイリストを表示', varName: 'enableFavMylists',
+      {title: '動画検索画面にお気に入りマイリストを表示', varName: 'enableFavMylists',
         values: {'する': true, 'しない': false}},
-      {description: 'タグが2行以内なら自動で高さ調節(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
+      {title: 'タグが2行以内なら自動で高さ調節(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
         values: {'する': true, 'しない': false},
           onchange: function(v) {
             // ピン留めする
             if (v) { w.WatchApp.ns.init.TagInitializer.tagViewController.setIsPinned(true); }
           }
        },
-      {description: 'ポップアップからのタグ検索でもプレイヤーを小さくする', varName: 'autoSmallScreenSearch',
+      {title: 'ポップアップからのタグ検索でもプレイヤーを小さくする', varName: 'autoSmallScreenSearch',
         values: {'する': true, 'しない': false}},
-      {description: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory',
+      {title: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory',
         values: {'する': true, 'しない': false}},
+      {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
+       description: '常に指定したいパラメータ指定するのに便利です\n例: 「-グロ -例のアレ」とすると、その言葉が含まれる動画が除外されます'},
 
-//      {description: '動画切り替え時にスライドするエフェクト(ただのお遊びです)', varName: 'enableSlideEffect',
+//      {title: '動画切り替え時にスライドするエフェクト(ただのお遊びです)', varName: 'enableSlideEffect',
 //        values: {'する': true, 'しない': false}},
-      {description: '「@ジャンプ」を無効化(※実験中。不具合があるかも)', varName: 'ignoreJumpCommand',
+      {title: '「@ジャンプ」を無効化(※実験中。不具合があるかも)', varName: 'ignoreJumpCommand',
         values: {'する': true, 'しない': false}, className: 'buggy'}
     ];
     pt.createPanelDom = function() {
@@ -686,9 +696,17 @@
       }
     };
     pt.createMenuItem = function(menu) {
-      var description = menu.description, varName = menu.varName, values = menu.values;
-      var $menu = w.jQuery('<li><p class="description">' + description + '</p></li>');
+      if (menu.type === 'text') {
+        return this.createTextMenuItem(menu);
+      } else {
+        return this.createRadioMenuItem(menu);
+      }
+    };
+    pt.createRadioMenuItem = function(menu) {
+      var title = menu.title, varName = menu.varName, values = menu.values;
+      var $menu = w.jQuery('<li><p class="title">' + title + '</p></li>');
       if (menu.className) { $menu.addClass(menu.className);}
+      if (menu.description) { $menu.attr('title', menu.description); }
       var currentValue = conf.getValue(varName);
       $menu.addClass(menu.varName);
       $panel.addClass(menu.varName + '_' + currentValue);
@@ -702,10 +720,10 @@
           $chk.attr('checked', 'checked');
         }
         $chk.click(function() {
-          var newValue = JSON.parse(this.value), oldValue = conf[this.name];
+          var newValue = JSON.parse(this.value), oldValue = conf.getValue(varName);
           if (oldValue !== newValue) {
             $panel.removeClass(menu.varName + '_' + oldValue).addClass(menu.varName + '_' + newValue);
-            conf.setValue(this.name, newValue);
+            conf.setValue(menu.varName, newValue);
             if (typeof menu.onchange === 'function') {
               menu.onchange(newValue, oldValue);
             }
@@ -714,6 +732,26 @@
         $label.append($chk).append(w.jQuery('<span>' + k + '</span>'));
         $menu.append($label);
       }
+      return $menu;
+    };
+    pt.createTextMenuItem = function(menu) {
+      var title = menu.title, varName = menu.varName, values = menu.values;
+      var $menu = w.jQuery('<li><p class="title">' + title + '</p></li>');
+      if (menu.className) { $menu.addClass(menu.className);}
+      if (menu.description) { $menu.attr('title', menu.description); }
+      var currentValue = conf.getValue(varName);
+      var $input = w.jQuery('<input type="text" />');
+      $input.val(currentValue);
+      $input.change(function() {
+        var newValue = $input.val(), oldValue = conf.getValue(varName);
+        if (oldValue !== newValue) {
+          conf.setValue(varName, newValue);
+          if (typeof menu.onchange === 'function') {
+            menu.onchange(newValue, oldValue);
+          }
+        }
+      });
+      $menu.append($input);
       return $menu;
     };
 
@@ -736,9 +774,10 @@
    *  動画タグ取得とポップアップ
    *
    */
-  var VideoTags = (function(){
+  var VideoTags = (function(conf, w){
 
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
+    var isWatch = w.WatchApp ? true : false;
     var pt = function(){};
     var lastPopup = null;
 
@@ -846,7 +885,12 @@
 
         var a = document.createElement('a');
         a.appendChild(document.createTextNode(text));
-        a.href = 'http://' + host + '/tag/' + encodeURIComponent(text);
+
+        var href = text;
+        if (conf.defaultSearchOption && conf.defaultSearchOption != '' && !text.match(/(sm|nm|so)\d+/)) {
+          href += ' ' + conf.defaultSearchOption;
+        }
+        a.href = 'http://' + host + '/tag/' + encodeURIComponent(href);
         a.addEventListener('click', function(e) {
           if (e.button != 0 || e.metaKey) return;
           if (w.WatchApp) {
@@ -875,7 +919,7 @@
     };
 
     return pt;
-  })();
+  })(conf, w);
 
 
 
@@ -1606,7 +1650,9 @@
   //===================================================
 
   var WatchController = (function(w) {
-    var WatchApp = w.WatchApp, watch = WatchApp.ns.init, $ = w.$, WatchJsApi = w.WatchJsApi;
+    var WatchApp = w.WatchApp,
+      watch = (WatchApp && WatchApp.ns.init) || {},
+      $ = w.$, WatchJsApi = w.WatchJsApi;
     return {
       nicoSearch: function(word, search_type) {
         search_type = search_type || 'tag';
@@ -1632,7 +1678,7 @@
       },
       scrollToVideoPlayer: function(force) {
         // 縦解像度がタグ+プレイヤーより大きいならタグの開始位置、そうでないならプレイヤーの位置にスクロール
-        // ただし、該当部分が画面内に納まっている場合は、勝手にスクロールすると帰ってうざいのでなにもしない
+        // ただし、該当部分が画面内に納まっている場合は、勝手にスクロールするとかえってうざいのでなにもしない
         var h = $('#playerContainer').outerHeight() + $('#videoTagContainer').outerHeight();
         var top = $(window).height() >= h ? '#videoTagContainer, #playerContainer' : '#playerContainer';
 
@@ -1914,6 +1960,7 @@
 
 
     function onVideoChangeStatusUpdated(f) {
+      AnchorHoverPopup.hidePopup();
       if (!isFirst) {
           $leftPanel;//animate({opacity: 0}, 800, function() { $leftPanel.empty(); });
         if (conf.enableSlideEffect) {
@@ -1947,39 +1994,50 @@
     // - 空っぽになった左になんか表示してみる
     function leftPanelJack($leftPanel) {
       if (!conf.leftPanelJack) { return; }
-      var uploaderId = watch.CommonModelInitializer.watchInfoModel.uploaderInfo.id;
+      var watchInfoModel = watch.CommonModelInitializer.watchInfoModel;
+      var uploaderId = watchInfoModel.uploaderInfo.id;
       var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
       var h = $leftPanel.innerHeight() - 100, $inner = $('<div/>');
+
+      var addComma = WatchApp.ns.util.StringUtil.addComma;
+      var $counter = $([
+        '<ul class="videoStats">',
+          '<li>再生: <span>'      , addComma(watchInfoModel.viewCount), '</span></li>',
+          '<li>コメント: <span>'  , addComma(watchInfoModel.commentCount), '</span></li>',
+          '<li>マイリスト: <span>', addComma(watchInfoModel.mylistCount), '</span></li>',
+        '</url>'
+      ].join(''));
+
       $leftPanel.empty();
-        $inner
-          .addClass('leftVideoInfoInner').css({opacity: 0})
-          .append(
-            $('<div/>')
-              .addClass('videoThumbnailContainer')
-                .append($('#videoInfo #videoTitle').clone().attr('id', null).addClass('videoTitle'))
-                .append($('#videoThumbnailImage').clone(true))
-          )
-          .append(
-            $('<div class="videoDetails"/>')
-              .css({maxHeight: 0, overflowY: 'hidden', minHeight: 0})
-                .append(
-                  $('<div class="videoInfo"/>')
-                      .append($('<span/>').text($('#videoInfoHead .videoPostedAt').text())).addClass('videoPostedAt')
-                      .append($('#videoInfo #videoStats').clone().attr('id', null).addClass('videoStats'))
-                )
-              .append($('.videoDescription').clone(true))
-          )
-          .append(
-            $('#userProfile .userIconContainer').clone(true)
+      $inner
+        .addClass('leftVideoInfoInner').css({opacity: 0})
+        .append(
+          $('<div/>')
+            .addClass('videoThumbnailContainer')
+              .append($('#videoInfo #videoTitle').clone().attr('id', null).addClass('videoTitle'))
+              .append($('#videoThumbnailImage').clone(true))
+        )
+        .append(
+          $('<div class="videoDetails"/>')
+            .css({maxHeight: 0, overflowY: 'hidden', minHeight: 0})
               .append(
-                $('<span class="userName">' + $('#videoInfo .userName').text() + '</span><br/>'))
-              .append(
-                $('#userProfile .showOtherVideos').clone(true).text('関連動画').attr('href', '/user/' + uploaderId + '/video')
+                $('<div class="videoInfo"/>')
+                    .append($('<span/>').text($('.videoPostedAt:last').text())).addClass('videoPostedAt')
+                    .append($counter)
               )
-          ).append(
-            $('#ch_prof').clone(true).attr('id', null)
-              .addClass('ch_profile')
-          );
+            .append($('.videoDescription:first').clone(true))
+        )
+        .append(
+          $('#userProfile .userIconContainer').clone(true)
+            .append(
+              $('<span class="userName">' + $('#videoInfo .userName').text() + '</span><br/>'))
+            .append(
+              $('#userProfile .showOtherVideos').clone(true).text('関連動画').attr('href', '/user/' + uploaderId + '/video')
+            )
+        ).append(
+          $('#ch_prof').clone(true).attr('id', null)
+            .addClass('ch_profile')
+        );
         $leftPanel.append($inner);
         // なんのためのアニメーション？ → 最初に投稿者アイコンをよく見せるため
         $inner.animate({opacity: 1}, 800, function() {
@@ -2363,6 +2421,19 @@
       });
       if (conf.enableNewsHistory) {NicoNews.initialize(w);}
 
+      if (conf.defaultSearchOption && conf.defaultSearchOption != '') {
+        var vs = watch.ComponentInitializer.videoSelection;
+        vs._searchVideo_org = vs._searchVideo;
+        vs._searchVideo = function(word, type, callback) {
+          AnchorHoverPopup.hidePopup();
+          if (word.indexOf(conf.defaultSearchOption) < 0 && !word.match(/(sm|nm|so)\d+/)) {
+            word += " " + conf.defaultSearchOption;
+          }
+          vs._searchVideo_org(word, type, callback);
+        }
+      }
+
+
       onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
     }
 
@@ -2413,7 +2484,7 @@
 
 
   /**
-   *  キーボードイベント
+   *  キーボードイベント他
    *
    */
   (function() {
@@ -2422,6 +2493,16 @@
         AnchorHoverPopup.hidePopup();
       }
     });
+/*
+    var hasFocus = true;
+    w.document.body.addEventListener('focus', function(e) {
+      console.log('get focus');
+    });
+
+    w.document.body.addEventListener('blur', function(e) {
+      console.log('lost focus');
+    });
+*/
   })(w);
 
   //===================================================
@@ -2453,5 +2534,4 @@
     monkey(true);
   }
 })();
-
 
