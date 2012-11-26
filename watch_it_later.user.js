@@ -7,6 +7,8 @@
 // @exclude        http://ads*.nicovideo.jp/*
 // @exclude        http://live*.nicovideo.jp/*
 // @exclude        http://dic.nicovideo.jp/*
+// @exclude        http://www.upload.nicovideo.jp/*
+// @exclude        http://upload.nicovideo.jp/*
 // @match          http://www.nicovideo.jp/*
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
@@ -14,8 +16,18 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121119
+// @version        1.121126
 // ==/UserScript==
+
+// * ver 1.121126
+// - 11/26のQwatch更新に対応
+// - 「@ジャンプ」キャンセラーの副作用なし正式版
+// - 「ウィンドウがアクティブの時だけ自動再生する」機能を追加
+//    自動再生ONだけど別タブで開く時は再生したくないって人に地味に便利
+// - お気に入りマイリストが新しい動画のある順に並ぶようにした
+//   お気に入りマイリストが２０件以上あると取得できなかった問題を修正
+// - タグ検索・マイリスト検索のソートを記憶するようにした
+//   毎回「コメントの新しい順」にリセットされてウゼーと思ってた人におすすめ
 
 // * ver 1.121119
 // - 検索のデフォルトパラメータ指定機能
@@ -104,14 +116,10 @@
 
 
 // TODO:
-// - QWatch上からお気に入りタグ取得・お気に入りマイリストを検索・登録
 // - ランキング取得
 // - 市場を色々なんとかする
 // - 検索部分を開閉するショートカットキーが欲くなった
 // - 段幕がちょっとだけ邪魔な時「CTRLを押してる間だけコメントが消える」とかやりたい
-// - お気に入りマイリスト取得
-// - 検索のソート順を覚える
-// - ニュースの履歴保存
 // - いいかげんコード整理
 
 (function() {
@@ -154,7 +162,7 @@
       leftPanelJack: true, // 左パネルに動画情報を表示
       headerViewCounter: false, // ヘッダに再生数コメント数を表示
       popupViewCounter: 'full', // 動画切り替わり時にポップアップで再生数を表示
-      ignoreJumpCommand: false, // @ジャンプ無効化(不具合があるかも)
+      ignoreJumpCommand: false, // @ジャンプ無効化
       doubleClickScroll: true, // 空白部分ををダブルクリックで動画の位置にスクロールする
       hidePlaylist: true, // プレイリストを閉じる
       hidariue: true, // てれびちゃんメニュー内に、原宿以前のランダム画像復活
@@ -166,9 +174,13 @@
       autoSmallScreenSearch: false, // ポップアップからのタグ検索でもプレイヤーを小さくする
       enableNewsHistory: false, // ニコニコニュースの履歴を保持する
       defaultSearchOption: '', // 検索時のデフォルトオプション
+      autoPlayIfWindowActive: 'no', // 'yes' = ウィンドウがアクティブの時だけ自動再生する
 
       enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
 
+      enableSortTypeMemory: true, // 検索のソート順を記憶する
+      searchSortType: 'n', //
+      searchSortOrder: 'd', // 'd'=desc 'a' = asc
       fxInterval: 40 // アニメーションのフレームレート 40 = 25fps
     };
 
@@ -186,7 +198,7 @@
         T = document.createTextNode(T)
         S.appendChild(T);
         var head = document.getElementsByTagName('head');
-        head = head[0]
+        head = head[0];
         head.appendChild(S);
         return;
       };
@@ -366,46 +378,49 @@
         color: #ff9; font-size: 70%;\n\
       }\n\n\
       /* 左に表示する動画情報 */\
-      #ichibaPanel.leftVideoInfo {\n\
+      #leftPanel.leftVideoInfo {\n\
+        padding: 6px; width: 184px;\n\
+      }\n\n\
+      #leftPanel.leftVideoInfo {\n\
         background: #bbb; text-Align: left; overflow-Y: auto; box-shadow: none; font-size: 90%;\n\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoThumbnailContainer{\n\
+      #leftPanel.leftVideoInfo .videoThumbnailContainer{\n\
         background: #ccc; text-align: center;  color: #000; border-radius: 4px 4px 0 0;\n\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoTitle{\n\
+      #leftPanel.leftVideoInfo .videoTitle{\n\
         \
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoPostedAt{\n\
+      #leftPanel.leftVideoInfo .videoPostedAt{\n\
         color: #333;\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoStats{\n\
+      #leftPanel.leftVideoInfo .videoStats{\n\
         font-size:90%;\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoStats li{\n\
+      #leftPanel.leftVideoInfo .videoStats li{\n\
         display: inline-block; margin: 0 2px;\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoStats li span{\n\
+      #leftPanel.leftVideoInfo .videoStats li span{\n\
         font-weight: bolder;\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoStats .ranking{\n\
+      #leftPanel.leftVideoInfo .videoStats .ranking{\n\
         display: none !important;\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoInfo{\n\
+      #leftPanel.leftVideoInfo .videoInfo{\n\
         background: #ccc; text-align: center;\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoDetails{\n\
+      #leftPanel.leftVideoInfo .videoDetails{\n\
         background: #bbb;\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .videoDetails a{\n\
+      #leftPanel.leftVideoInfo .videoDetails a{\n\
         margin: auto 4px;\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .userIconContainer a, #ichibaPanel.leftVideoInfo .ch_profile a{\n\
+      #leftPanel.leftVideoInfo .userIconContainer a, #leftPanel.leftVideoInfo .ch_profile a{\n\
         display: block;\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .userIconContainer, #ichibaPanel.leftVideoInfo .ch_profile{\n\
+      #leftPanel.leftVideoInfo .userIconContainer, #leftPanel.leftVideoInfo .ch_profile{\n\
         background: #ccc; width: 100%; text-align: center; border-radius: 0 0 4px 4px; float: none; \n\
       }\n\n\
-      #ichibaPanel.leftVideoInfo .userIconContainer .usericon, #ichibaPanel.leftVideoInfo .ch_profile img{\n\
+      #leftPanel.leftVideoInfo .userIconContainer .usericon, #leftPanel.leftVideoInfo .ch_profile img{\n\
         max-width: 130px; width: auto; height: auto;\n\
       }\n\n\
 \
@@ -451,7 +466,7 @@
       body.w_setting #searchResultExplorer.wide {\n\ /* QWatch設定パネルと検索ウィンドウが被るのを防止 */\
         top: auto !important;\n\
       }\n\n\
-      body.w_channel #ichibaPanel .userIconContainer{\n\
+      body.w_channel #leftPanel .userIconContainer{\n\
         display: none;\n\
       }\n\n\
       /* QWatch設定パネル */\
@@ -521,6 +536,13 @@
       #searchResultNavigation .favTagsPopup ul li, #searchResultNavigation .favMylistsPopup ul li{\
         background: #fdfdfd; padding: 0; border: 0;font-size: 90%;\
       }\n\
+      #searchResultNavigation .favTagsPopup ul li a:hover, #searchResultNavigation .favMylistsPopup ul li a:hover{\
+        background: #f0f0ff;\
+      }\n\
+      #searchResultNavigation .favTagsPopup ul .reload, #searchResultNavigation .favMylistsPopup ul .reload{\
+        cursor: pointer; border: 1px solid; padding: 0;\
+      }\n\
+\
 \
 \
       /* 動画タグが1行以下の時 */\
@@ -671,13 +693,19 @@
         values: {'する': true, 'しない': false}},
       {title: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory',
         values: {'する': true, 'しない': false}},
+      {title: 'ウィンドウがアクティブの時だけ自動再生する', varName: 'autoPlayIfWindowActive',
+        description: 'QWatch側の設定パネルの自動再生はオフにしてください。\n\n■こんな人におすすめ\n・自動再生ONにしたいけど別タブで開く時は自動再生したくない\n・複数タブ開いたままブラウザ再起動したら全部のタブで再生が始まって「うるせー！」という経験のある人',
+        values: {'する': 'yes', 'しない': 'no'}},
+
+
+
       {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
        description: '常に指定したいパラメータ指定するのに便利です\n例: 「-グロ -例のアレ」とすると、その言葉が含まれる動画が除外されます'},
 
 //      {title: '動画切り替え時にスライドするエフェクト(ただのお遊びです)', varName: 'enableSlideEffect',
 //        values: {'する': true, 'しない': false}},
-      {title: '「@ジャンプ」を無効化(※実験中。不具合があるかも)', varName: 'ignoreJumpCommand',
-        values: {'する': true, 'しない': false}, className: 'buggy'}
+      {title: '「@ジャンプ」を無効化', varName: 'ignoreJumpCommand',
+        values: {'する': true, 'しない': false}}
     ];
     pt.createPanelDom = function() {
       if ($panel == null) {
@@ -890,7 +918,8 @@
         if (conf.defaultSearchOption && conf.defaultSearchOption != '' && !text.match(/(sm|nm|so)\d+/)) {
           href += ' ' + conf.defaultSearchOption;
         }
-        a.href = 'http://' + host + '/tag/' + encodeURIComponent(href);
+        var sortOrder = '?sort=' + conf.searchSortType + '&order=' + conf.searchSortOrder;
+        a.href = 'http://' + host + '/tag/' + encodeURIComponent(href) + sortOrder;
         a.addEventListener('click', function(e) {
           if (e.button != 0 || e.metaKey) return;
           if (w.WatchApp) {
@@ -1365,10 +1394,10 @@
   })();
 
   var FavMylists = (function() {
+    var lastUpdate = 0;
     var favMylistList = [];
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
     var $ = w.$;
-
     /**
      *  お気に入りマイリストの取得。 jQueryのあるページでしか使えない
      *  マイページを無理矢理パースしてるので突然使えなくなるかも
@@ -1376,21 +1405,89 @@
     var self = {
       load: function(callback) {
         if (!w.jQuery) return; //
-        var url = 'http://' + host + '/my/fav/mylist';
-        GM_xmlhttpRequest({
-          url: url,
-          onload: function(resp) {
-            var $result = $(resp.responseText).find('#favMylist');
-            if ($result.length < 1) return;
-            $result.find('.outer').each(function() {
-              var $this = $(this), $a = $this.find('h5 a'), $desc = $this.find('.mylistDescription'),
-                  id = ($a.attr('href').split('/').reverse())[0];
+        var now = Date.now();
+        if (now - lastUpdate < 3 * 60 * 1000) {
+          do_callback();
+          return;
+        }
+        lastUpdate = now;
 
-              favMylistList.push({id: id, name: $a.text(), description: $desc.text()});
-            });
-            if (typeof callback === 'function') { callback(favMylistList); }
-          }
-        });
+        var
+          baseUrl = 'http://' + host + '/my/fav/mylist',
+          url = baseUrl,
+          maxPage = 1;
+
+        request(1);
+
+        function request(page) {
+          url = baseUrl + '?page=' + page;
+          console.log('GET ' +url);
+          GM_xmlhttpRequest({
+            url: url,
+            onload: function(resp) {
+              var $result = $(resp.responseText).find('#favMylist');
+
+              if ($result.length >= 1) {
+                updateMaxPage($result);
+
+                if (page === 1) { favMylistList = []; }
+
+                $result.find('.outer').each(function() {
+                  favMylistList.push(readBlock(this));
+                });
+              }
+
+              if (page < maxPage) {
+                setTimeout(function() {
+                  page++;
+                  request(page);
+                }, 500);
+              } else {
+                sort();
+                do_callback();
+              }
+            }
+          });
+        }
+
+        function readBlock(elm) {
+          var
+            $elm         = $(elm),
+            $a           = $elm.find('h5 a'), $desc = $elm.find('.mylistDescription'),
+            id           = ($a.attr('href').split('/').reverse())[0],
+            $postTime    = $elm.find('.postTime span'),
+            postTime     = $.trim($postTime.text()),
+            postTimeData = $postTime.data(),
+            $videoLink   = $elm.find('.videoTitle a'),
+            videoTitle   = $videoLink.text(),
+            videoHref    = $videoLink.attr('href'),
+            videoId      = videoHref ? (videoHref.split('/').reverse()[0]) : '';
+
+          return {
+            id: id,
+            name: $a.text(),
+            description: $desc.text(),
+            lastVideo: {
+              title: videoTitle,
+              videoId: videoId,
+              postedAt: postTime,
+              postTimeData: postTimeData
+            }
+          };
+        }
+
+        function updateMaxPage($result) {
+          var $paging = $result.find('.pagerWrap:first .pager:first a');
+          maxPage = Math.min(Math.max($paging.length, 1), 3);
+        }
+        function sort() {
+          favMylistList.sort(function(a, b) {
+              return (a.lastVideo.postedAt < b.lastVideo.postedAt) ? 1 : -1;
+          });
+        }
+        function do_callback() {
+          if (typeof callback === 'function') { callback(favMylistList); }
+        }
       }
     };
     return self;
@@ -1398,6 +1495,7 @@
 
 
   var FavTags = (function() {
+    var lastUpdate = 0;
     var favTagList = [];
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
     var $ = w.$;
@@ -1410,16 +1508,25 @@
      */
     function load(callback) {
       if (!w.jQuery) return; //
+      var now = Date.now();
+      if (now - lastUpdate < 60 * 1000) {
+        if (typeof callback === 'function') { callback(favMylistList); }
+        return;
+      }
+      lastUpdate = now;
+
       var url = 'http://' + host + '/my/fav/tag';
       GM_xmlhttpRequest({
         url: url,
         onload: function(resp) {
           var $result = $(resp.responseText).find('#favTag');
-          if ($result.length < 1) return;
-          $result.find('.outer').each(function() {
-            var $a = $(this).find('h5 a');
-            favTagList.push({href: $a.attr('href'), name: $a.text()});
-          });
+          if ($result.length >= 1) {
+            favMylistList = [];
+            $result.find('.outer').each(function() {
+              var $a = $(this).find('h5 a');
+              favTagList.push({href: $a.attr('href'), name: $a.text()});
+            });
+          }
           if (typeof callback === 'function') { callback(favTagList); }
         }
       });
@@ -1453,6 +1560,11 @@
         w.alert(text);
       }
     };
+    Popup.hide = function() {
+      if (w.WatchApp) {
+        w.WatchApp.namespace.init.PopupMarqueeInitializer.popupMarqueeViewController.stop();
+      }
+    }
     return Popup;
   })();
 
@@ -1552,6 +1664,23 @@
 
 
     }
+
+    var lastUpdate = 0;
+    var timer = null, linksCount = document.links.length,
+      bindLoop = function(nextTime) {
+        var now = Date.now();
+        var updateInterval = w.document.hasFocus() ? 3000 : 15000;
+        if (now - lastUpdate < updateInterval) {
+          var len = document.links.length;
+          if (linksCount == len) {
+            return;
+          }
+          linksCount = len;
+        }
+        bind();
+        lastUpdate = now;
+      };
+
     var self = {
       hidePopup: function() {
         VideoTags.hidePopup();
@@ -1560,7 +1689,7 @@
       },
       updateNow: function() {
         bind();
-        setTimeout(function() { bind();}, 1000);
+        lastUpdate -= 1500;
         return this;
       }
     };
@@ -1569,10 +1698,7 @@
       bind();
     } else {
       bind();
-      setInterval(
-        function() { bind(); }, 3000
-      );
-      //w.Event.observe(w, 'load', function() { add_btn('a[href*="watch/"]'); }, false);
+      setInterval(bindLoop, 500);
     }
     return self;
   })();
@@ -1671,6 +1797,7 @@
       },
       showMylist: function(mylistId) {
         watch.ComponentInitializer.videoSelection.showMylistgroup(mylistId);
+        AnchorHoverPopup.hidePopup().updateNow();
       },
       changeScreenMode: function(mode) {
         WatchJsApi.player.changePlayerScreenMode(mode);
@@ -1703,6 +1830,12 @@
           $e.width($e.width() + px);
         }
         $('#playerCommentPanelOuter').css({'right': - $('#playerCommentPanelOuter').outerWidth() + 'px'});
+      },
+      play: function() {
+        watch.PlayerInitializer.nicoPlayerConnector.playVideo();
+      },
+      pause: function() {
+        watch.PlayerInitializer.nicoPlayerConnector.pauseVideo();
       }
     }
   })(w);
@@ -1804,7 +1937,8 @@
     var pac  = watch.PlayerInitializer.playerAreaConnector;
     var vs   = watch.ComponentInitializer.videoSelection;
     var isSearchOpen = false;
-    var $leftPanel = $('#ichibaPanel'), $rightPanel = $('#playerCommentPanelOuter');
+
+    var $leftPanel = $('#leftPanel'), $rightPanel = $('#playerCommentPanelOuter');
   //  var flashVars = pim.playerInitializeModel.flashVars;
   //  flashVars.isBackComment = 0;
 
@@ -1954,6 +2088,11 @@
       resetHidariue();
       onTagReset();
       if (!isFirst) {
+      } else {
+        if (conf.autoPlayIfWindowActive === 'yes' && w.document.hasFocus()) {
+          // ウィンドウがアクティブの時だけ自動再生する。 複数タブ開いてるときは便利
+          setTimeout(function() { WatchController.play();}, 2000);
+        }
       }
       isFirst = false;
     }
@@ -2065,7 +2204,8 @@
       setTimeout(function() {
         var $favmylists = $('<li style="display:none;"></li>'),
             $a = $('<a>▼お気に入りマイリスト</a>'),
-            $popup = $('<li><ul></ul></li>'), $ul = $popup.find('ul');
+            $popup = $('<li><ul></ul></li>'), $ul = $popup.find('ul'),
+            $reload = $('<li><button class="reload">リロード</button></li>');
         $favmylists.attr('id','favoriteMylistsMenu');
         $a.attr('href', '/my/fav/mylist').click(function(e) {
           if (e.button != 0 || e.metaKey) return;
@@ -2078,30 +2218,53 @@
         $favmylists.append($a);//.append($popup)
         $('#searchResultNavigation ul:first').append($favmylists).append($popup);
 
-        FavMylists.load(function(mylists) {
-          if (mylists.length < 1) {
-            $favmylists.remove();
-            return;
-          }
-          for (var i = 0, len = mylists.length; i < len; i++) {
-            var mylist = mylists[i], $li = $('<li/>'),
-              $a = $('<a/>')
-              .attr({href: '/mylist/' + mylist.id, title: "/mylist/" + mylist.id + "\n" + mylist.description})
-              .text(mylist.name)
-              .addClass('favoriteMylist')
-              .click(
-                (function(id) {
-                  return function(e) {
-                    if (e.button != 0 || e.metaKey) return;
-                    e.preventDefault();
-                    WatchController.showMylist(id);
-                  };
-                })(mylist.id)
-              );
-            $ul.append($li.append($a));
-          }
-          $favmylists.show();
-        });
+        load();
+        $reload.click(reload);
+
+        function reload() {
+          $reload.unbind('click', reload);
+          $ul.hide(300, function() { $ul.empty().show()});
+          setTimeout(function() {
+            load();
+            $reload.click(reload);
+          }, 500);
+        }
+
+        function load() {
+          FavMylists.load(function(mylists) {
+            if (mylists.length < 1) {
+              //$favmylists.remove();
+              $ul.append($reload);
+              return;
+            }
+            for (var i = 0, len = mylists.length; i < len; i++) {
+              var mylist = mylists[i], lastVideo = mylist.lastVideo, $li = $('<li/>'),
+                title = [
+                  '/mylist/', mylist.id, '\n',
+                  mylist.description, '\n\n',
+                  '最新動画: ', lastVideo.title, '\n',
+                  '投稿日時: ', lastVideo.postedAt, '\n',
+                ''].join(''),
+                $a = $('<a/>')
+                .attr({href: '/mylist/' + mylist.id, title: title})
+                .text(mylist.name)
+                .addClass('favoriteMylist')
+                .click(
+                  (function(id) {
+                    return function(e) {
+                      if (e.button != 0 || e.metaKey) return;
+                      e.preventDefault();
+                      WatchController.showMylist(id);
+                    };
+                  })(mylist.id)
+                );
+              $ul.append($li.append($a));
+            }
+            $ul.append($reload);
+            $favmylists.show();
+          });
+        }
+
       }, 100);
     }
 
@@ -2113,7 +2276,7 @@
             $a = $('<a>▼お気に入りタグ</a>'),
             $popup = $('<li><ul></ul></li>'), $ul = $popup.find('ul');
         $favtags.attr('id', 'favoriteTagsMenu');
-        $a.attr('href', '/my/fav/tags').click(function(e) {
+        $a.attr('href', '/my/fav/tag').click(function(e) {
           if (e.button != 0 || e.metaKey) return;
           e.preventDefault();
           $popup.toggleClass('open').toggle(200);
@@ -2129,10 +2292,11 @@
             $favtags.remove();
             return;
           }
+          var sortOrder = '?sort=' + conf.searchSortType + '&order=' + conf.searchSortOrder;
           for (var i = 0, len = tags.length; i < len; i++) {
             var tag = tags[i], $li = $('<li/>'),
               $a = $('<a/>')
-              .attr({href: tag.href})
+              .attr({href: '/tag/' + encodeURIComponent(tag.name + ' ' + conf.defaultSearchOption) + sortOrder})
               .text(tag.name)
               .addClass('favoriteTag')
               .click(function(e) {
@@ -2314,15 +2478,25 @@
 
       // メモ
       // とりあえずマイリストのオープン
-      //watch.ComponentInitializer.videoSelection.contentsAreaVC.addEventListener('deflistFolderClickedEvent', function(){ })
-
+      function updatePopup() {
+        AnchorHoverPopup.hidePopup().updateNow();
+      }
+      var cvc = watch.ComponentInitializer.videoSelection.contentsAreaVC;
+      cvc.addEventListener('deflistFolderClickedEvent', function(){
+        watch.ComponentInitializer.videoSelection.loaderAgent.deflistVideoLoader._cache.deleteElement({}); // キャッシュクリア
+        updatePopup();
+      });
+      cvc.addEventListener('uploadedFolderClickedEvent', updatePopup);
+      cvc.addEventListener('mylistFolderClickedEvent'  , updatePopup);
+      cvc.addEventListener('paginationClickedEvent'    , updatePopup);
 
       watch.TagInitializer.tagList.addEventListener('reset', onTagReset);
 
       $('body').dblclick(function(){
         if (conf.doubleClickScroll) { WatchController.scrollToVideoPlayer(true);}
       });
-      w.$(window).resize(onWindowResize);
+
+      $(window).resize(onWindowResize);
 
     }
 
@@ -2368,7 +2542,6 @@
       $('#playerContainerWrapper').append($conf);
     }
 
-
     function toggleSearchType(suffix) {
       if ($('.searchText a' + suffix).hasClass('searchKeywordIcon')) {
         $('.searchTag a' + suffix).click();
@@ -2376,6 +2549,26 @@
         $('.searchKeyword a ' + suffix).click();
       }
       $('.searchOption').hide();
+    }
+
+    function initSearchOption() {
+      var sort = conf.searchSortType || 'n', order = conf.searchSortOrder || 'd';
+      $('#searchResultSortOptions select').change(function() {
+        var v = $(this).val().split('&');
+        sort  = v[0].split('=')[1];
+        order = v[1].split('=')[1];
+        conf.setValue('searchSortType',  sort);
+        conf.setValue('searchSortOrder', order);
+      });
+      watch.ComponentInitializer.videoSelection.stateHistory["MenuType.search"].reset = function () {
+        var self = watch.ComponentInitializer.videoSelection.stateHistory["MenuType.search"];
+        self._searchWord = "";
+        self._searchType = undefined;
+        self._sortType   = sort;
+        self._orderType  = order;
+        self._pageIndex  = 1;
+        return self;
+      };
     }
 
     function initOther() {
@@ -2434,6 +2627,14 @@
       }
 
 
+      WatchJsApi.nicos.addEventListener('nicoSJump', function(e) {
+        if (conf.ignoreJumpCommand) {
+          e.cancel();
+          Popup.show('「@ジャンプ」コマンドをキャンセルしました');
+        }
+      });
+
+
       onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
     }
 
@@ -2448,6 +2649,7 @@
       initSidePanel();
       initEvents();
       initPager();
+      initSearchOption();
       initOther();
 
       onWindowResize();
@@ -2459,6 +2661,7 @@
       }, 3000);
 
     } catch(e) {
+      console.log(e);
       w.alert(e);
     }
   })();
@@ -2491,18 +2694,10 @@
     w.document.body.addEventListener('keydown', function(e) {
       if (e.keyCode === 27 || e.keyCode === 88) { // ESC or x
         AnchorHoverPopup.hidePopup();
+        Popup.hide();
       }
     });
-/*
-    var hasFocus = true;
-    w.document.body.addEventListener('focus', function(e) {
-      console.log('get focus');
-    });
 
-    w.document.body.addEventListener('blur', function(e) {
-      console.log('lost focus');
-    });
-*/
   })(w);
 
   //===================================================
@@ -2534,4 +2729,5 @@
     monkey(true);
   }
 })();
+
 
