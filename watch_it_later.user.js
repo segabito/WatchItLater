@@ -16,8 +16,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121126
+// @version        1.121127
 // ==/UserScript==
+
+// * ver 1.121127
+// - 小バグ修正
 
 // * ver 1.121126
 // - 11/26のQwatch更新に対応
@@ -2036,7 +2039,13 @@
           (conf.popupViewCounter === 'full' && $('body').hasClass('full_with_browser'))
       ) {
         Popup.show(
-          $('<div/>').append($('<a/>').text(watchInfoModel.title).attr('href', 'http://nico.ms/' + watchInfoModel.v)).html() +
+          $('<div/>')
+            .append(
+              $('<a/>')
+              .text(WatchApp.ns.util.StringUtil.unescapeHTML(watchInfoModel.title))
+              .attr('href', 'http://nico.ms/' + watchInfoModel.v)
+            )
+            .html() +
           '<br/><span style="margin-left:10px; font-size: 90%;">'+ h + '</span>'
         );
       }
@@ -2190,6 +2199,10 @@
     }
     var hidariue = null;
     function resetHidariue() {
+      var dt = new Date();
+      if (dt.getMonth() < 1 && dt.getDate() <=3) {
+        $('#videoMenuTopList').append('<li style="position:absolute;left:300px;font-size:50%">　＼　│　／<br>　　／￣＼　　 ／￣￣￣￣￣￣￣￣￣<br>─（ ﾟ ∀ ﾟ ）＜　しんねんしんねん！<br>　　＼＿／　　 ＼＿＿＿＿＿＿＿＿＿<br>　／　│　＼</li>');
+      }
       if (!conf.hidariue) { return; }
       if (!hidariue) {
         $('#videoMenuTopList').append('<li style="position:absolute;top:22px;left:0px;"><a href="https://github.com/segabito/WatchItLater" target="_blank" style="color:black;"><img id="hidariue"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:Q"></a></p><a href="http://nico.ms/sm18845030" class="itemEcoLink">…</a></li>');
@@ -2729,5 +2742,4 @@
     monkey(true);
   }
 })();
-
 
