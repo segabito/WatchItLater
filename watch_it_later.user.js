@@ -16,8 +16,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121127
+// @version        1.121129
 // ==/UserScript==
+
+// * ver 1.121129
+// - ニコニコニュースのレイアウト変更に対応
 
 // * ver 1.121127
 // - 小バグ修正
@@ -382,7 +385,7 @@
       }\n\n\
       /* 左に表示する動画情報 */\
       #leftPanel.leftVideoInfo {\n\
-        padding: 6px; width: 184px;\n\
+        padding: 3px 6px 0 6px; width: 184px;\n\
       }\n\n\
       #leftPanel.leftVideoInfo {\n\
         background: #bbb; text-Align: left; overflow-Y: auto; box-shadow: none; font-size: 90%;\n\
@@ -579,18 +582,42 @@
 \
       /* ニュース履歴 */\
       body.w_searchOpen #textMarquee .openNewsHistory, body.w_searchOpen #textMarquee .newsHistory {\
-        display: none !important;\
+        display: none;\
+      }\
+      body.w_searchOpen #playerContainer.upside #textMarquee .openNewsHistory, body.w_searchOpen #playerContainer.upside #textMarquee .newsHistory {\
+        display: block;\
+      }\
+      #playerContainer.upside #textMarquee .openNewsHistory {\
+        background: none repeat scroll 0 0 transparent;\
+        border: 1px none;\
+        border-radius: 2px 2px 2px 2px;\
+        cursor: pointer;\
+        font-size: 13px;\
+        height: 28px;\
+        margin: 0;\
+        padding: 0;\
+        position: absolute;\
+        right: 18px; left: auto;\
+        width: 30px;\
+        z-index: 200;\
+      }\
+      #playerContainer.upside #textMarquee .openNewsHistory:hover {\
+        border:1px outset;\
       }\
       #textMarquee .openNewsHistory {\
-        position: absolute; width: 30px;left: -30px; top: 0;\
+        position: absolute; width: 30px;left: -30px;\
         font-size: 13px; padding: 0; margin: 0; height: 28px;\
         cursor: pointer;\
+        bottom: 0;\
+      }\
+      #playerContainer.upside #textMarquee .newsHistory {\
+        box-shadow: none;\
       }\
       #textMarquee .newsHistory {\
         position: absolute;\
-        bottom: -2px; left: 0px; width: 100%;\
+        bottom: 0px; right: 0px; width: 100%;\
         max-height: 132px;\
-        min-height: 28px;\
+        min-height: 40px;\
         overflow-y: auto;\
         overflow-x: hidden;\
         z-index: 1;\
@@ -601,7 +628,6 @@
         font-size: 14px;\
         box-shadow: 2px 2px #000;\
         padding: 0;\
-        margin: 0;\
       }\
       #textMarquee .newsHistory li{\
         padding: 0 2px;\
@@ -621,6 +647,12 @@
       }\
       body.full_with_browser #playerContainer {\
         margin-left: 0 !important;\
+      }\
+      body.w_notFull #playerContainer.upside{\
+        top: -10px;\
+      }\
+      body.full_with_browser #playerContainer.upside, body.w_small #playerContainer.upside{\
+        top: auto;\
       }\
       ',
     ''].join('');
@@ -1850,8 +1882,10 @@
 
     function onNewsUpdate(news) {
       var id = news.data.id, type = news.data.type, $current = null,
-          newsText = $textMarqueeInner.text(),
+          newsText = $textMarqueeInner.find('.categoryOuter:last').text() +
+                     $textMarqueeInner.find('.item .title, .item .header, .item .bannertext, .item .text').text(),
           newsHref = $textMarqueeInner.find('a').attr('href');
+      //console.log($textMarqueeInner.find('.categoryOuter'), $textMarqueeInner.find('.categoryOuter').text(), $textMarqueeInner.find('.categoryOuter').html());
       if (deteru[newsHref]) {
         $current = deteru[newsHref].remove();
       } else {
@@ -1895,11 +1929,14 @@
         $ul = $history.find('ul');
         $button.click(function() { self.toggle(); });
 
-        $('#textMarquee .textMarqueeOuter').append($button).append($history);
+        $('#textMarquee').append($button).append($history);
         initialized = true;
       },
       open: function() {
-        $history.show(200, scrollToBottom);
+        $history.show(200, function() {
+          scrollToBottom();
+          WatchApp.ns.util.WindowUtil.scrollFitMinimum('.newsHistory', 200);
+        });
       },
       close: function() {
         $history.hide(200);
