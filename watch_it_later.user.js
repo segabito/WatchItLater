@@ -16,8 +16,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121129
+// @version        1.121130
 // ==/UserScript==
+
+// * ver 1.121130
+// - ニコニコニュースが上表示の時に履歴が勝手に開く事がある問題を修正
 
 // * ver 1.121129
 // - ニコニコニュースのレイアウト変更に対応
@@ -1921,7 +1924,7 @@
           onNewsUpdate);
 
         $button = $('<button class="openNewsHistory" title="ニコニコニュースの履歴を開く">▲</button>');
-        $history = $('<div class="newsHistory"><ul></ul></div>');
+        $history = $('<div class="newsHistory" style="display: none;"><ul></ul></div>');
         $history.hover(
           function() { isHover = true; },
           function() { isHover = false; }
