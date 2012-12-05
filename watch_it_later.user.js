@@ -16,8 +16,12 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121130
+// @version        1.121205
 // ==/UserScript==
+
+// * ver 1.121205
+// - 検索画面の投稿動画一覧の並び順がおかしい(例: sm1000 -> sm2000 -> sm999 文字列ソート!)のを、
+//   投稿が新しい順に出てくるようにしてみるテスト
 
 // * ver 1.121130
 // - ニコニコニュースが上表示の時に履歴が勝手に開く事がある問題を修正
@@ -1875,6 +1879,7 @@
       pause: function() {
         watch.PlayerInitializer.nicoPlayerConnector.pauseVideo();
       }
+
     }
   })(w);
 
@@ -2065,6 +2070,35 @@
       w.ichiba.showConsole();
     }
 
+    /**
+     * 動画検索ウィンドウのユーザー投稿動画一覧が、動画IDの文字列順でソートされてて探しづらい(sm1000 sm2000 sm3000 sm999)のを
+     * 強引に新しい動画順に直してみる
+     *
+     */
+    function fixUploadedVideoSorting() {
+      watch.ComponentInitializer.videoSelection.loaderAgent.uploadedVideoLoader.cachingLoad_org =
+          watch.ComponentInitializer.videoSelection.loaderAgent.uploadedVideoLoader.cachingLoad;
+      watch.ComponentInitializer.videoSelection.loaderAgent.uploadedVideoLoader.cachingLoad = function(param) {
+      var self = watch.ComponentInitializer.videoSelection.loaderAgent.uploadedVideoLoader;
+
+        self.cachingLoad_org({
+          filter: function(result) {
+            if (result.list) {
+              result.list.sort(function(a, b) { return (a.first_retrieve < b.first_retrieve) ? 1 : -1; });
+            }
+            return param.filter(result);
+          },
+          success: param.success,
+          url: param.url,
+          queryParams: param.queryParams,
+          cacheParams: param.queryParams,
+          isSuccess:   param.isSuccess,
+          cache:       param.cache,
+          error:       param.error
+        });
+      };
+    }
+
 
     function onVideoChange(newVideoId, newWatchId) {
     }
@@ -2240,7 +2274,7 @@
     var hidariue = null;
     function resetHidariue() {
       var dt = new Date();
-      if (dt.getMonth() < 1 && dt.getDate() <=3) {
+      if (dt.getMonth() < 1 && dt.getDate() <=1) {
         $('#videoMenuTopList').append('<li style="position:absolute;left:300px;font-size:50%">　＼　│　／<br>　　／￣＼　　 ／￣￣￣￣￣￣￣￣￣<br>─（ ﾟ ∀ ﾟ ）＜　しんねんしんねん！<br>　　＼＿／　　 ＼＿＿＿＿＿＿＿＿＿<br>　／　│　＼</li>');
       }
       if (!conf.hidariue) { return; }
@@ -2689,6 +2723,8 @@
 
 
       onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
+
+      fixUploadedVideoSorting();
     }
 
 
@@ -2782,4 +2818,5 @@
     monkey(true);
   }
 })();
+
 
