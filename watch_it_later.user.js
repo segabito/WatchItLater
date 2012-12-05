@@ -16,8 +16,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121205
+// @version        1.121206
 // ==/UserScript==
+
+// * ver 1.121206
+// - 12/5のQwatch側の更新で、検索のソート順を記憶する機能が効かなくなったのを修正
 
 // * ver 1.121205
 // - 検索画面の投稿動画一覧の並び順がおかしい(例: sm1000 -> sm2000 -> sm999 文字列ソート!)のを、
@@ -2647,14 +2650,20 @@
         conf.setValue('searchSortType',  sort);
         conf.setValue('searchSortOrder', order);
       });
-      watch.ComponentInitializer.videoSelection.stateHistory["MenuType.search"].reset = function () {
-        var self = watch.ComponentInitializer.videoSelection.stateHistory["MenuType.search"];
-        self._searchWord = "";
-        self._searchType = undefined;
-        self._sortType   = sort;
-        self._orderType  = order;
-        self._pageIndex  = 1;
-        return self;
+      var org = watch.ComponentInitializer.videoSelection.stateHistory["MenuType.search"];
+      org.reset = function () {
+        org._searchWord = "";
+        org._searchType = undefined;
+        org._sortType   = sort;
+        org._orderType  = order;
+        org._pageIndex  = 1;
+        return org;
+      };
+      org.update_org = org.update;
+      org.update = function(p) {
+        if (typeof p.sortType  !== 'string') { p.sortType  = sort; }
+        if (typeof p.orderType !== 'string') { p.orderType = order; }
+        org.update_org(p);
       };
     }
 
