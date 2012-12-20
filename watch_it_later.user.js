@@ -16,8 +16,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121220
+// @version        1.121221
 // ==/UserScript==
+
+// * ver 1.121221
+// - 動画検索画面は自分のマイリストが16個以上あるとダルいので、左のリストからすぐ開けるようにした。
 
 // * ver 1.121220
 // - 新しくなった検索画面に仮対応。 個人的にかなり快適だけど、ちょっと重い
@@ -735,12 +738,12 @@
 \
 \
       /* 動画検索画面に出るお気に入りタグ・お気に入りマイリスト */\
-      #favoriteTagsMenu.open, #favoriteMylistsMenu.open {\
+      #favoriteTagsMenu.open, #favoriteMylistsMenu.open, #mylistListMenu.open {\
         background: -moz-linear-gradient(center top , #D1D1D1, #FDFDFD) repeat scroll 0 0 transparent !important;\
         background: -webkit-gradient(linear, left top, left bottom, from(#D1D1D1), to(#FDFDFD)) !important;\
         border-bottom: 0 !important;\
       }\
-      #searchResultNavigation .favTagsPopup,       #searchResultNavigation .favMylistsPopup {\
+      #searchResultNavigation .favTagsPopup, #searchResultNavigation .favMylistsPopup,#searchResultNavigation .mylistListPopup {\
         width: 100%; height: auto !important;\
         /*max-height: 100px;*/\
         overflow-x: hidden;\
@@ -750,21 +753,21 @@
         display: none; \
         border-top: 0 !important;\
       }\
-      #searchResultNavigation #favoriteTagsMenu a:after,       #searchResultNavigation #favoriteMylistsMenu a:after{\
+      #searchResultNavigation #favoriteTagsMenu a:after,       #searchResultNavigation #favoriteMylistsMenu a:after, #searchResultNavigation #mylistListMenu a:after{\
         content: "▼"; position: absolute; background: none; top: 0px; right: 10px;\
       }\n\
-      #searchResultNavigation #favoriteTagsMenu.open a:after,  #searchResultNavigation #favoriteMylistsMenu.open a:after{\
+      #searchResultNavigation #favoriteTagsMenu.open a:after,  #searchResultNavigation #favoriteMylistsMenu.open a:after,  #searchResultNavigation #mylistListMenu.open a:after{\
         content: "▲";\
       }\n\
-      #searchResultNavigation .favTagsPopup ul,    #searchResultNavigation .favMylistsPopup ul{\
+      #searchResultNavigation .favTagsPopup ul,    #searchResultNavigation .favMylistsPopup ul,    #searchResultNavigation .mylistListPopup ul{\
       }\n\
-      #searchResultNavigation .favTagsPopup.open ul li, #searchResultNavigation .favMylistsPopup.open ul li{\
+      #searchResultNavigation .favTagsPopup.open ul li, #searchResultNavigation .favMylistsPopup.open ul li, #searchResultNavigation .mylistListPopup.open ul li{\
         background: #fdfdfd; padding: 0; border: 0;font-size: 90%; height: auto !important;\
       }\n\
-      #searchResultNavigation .favTagsPopup ul li a, #searchResultNavigation .favMylistsPopup ul li a{\
+      #searchResultNavigation .favTagsPopup ul li a, #searchResultNavigation .favMylistsPopup ul li a, #searchResultNavigation .mylistListPopup ul li a{\
         line-height: 165% !important; background: none\
       }\n\
-        #searchResultNavigation .favMylistsPopup ul li a:before{\
+        #searchResultNavigation .favMylistsPopup ul li a:before,#searchResultNavigation .mylistListPopup ul li a:before{\
           background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;\
           display: inline-block; height: 14px; margin: -4px 4px 0 0; vertical-align: middle; width: 18px; content: ""\
         }\n\
@@ -778,13 +781,13 @@
         #searchResultNavigation .favMylistsPopup ul li.folder7  a:before{ background-position: 0 -161px;}\n\
         #searchResultNavigation .favMylistsPopup ul li.folder8  a:before{ background-position: 0 -184px;}\n\
         #searchResultNavigation .favMylistsPopup ul li.folder9  a:before{ background-position: 0 -207px;}\n\
-      #searchResultNavigation .favTagsPopup ul li a:after, #searchResultNavigation .favMylistsPopup ul li a:after{\
+      #searchResultNavigation .favTagsPopup ul li a:after, #searchResultNavigation .favMylistsPopup ul li a:after, #searchResultNavigation .mylistListPopup ul li a:after{\
         background: none !important;\
       }\n\
-      #searchResultNavigation .favTagsPopup ul li a:hover, #searchResultNavigation .favMylistsPopup ul li a:hover{\
+      #searchResultNavigation .favTagsPopup ul li a:hover, #searchResultNavigation .favMylistsPopup ul li a:hover,, #searchResultNavigation .mylistListPopup ul li a:hover{\
         background: #f0f0ff;\
       }\n\
-      #searchResultNavigation .favTagsPopup ul .reload, #searchResultNavigation .favMylistsPopup ul .reload{\
+      #searchResultNavigation .favTagsPopup ul .reload, #searchResultNavigation .favMylistsPopup ul .reload, #searchResultNavigation .mylistListPopup ul .reload{\
         cursor: pointer; border: 1px solid; padding: 0;\
       }\n\
 \
@@ -1325,6 +1328,7 @@
       }
     };
 
+    var onInitialized = [];
     pt.initialize = function() {
       if (initialized) return;
       var uid = this.getUserId();
@@ -1344,10 +1348,21 @@
           if (result.status == "ok" && result.list) {
             mylistlist = result.list;
             initialized = true;
+            for (var i = 0; i < onInitialized.length; i++) {
+              onInitialized[i](mylistlist);
+            }
           }
         }
       });
       this.reloadDefList();
+    };
+
+    pt.loadMylistList = function(callback) {
+      if (initialized) {
+          callback(mylistlist);
+      } else {
+          onInitialized.push(callback);
+      }
     };
 
     pt.reloadDefList = function(callback) {
@@ -2879,6 +2894,54 @@
     }
 
 
+
+    function loadMylistList() {
+      setTimeout(function() {
+        var $mylistList = $('<li style="display:none;"></li>'),
+            $a = $('<a>自分のマイリスト</a>'),
+            $popup = $('<li><ul></ul></li>'), $ul = $popup.find('ul');
+        $mylistList.attr('id', 'mylistListMenu');
+        $a.attr('href', '/my/mylist').click(function(e) {
+          if (e.button != 0 || e.metaKey) return;
+          e.preventDefault();
+          $popup.toggleClass('open').toggle(200);
+          $mylistList.toggleClass('open');
+          return;
+        });
+        $popup.addClass('mylistListPopup')
+        $mylistList.append($a);
+        $('#searchResultNavigation ul:first li:first').after($popup);
+        $('#searchResultNavigation ul:first li:first').after($mylistList);
+
+        Mylist.loadMylistList(function(mylistList) {
+          if (mylistList.length < 1) {
+            $mylistList.remove();
+            return;
+          }
+          for (var i = 0, len = mylistList.length; i < len; i++) {
+            var mylist = mylistList[i], $li = $('<li/>'),
+              $a = $('<a/>')
+              .attr({href: '/mylist/' + mylist.id})
+              .text(mylist.name)
+              .addClass('mylistList')
+              .click(
+                (function(id) {
+                  return function(e) {
+                    if (e.button != 0 || e.metaKey) return;
+                    e.preventDefault();
+                    WatchController.showMylist(id);
+                  };
+                })(mylist.id)
+              );
+            $ul.append($li.append($a));
+          }
+          $mylistList.fadeIn(500);
+        });
+      }, 100);
+    }
+
+
+
     function onVideoStopped() {
     }
 
@@ -2901,6 +2964,7 @@
         if (conf.enableFavMylists) {
           loadFavMylists();
         }
+       loadMylistList();
       }
        adjustSmallVideoSize();
        if (conf.videoExplorerHack) {
