@@ -16,8 +16,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121221
+// @version        1.121221b
 // ==/UserScript==
+
+// * ver 1.121221b
+// - とりあえずマイリストを追加(忘れてた)と、若干のレスポンス改善
 
 // * ver 1.121221
 // - 動画検索画面は自分のマイリストが16個以上あるとダルいので、左のリストからすぐ開けるようにした。
@@ -771,6 +774,7 @@
           background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;\
           display: inline-block; height: 14px; margin: -4px 4px 0 0; vertical-align: middle; width: 18px; content: ""\
         }\n\
+        #searchResultNavigation .mylistListPopup ul li a.defMylist:before{ background-position: 0 -253px;}\n\
         #searchResultNavigation .favMylistsPopup ul li.folder0  a:before{ background-position: 0 0;}\n\
         #searchResultNavigation .favMylistsPopup ul li.folder1  a:before{ background-position: 0 -23px;}\n\
         #searchResultNavigation .favMylistsPopup ul li.folder2  a:before{ background-position: 0 -46px;}\n\
@@ -924,10 +928,10 @@
         display: block;\
       }\n\
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a{\
-        display: inline-block;\
+        display: inline;\
       }\n\
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a p {\
-        display: inline-block; margin-right: 16px;\
+        display: inline; margin-right: 16px;\
       }\n\
 \
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter .itemVideoDescription {\
@@ -1197,6 +1201,7 @@
         popup.className        = 'tagItemsPopup';
         popup.addEventListener('click', function(e) {
           popup.style.display = 'none';
+          e.preventDefault();
         });
         return popup;
       }
@@ -1225,7 +1230,7 @@
       function createItemDOM(tag) {
         var text = tag.tag;
         var li  = document.createElement('li');
-
+        li.className = 'popupTagItem';
 
         var dic = createDicIconDOM(tag, text);
         li.appendChild(dic);
@@ -1318,7 +1323,19 @@
       return _token;
     }
 
-    var pt = Mylist.prototype;
+    var pt = Mylist.prototype, events = {defMylistUpdate: []};
+
+    function dispatchEvent(name) {
+      var e = events[name];
+      for (var i =0, len = e.length; i < len; i++) {
+        e[i]();
+      }
+    }
+
+    pt.onDefMylistUpdate = function(callback) {
+      events.defMylistUpdate.push(callback);
+    };
+
 
     pt.getUserId = function() {
       if (document.cookie.match(/user_session_(\d+)/)) {
@@ -1406,6 +1423,7 @@
         onload: function(resp) {
           var result = JSON.parse(resp.responseText);
           if (typeof callback == "function") callback(result.status, result);
+          dispatchEvent('defMylistUpdate');
         }
       };
       GM_xmlhttpRequest(req);
@@ -1439,6 +1457,7 @@
       if (!this.deleteDefList(watchId, _add)) {
         replaced = false;
         _add();
+        dispatchEvent('defMylistUpdate');
       }
     };
 
@@ -2151,7 +2170,12 @@
       },
       showMylist: function(mylistId) {
         watch.ComponentInitializer.videoSelection.showMylistgroup(mylistId);
-        AnchorHoverPopup.hidePopup().updateNow();
+      },
+      clearDeflistCache: function() {
+        watch.ComponentInitializer.videoSelection.loaderAgent.deflistVideoLoader._cache.deleteElement({});
+      },
+      showDefMylist: function() {
+        watch.ComponentInitializer.videoSelection.showDefMylist();
       },
       changeScreenMode: function(mode) {
         WatchJsApi.player.changePlayerScreenMode(mode);
@@ -2242,7 +2266,7 @@
         watch = WatchApp.ns.init;
         $ = w.$;
         WatchJsApi = w.WatchJsApi;
-        $textMarqueeInner = $('#textMarquee .textMarqueeInner');
+        $textMarqueeInner = $('#textMarquee').find('.textMarqueeInner');
 
         watch.TextMarqueeInitializer.textMarqueeViewController.scheduler.addEventListener(
           'schedule',
@@ -2305,8 +2329,8 @@
       tagv = watch.TagInitializer.tagViewController, pim = watch.PlayerInitializer.playerInitializeModel, npc = watch.PlayerInitializer.nicoPlayerConnector,
       pac  = watch.PlayerInitializer.playerAreaConnector, vs = watch.ComponentInitializer.videoSelection, isSearchOpen = false,
       $leftPanel     = $('#leftPanel'),
-      $leftInfoPanel = $('#leftPanel #leftPanelContent').clone().empty().attr({'id': 'leftVideoInfo',   'class': 'leftVideoInfo'}),
-      $ichibaPanel   = $('#leftPanel #leftPanelContent').clone().empty().attr({'id': 'leftIchibaPanel', 'class': 'leftIchibaPanel'}),
+      $leftInfoPanel = $('#leftPanelContent').clone().empty().attr({'id': 'leftVideoInfo',   'class': 'leftVideoInfo'}),
+      $ichibaPanel   = $('#leftPanelContent').clone().empty().attr({'id': 'leftIchibaPanel', 'class': 'leftIchibaPanel'}),
       $rightPanel = $('#playerCommentPanelOuter');
   //  var flashVars = pim.playerInitializeModel.flashVars;
 
@@ -2315,6 +2339,7 @@
       if (resizeWatchTimer != null) {
         clearTimeout(resizeWatchTimer);
       }
+      AnchorHoverPopup.hidePopup();
       resizeWatchTimer = setTimeout(function() {
         var narrow = $(window).innerWidth() < 1350,r = - $('#playerCommentPanelOuter').outerWidth();
         /*$('#content').toggleClass('narrowBorder', narrow);
@@ -2429,12 +2454,12 @@
         );
       }
       if (conf.headerViewCounter) {
-        var vc = $('li.#videoCounter');
+        var vc = $('#videoCounter');
         if (vc.length < 1) {
           var li = $('<li></li>')[0];
           li.id = 'videoCounter';
           $('#siteHeaderLeftMenu').after(li);
-          vc = $('li.#videoCounter');
+          vc = $('#videoCounter');
         }
         vc.html(h);
       }
@@ -2561,6 +2586,7 @@
         resizeLeftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
 
         $tab.click(function(e) {
+          AnchorHoverPopup.hidePopup();
           var selection = $(e.target).attr('data-selection');
           if (typeof selection === 'string') {
             conf.setValue('lastLeftTab', selection);
@@ -2625,7 +2651,7 @@
       $template.css('opacity', 0);
 
       var $videoTitleContainer = $template.find('.videoTitleContainer');
-      $videoTitleContainer.append($('#videoInfo #videoTitle').clone().attr('id', null));
+      $videoTitleContainer.append($('#videoTitle').clone().attr('id', null));
 
       var $videoThumbnailContainer = $template.find('.videoThumbnailContainer');//.css({maxHeight: 0});
       $videoThumbnailContainer.append($('#videoThumbnailImage').clone(true).attr('id', null))
@@ -2652,11 +2678,11 @@
       var $videoOwnerInfoContainer = $template.find('.videoOwnerInfoContainer');
       $videoOwnerInfoContainer
         .append(
-          $('#userProfile .userIconContainer').clone(true)
+          $('#userProfile').find('.userIconContainer').clone(true)
             .append(
-              $('<span class="userName">' + $('#videoInfo .userName').text() + '</span><br/>'))
+              $('<span class="userName">' + $('#videoInfo').find('.userName').text() + '</span><br/>'))
             .append(
-              $('#userProfile .showOtherVideos').clone(true).text('関連動画').attr('href', '/user/' + uploaderId + '/video')
+              $('#userProfile').find('.showOtherVideos').clone(true).text('関連動画').attr('href', '/user/' + uploaderId + '/video')
             )
         ).append(
           $('#ch_prof').clone(true).attr('id', null)
@@ -2722,7 +2748,7 @@
 
 
       var items = [];
-      $('#ichibaMain .ichiba_mainitem>div').each(function() {
+      $('#ichibaMain').find('.ichiba_mainitem>div').each(function() {
         var $item = $(this).clone().attr('id', null);
         var $dl = $('<dl class="ichiba_mainitem" />').append($item);
         $item.find('.thumbnail span').css({fontSize: ''});
@@ -2795,8 +2821,8 @@
         });
         $popup.addClass('favMylistsPopup')
         $favmylists.append($a);//.append($popup)
-        $('#searchResultNavigation ul:first li:first').after($popup);
-        $('#searchResultNavigation ul:first li:first').after($favmylists);
+        $('#searchResultNavigation').find('ul:first li:first').after($popup).after($favmylists);
+//        $('#searchResultNavigation').find('ul:first li:first').after($favmylists);
 
         load();
         $reloadButton.click(reload);
@@ -2866,8 +2892,8 @@
         $popup.addClass('favTagsPopup')
         $favtags.append($a);
 //        $('#searchResultNavigation ul:first').append($favtags).append($popup);
-        $('#searchResultNavigation ul:first li:first').after($popup);
-        $('#searchResultNavigation ul:first li:first').after($favtags);
+        $('#searchResultNavigation').find('ul:first li:first').after($popup).after($favtags);
+//        $('#searchResultNavigation ul:first li:first').after($favtags);
 
         FavTags.load(function(tags) {
           if (tags.length < 1) {
@@ -2910,14 +2936,25 @@
         });
         $popup.addClass('mylistListPopup')
         $mylistList.append($a);
-        $('#searchResultNavigation ul:first li:first').after($popup);
-        $('#searchResultNavigation ul:first li:first').after($mylistList);
+        $('#searchResultNavigation').find('ul:first li:first').after($popup).after($mylistList);
+//        $('#searchResultNavigation ul:first li:first').after($mylistList);
 
         Mylist.loadMylistList(function(mylistList) {
-          if (mylistList.length < 1) {
-            $mylistList.remove();
-            return;
-          }
+          $ul.append(
+            $('<li/>').append(
+              $('<a/>')
+                .attr({href: '/my/mylist/'})
+                .text('とりあえずマイリスト')
+                .addClass('mylistList')
+                .addClass('defMylist')
+                .click(function(e) {
+                  if (e.button != 0 || e.metaKey) return;
+                  e.preventDefault();
+                  WatchController.showDefMylist();
+              })
+            )
+         );
+
           for (var i = 0, len = mylistList.length; i < len; i++) {
             var mylist = mylistList[i], $li = $('<li/>'),
               $a = $('<a/>')
@@ -3001,7 +3038,7 @@
     function adjustSmallVideoSize() {
       if (!conf.videoExplorerHack || !$('body').hasClass('videoSelection')) { return; }
 
-      $('#leftVideoInfo .videoDetails').attr('style', '');
+      $('#leftVideoInfo').find('.videoDetails').attr('style', '');
       $('#searchResultExplorer, #content').addClass('w_adjusted');
       var
         availableWidth = $(window).innerWidth() - ($('#resultContainer').outerWidth()),
@@ -3042,10 +3079,10 @@
         // 破滅！
         'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #leftPanel {',
           ' display: block; top: ', availableHeight, 'px !important; max-height: ', bottomHeight, 'px !important; width: ', (xdiff - 4), 'px !important; left: 0;',
-          ' height:', (Math.min(bottomHeight, 300) - 72) , 'px !important;',
+          ' height:', (Math.min(bottomHeight, 600) - 72 /* タグ領域3行分の高さ */) , 'px !important;',
         '}',
           'body.size_small.content-fix.no_setting_panel.videoSelection #content.w_adjusted #leftPanel {',
-            ' height:', Math.min(bottomHeight, 300) , 'px !important;',
+            ' height:', Math.min(bottomHeight, 600) , 'px !important;',
           '}',
         'body.size_small.no_setting_panel.videoSelection #content.w_adjusted .leftVideoInfo, body.size_small.no_setting_panel.videoSelection #content.w_adjusted .leftIchibaPanel {',
           'width: ', (xdiff - 4), 'px !important;',
@@ -3071,17 +3108,17 @@
       $('body').toggleClass('w_notFull', sc.mode != 'browserFull');
       $('body').toggleClass('w_small',   sc.mode == 'small');
       //console.log("mode change", sc.mode);
-      AnchorHoverPopup.hidePopup().updateNow();
       if (conf.hideNewsInFull) { $('body').addClass('hideNewsInFull'); }
       setTimeout(function() {
-        $('#content').css({zIndex: 2});
+        AnchorHoverPopup.hidePopup();
+//        $('#content').css({zIndex: 2});
         resetSearchExplorerPos();
         $('body').toggleClass('w_setting',   $('#playerSettingPanel').is(':visible'));
 
         // フル画面時プレイリストを閉じる
         if (conf.autoClosePlaylistInFull &&
-          $('#content .browserFullPlaylistClose').is(':visible')) {
-          $('#content .browserFullPlaylistClose').click();
+          $('#content').find('.browserFullPlaylistClose').is(':visible')) {
+          $('#content').find('.browserFullPlaylistClose').click();
         }
         if (sc.mode == 'small' && $('body').hasClass('videoSelection')) {
           //WatchApp.ns.util.WindowUtil.scrollFit('#playerContainerWrapper', 300);
@@ -3104,10 +3141,10 @@
       // タグが2行以下だったら自動的に狭くする処理
       if (conf.enableAutoTagContainerHeight) {
         if (baseTagHeight === 0) { baseTagHeight = watch.TagInitializer.tagViewController.defaultHeightInNormal;}
-        var h = Math.min(baseTagHeight, $('#videoTagContainer .tagInner').innerHeight());
+        var h = Math.min(baseTagHeight, $('#videoTagContainer').find('.tagInner').innerHeight());
 
         if (watch.TagInitializer.tagViewController.defaultHeightInNormal != h) {
-          var $toggle = $('#videoTagContainer .toggleTagEdit');
+          var $toggle = $('#videoTagContainer').find('.toggleTagEdit');
           watch.TagInitializer.tagViewController.defaultHeightInNormal = h;
           $toggle.removeClass('oneLine').removeClass('twoLines');
 
@@ -3204,6 +3241,10 @@
 
       $(window).resize(onWindowResize);
 
+      Mylist.onDefMylistUpdate(function() {
+        WatchController.clearDeflistCache();
+      });
+
     }
 
     function initAdditionalButtons() {
@@ -3253,7 +3294,7 @@
 
     function initSearchOption() {
       var sort = conf.searchSortType || 'n', order = conf.searchSortOrder || 'd';
-      $('#searchResultSortOptions select').change(function() {
+      $('#searchResultSortOptions').find('select').change(function() {
         var v = $(this).val().split('&');
         sort  = v[0].split('=')[1];
         order = v[1].split('=')[1];
@@ -3316,7 +3357,7 @@
           npc.onPlaybackModeChanged_org(mode);
         };
       }
-      $('#playlistContainer a').click(function() {
+      $('#playlistContainer').find('a').click(function() {
         AnchorHoverPopup.hidePopup();
       });
       if (conf.enableNewsHistory) {NicoNews.initialize(w);}
@@ -3415,6 +3456,12 @@
       if (e.keyCode === 27 || e.keyCode === 88) { // ESC or x
         AnchorHoverPopup.hidePopup();
         Popup.hide();
+      }
+    });
+    w.document.body.addEventListener('click', function(e) {
+      var tagName = e.target.tagName;
+      if (tagName !== 'BUTTON' && tagName !== 'SELECT' && e.target.className !== 'popupTagItem' && e.target.className !== 'mylistPopupPanel') {
+        AnchorHoverPopup.hidePopup();
       }
     });
 
