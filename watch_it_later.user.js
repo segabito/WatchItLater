@@ -16,8 +16,12 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121221b
+// @version        1.121225b
 // ==/UserScript==
+
+// * ver 1.121225b
+// - ポップアップの反応が微妙におかしくなっていたのを修正
+// - 検索画面でスクロールがバタバタするのを軽減
 
 // * ver 1.121221b
 // - とりあえずマイリストを追加(忘れてた)と、若干のレスポンス改善
@@ -1200,6 +1204,9 @@
         var popup = document.createElement('div');
         popup.className        = 'tagItemsPopup';
         popup.addEventListener('click', function(e) {
+          if (e.button != 0 || e.shiftKey || e.ctrlKey || e.altKey || e.target.className === 'icon' || e.target.tagName === 'A') {
+            return;
+          }
           popup.style.display = 'none';
           e.preventDefault();
         });
@@ -1569,15 +1576,15 @@
             body.className = body.className.replace('deflistSelected', 'mylistSelected');
           }
         });
-        ondblclick = function() {
-          sel.selectedIndex = 0;
-          body.className = body.className.replace('mylistSelected', 'deflistSelected');
-        };
         if (w.jQuery) {
           w.jQuery(body).dblclick(ondblclick);
         } else {
           body.addEventListener('dblclick', ondblclick);
         }
+        function ondblclick() {
+          sel.selectedIndex = 0;
+          body.className = body.className.replace('mylistSelected', 'deflistSelected');
+        };
         return sel;
       }
 
@@ -2066,9 +2073,6 @@
             each(this, 'so' + RegExp.$1);
           }
         });
-        w.jQuery('a').mousedown(function() {
-          AnchorHoverPopup.hidePopup();
-        });
       }
       bind();
       setInterval(bindLoop, 500);
@@ -2181,12 +2185,27 @@
         WatchJsApi.player.changePlayerScreenMode(mode);
         setTimeout(function(){$(window).resize();}, 3000);
       },
+      isFixedHeader: function() {
+        return !$('body').hasClass('nofix');
+      },
+      // ヘッダー追従かどうかを考慮したscrollTop
+      scrollTop: function(top, dur) {
+        var header = (this.isFixedHeader() ? $("#siteHeader").outerHeight() : 0);
+
+        if (top != undefined) {
+          return $(window).scrollTop(top - header, dur);
+        } else {
+          return $(window).scrollTop() + header;
+        }
+      },
       scrollToVideoPlayer: function(force) {
         // 縦解像度がタグ+プレイヤーより大きいならタグの開始位置、そうでないならプレイヤーの位置にスクロール
         // ただし、該当部分が画面内に納まっている場合は、勝手にスクロールするとかえってうざいのでなにもしない
+        var isContentFix = $('body').hasClass('content-fix')
         $('body').removeClass('content-fix');
         var h = $('#playerContainer').outerHeight() + $('#videoTagContainer').outerHeight();
         var top = $(window).height() >= h ? '#videoTagContainer, #playerContainer' : '#playerContainer';
+
 
         if (force) {
           // 要素が画面内に納まっている場合でも、その要素の位置までスクロール
@@ -2195,6 +2214,7 @@
           // 要素が画面内に収まっている場合はスクロールしない
           WatchApp.ns.util.WindowUtil.scrollFitMinimum(top, 600);
         }
+        $('body').toggleClass('content-fix', isContentFix);
       },
       changeCommentPanelWidth: function(target) {
         var px = target - $('#playerCommentPanelOuter').outerWidth();
@@ -2633,6 +2653,26 @@
         ''].join(''));
 
         leftInfoPanelInitialized = true;
+        // 検索中のスクロールのガタガタ感を軽減
+          WatchApp.ns.util.WindowUtil.scrollForDisplayPlayer_org = WatchApp.ns.util.WindowUtil.scrollForDisplayPlayer;
+          WatchApp.ns.util.WindowUtil.scrollForDisplayPlayer = function(dur) {
+            if($('body').hasClass('content-fix')) {
+              // 検索モードかつ動画情報上表示の時だとなぜかページの一番上まで飛ばされる
+              return;
+            } else {
+              WatchApp.ns.util.WindowUtil.scrollForDisplayPlayer_org(dur);
+            }
+          };
+          watch.ComponentInitializer.videoSelection.scrollUp = function(dur) {
+            var target = '#playlistReplaceButton'/*, '#searchResultContent'*/, dur = dur || 200;
+            if ($(target).offset().top < WatchController.scrollTop()) {
+              WatchApp.ns.util.WindowUtil.scrollFitMinimum(target, dur);
+            }
+          };
+          watch.ComponentInitializer.videoSelection.scroll = function(dur) {
+            var target = '#playlistReplaceButton'/*, '#searchResultContent'*/, dur = dur || 200;
+            WatchApp.ns.util.WindowUtil.scrollFitMinimum(target, dur);
+          };
       }
     }
     function leftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel) {
@@ -2673,6 +2713,7 @@
 
       var $videoDescription = $template.find('.videoDescription');
       $videoDescription.find('.videoDescriptionInner').append($('.videoDescription:first').clone(true));
+      $videoDescription.find('.watch').unbind('click');
 
 
       var $videoOwnerInfoContainer = $template.find('.videoOwnerInfoContainer');
@@ -3345,18 +3386,6 @@
         WatchController.closeSearch();
       });
 
-      if (conf.ignoreJumpCommand) {
-        // 連続再生中は@ジャンプ動かない ＝ 動画プレイヤーに「連続再生モードだよ」
-        // という嘘情報を送れば無効にできるんじゃね？作戦 (思わぬ副作用があるかも)
-        var npc = WatchApp.ns.init.PlayerInitializer.nicoPlayerConnector;
-        npc.onPlaybackModeChanged_org = npc.onPlaybackModeChanged;
-        npc.onPlaybackModeChanged = function(mode) {
-          if (mode == 'normal' && conf.ignoreJumpCommand) {
-            mode = 'continuous';
-          }
-          npc.onPlaybackModeChanged_org(mode);
-        };
-      }
       $('#playlistContainer').find('a').click(function() {
         AnchorHoverPopup.hidePopup();
       });
@@ -3374,14 +3403,12 @@
         }
       }
 
-
       WatchJsApi.nicos.addEventListener('nicoSJump', function(e) {
         if (conf.ignoreJumpCommand) {
           e.cancel();
           Popup.show('「@ジャンプ」コマンドをキャンセルしました');
         }
       });
-
 
       onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
 
@@ -3459,11 +3486,15 @@
       }
     });
     w.document.body.addEventListener('click', function(e) {
-      var tagName = e.target.tagName;
-      if (tagName !== 'BUTTON' && tagName !== 'SELECT' && e.target.className !== 'popupTagItem' && e.target.className !== 'mylistPopupPanel') {
+      var tagName = e.target.tagName, className = e.target.className;
+      //console.log(tagName, className);
+      if (tagName !== 'BUTTON' && tagName !== 'SELECT' && tagName !== 'OPTION' && className !== 'popupTagItem' && className.indexOf('mylistPopupPanel') < 0) {
         AnchorHoverPopup.hidePopup();
+      } else {
       }
     });
+
+//    w.document.body.addEventListener('dblclick', function(e) {var tagName = e.target.tagName, className = e.target.className;console.log(tagName, className);});
 
   })(w);
 
