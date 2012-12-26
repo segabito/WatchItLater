@@ -16,8 +16,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121225b
+// @version        1.121226
 // ==/UserScript==
+
+// * ver 1.121226
+// - 検索画面で視聴履歴を表示できるようにした
 
 // * ver 1.121225b
 // - ポップアップの反応が微妙におかしくなっていたのを修正
@@ -944,6 +947,12 @@
 \
       body.videoSelection #resultlist.column4 .videoItem .balloon {\
         bottom: auto; top: 10px;\
+      }\n\
+\
+      body.videoSelection #resultContainer.dummyMylist #searchResultContainer .favMylistEditContainer,\
+      body.videoSelection #resultContainer.dummyMylist #searchResultMylistSortOptions,\
+      body.videoSelection #resultContainer.dummyMylist #searchResultHeader {\
+        display: none !important;\
       }\n\
       ',
     ''].join('');
@@ -2327,6 +2336,105 @@
     return self;
   })();
 
+
+  /**
+   *  動画視聴履歴をマイリストAPIと互換のある形式で返すことで、ダミーマイリストとして表示してしまう作戦
+   */
+  var VideoWatchHistory = (function(){
+    var lastUpdate = 0, lastResult = {};
+    function load(callback) {
+      try{
+        var
+          watch = w.WatchApp.ns.init, $ = w.$, url = '/my/history',
+          myInfo = watch.CommonModelInitializer.viewerInfoModel, myNick = myInfo.nickname, myId = myInfo.userId;
+      } catch (e) {
+        console.log(e);
+        return ;
+      }
+      var now = Date.now();
+      if (now - lastUpdate < 60 * 1000) {
+        if (typeof callback === 'function') {
+          callback(lastResult);
+        }
+        return;
+      }
+      lastUpdate = now;
+      var result = {
+        banner: '',
+        id: '-1',
+        isDeflist: -1,
+        isWatchngCountFull: false,
+        isWatchngThisMylist: false,
+        itemCount: 0,
+        items: [],
+        rawData: {
+          name: myNick + 'の視聴履歴',
+          user_id: myId,
+          user_name: 'ニコニコ動画'
+        },
+        sort: '1' // $('searchResultMylistSortOptions select').val()
+      };
+      GM_xmlhttpRequest({
+        url: url,
+        onload: function(resp) {
+          var $dom = $(resp.responseText), $list = $dom.find('#historyList');
+          $list.find('.outer').each(function() {
+            var
+              $item = $(this), $meta = $item.find('.metadata'), $title = $item.find('.section h5 a'),
+              id = $title.attr('href').split('/').reverse()[0], title = $title.text(),
+              duration = $item.find('.videoTime').text(),
+              viewCnt   = $meta.find('.play')   .text().split(':')[1].replace(/,/g, ''),
+              resCnt    = $meta.find('.comment').text().split(':')[1].replace(/,/g, ''),
+              mylistCnt = $meta.find('.mylist') .text().split(':')[1].replace(/,/g, ''),
+              postedAt  = '20' + $meta.find('.posttime').text().replace(/(年|月)/g, '-').replace(/(日| *投稿)/g, ''),
+              thumbnail = $item.find('.thumbContainer a .video').attr('src'),
+              hoge
+            ;
+
+            var item = {
+              id: id,
+              length: duration,
+              mylist_counter: mylistCnt,
+              view_counter: viewCnt,
+              num_res: resCnt,
+              first_retrieve: postedAt,
+              thumbnail_url: thumbnail,
+              title: title,
+              type: 'video',
+              description_short: $item.find('.section .posttime span').text(),
+              getType:        function() { return this.type; },
+              getInfo:        function() { return this;},
+              getName:        function() { return this.title;},
+              getId:          function() { return this.id; },
+              getDescription: function() { return ''},
+
+              // マイリストAPIの応答にあるけど使ってなさそう？なので未実装
+              length_seconds: 0, // TODO:
+              create_time: parseInt(Date.now() / 1000, 10),  // TODO:
+              thread_update_time: '2000-01-01 00:00:00', // TODO:
+              mylist_comment: ''
+
+            };
+            result.items.push(item);
+            result.itemCount++;
+          });
+          lastResult = result;
+          callback(result);
+        }
+      });
+
+    }
+    var self = {
+      load : function(onload, onerror) {
+        setTimeout(function() {
+          load(onload, onerror);
+        }, 0);
+      }
+    };
+    return self;
+  })();
+
+
   /**
    *  QWatch上でのあれこれ
    *  無計画に増築中
@@ -2965,7 +3073,7 @@
     function loadMylistList() {
       setTimeout(function() {
         var $mylistList = $('<li style="display:none;"></li>'),
-            $a = $('<a>自分のマイリスト</a>'),
+            $a = $('<a>マイショートカット</a>'),
             $popup = $('<li><ul></ul></li>'), $ul = $popup.find('ul');
         $mylistList.attr('id', 'mylistListMenu');
         $a.attr('href', '/my/mylist').click(function(e) {
@@ -2984,7 +3092,7 @@
           $ul.append(
             $('<li/>').append(
               $('<a/>')
-                .attr({href: '/my/mylist/'})
+                .attr({href: '/my/mylist'})
                 .text('とりあえずマイリスト')
                 .addClass('mylistList')
                 .addClass('defMylist')
@@ -2992,6 +3100,21 @@
                   if (e.button != 0 || e.metaKey) return;
                   e.preventDefault();
                   WatchController.showDefMylist();
+              })
+            )
+         );
+          $ul.append(
+            $('<li/>').append(
+              $('<a/>')
+                .attr({href: '/my/history'})
+                .text('視聴履歴(テスト中)')
+                .addClass('mylistList')
+                .addClass('defMylist')
+                .click(function(e) {
+                  if (e.button != 0 || e.metaKey) return;
+                  mylistHackInit();
+                  e.preventDefault();
+                  WatchController.showMylist(-1);
               })
             )
          );
@@ -3016,6 +3139,26 @@
           $mylistList.fadeIn(500);
         });
       }, 100);
+    }
+    var isMylistHacked = false;
+    function mylistHackInit() {
+      if (isMylistHacked) { return; }
+      watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader.load_org =
+      watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader.load;
+      watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader.load = function (p, onload, onerror) {
+        var self = watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader;
+        if (p.id >= 0) {
+          $('#resultContainer').removeClass('dummyMylist');
+          self.load_org(p, onload, onerror);
+        } else {
+          // マイリストIDに負の数字(通常ないはず)が来たら乗っ取るサイン
+          $('#resultContainer').addClass('dummyMylist');
+          if (p.id == -1) {
+            VideoWatchHistory.load(onload, onerror);
+          }
+        }
+      };
+      isMylistHacked = true;
     }
 
 
