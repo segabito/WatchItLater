@@ -16,8 +16,12 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121226
+// @version        1.121231
 // ==/UserScript==
+
+// * ver 1.121231
+// - 謎の技術によって、検索画面に「あなたにオススメの動画」と動画ランキングを表示
+// - 動画再生時に自動で検索画面にする設定を追加
 
 // * ver 1.121226
 // - 検索画面で視聴履歴を表示できるようにした
@@ -191,6 +195,7 @@
       topPager: true, // 検索ボックスのページャを上にする
       hideLeftIchiba: false,
       autoClosePlaylistInFull: true, // 全画面時にプレイリストを自動で閉じる
+      autoOpenSearch: false, // 再生開始時に自動検索画面
       autoScrollToPlayer: true, // プレイヤー位置に自動スクロール(自動全画面化オフ時)
       hideNewsInFull: true, // 全画面時にニュースを閉じる
       wideCommentPanel: true, // コメントパネルをワイドにする
@@ -739,7 +744,7 @@
       #watchItLaterConfigPanel.autoBrowserFull_false .disableAutoBrowserFullIfNicowari {\
         color: #ccc;\
       }\
-      #watchItLaterConfigPanel.autoBrowserFull_true .autoScrollToPlayer {\
+      #watchItLaterConfigPanel.autoBrowserFull_true .autoScrollToPlayer, #watchItLaterConfigPanel.autoBrowserFull_true .autoOpenSearch {\
         color: #ccc;\
       }\
       #content .openConfButton {\n\
@@ -748,14 +753,14 @@
 \
 \
       /* 動画検索画面に出るお気に入りタグ・お気に入りマイリスト */\
-      #favoriteTagsMenu.open, #favoriteMylistsMenu.open, #mylistListMenu.open {\
+      #favoriteTagsMenu.open, #favoriteMylistsMenu.open, #mylistListMenu.open, #videoRankingMenu.open {\
         background: -moz-linear-gradient(center top , #D1D1D1, #FDFDFD) repeat scroll 0 0 transparent !important;\
         background: -webkit-gradient(linear, left top, left bottom, from(#D1D1D1), to(#FDFDFD)) !important;\
         border-bottom: 0 !important;\
       }\
-      #searchResultNavigation .favTagsPopup, #searchResultNavigation .favMylistsPopup,#searchResultNavigation .mylistListPopup {\
+      #searchResultNavigation .slideMenu{\
         width: 100%; height: auto !important;\
-        /*max-height: 100px;*/\
+        max-height: 0px;\
         overflow-x: hidden;\
         overflow-y: auto;\
         padding: 0;\
@@ -763,42 +768,57 @@
         display: none; \
         border-top: 0 !important;\
       }\
-      #searchResultNavigation #favoriteTagsMenu a:after,       #searchResultNavigation #favoriteMylistsMenu a:after, #searchResultNavigation #mylistListMenu a:after{\
+      #searchResultNavigation .slideMenu.open{\
+        display: block;\
+      }\
+      #searchResultNavigation #favoriteTagsMenu a:after,       #searchResultNavigation #favoriteMylistsMenu a:after,\
+      #searchResultNavigation #mylistListMenu   a:after,       #searchResultNavigation #videoRankingMenu a:after{\
         content: "▼"; position: absolute; background: none; top: 0px; right: 10px;\
       }\n\
-      #searchResultNavigation #favoriteTagsMenu.open a:after,  #searchResultNavigation #favoriteMylistsMenu.open a:after,  #searchResultNavigation #mylistListMenu.open a:after{\
+      #searchResultNavigation #favoriteTagsMenu.open a:after,  #searchResultNavigation #favoriteMylistsMenu.open a:after,\
+      #searchResultNavigation #mylistListMenu.open   a:after,  #searchResultNavigation #videoRankingMenu.open a:after{\
         content: "▲";\
       }\n\
-      #searchResultNavigation .favTagsPopup ul,    #searchResultNavigation .favMylistsPopup ul,    #searchResultNavigation .mylistListPopup ul{\
+      #searchResultNavigation .slideMenu ul{\
       }\n\
-      #searchResultNavigation .favTagsPopup.open ul li, #searchResultNavigation .favMylistsPopup.open ul li, #searchResultNavigation .mylistListPopup.open ul li{\
+      #searchResultNavigation .slideMenu.open ul li{\
         background: #fdfdfd; padding: 0; border: 0;font-size: 90%; height: auto !important;\
       }\n\
-      #searchResultNavigation .favTagsPopup ul li a, #searchResultNavigation .favMylistsPopup ul li a, #searchResultNavigation .mylistListPopup ul li a{\
+      #searchResultNavigation .slideMenu ul li a{\
         line-height: 165% !important; background: none\
       }\n\
-        #searchResultNavigation .favMylistsPopup ul li a:before,#searchResultNavigation .mylistListPopup ul li a:before{\
+        #searchResultNavigation .slideMenu ul li a:before{\
           background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;\
           display: inline-block; height: 14px; margin: -4px 4px 0 0; vertical-align: middle; width: 18px; content: ""\
         }\n\
-        #searchResultNavigation .mylistListPopup ul li a.defMylist:before{ background-position: 0 -253px;}\n\
-        #searchResultNavigation .favMylistsPopup ul li.folder0  a:before{ background-position: 0 0;}\n\
-        #searchResultNavigation .favMylistsPopup ul li.folder1  a:before{ background-position: 0 -23px;}\n\
-        #searchResultNavigation .favMylistsPopup ul li.folder2  a:before{ background-position: 0 -46px;}\n\
-        #searchResultNavigation .favMylistsPopup ul li.folder3  a:before{ background-position: 0 -69px;}\n\
-        #searchResultNavigation .favMylistsPopup ul li.folder4  a:before{ background-position: 0 -92px;}\n\
-        #searchResultNavigation .favMylistsPopup ul li.folder5  a:before{ background-position: 0 -115px;}\n\
-        #searchResultNavigation .favMylistsPopup ul li.folder6  a:before{ background-position: 0 -138px;}\n\
-        #searchResultNavigation .favMylistsPopup ul li.folder7  a:before{ background-position: 0 -161px;}\n\
-        #searchResultNavigation .favMylistsPopup ul li.folder8  a:before{ background-position: 0 -184px;}\n\
-        #searchResultNavigation .favMylistsPopup ul li.folder9  a:before{ background-position: 0 -207px;}\n\
-      #searchResultNavigation .favTagsPopup ul li a:after, #searchResultNavigation .favMylistsPopup ul li a:after, #searchResultNavigation .mylistListPopup ul li a:after{\
+        #searchResultNavigation .slideMenu ul li          a.defMylist:before{ background-position: 0 -253px;}\n\
+        #searchResultNavigation .slideMenu ul li.folder0  a:before{ background-position: 0 0;}\n\
+        #searchResultNavigation .slideMenu ul li.folder1  a:before{ background-position: 0 -23px;}\n\
+        #searchResultNavigation .slideMenu ul li.folder2  a:before{ background-position: 0 -46px;}\n\
+        #searchResultNavigation .slideMenu ul li.folder3  a:before{ background-position: 0 -69px;}\n\
+        #searchResultNavigation .slideMenu ul li.folder4  a:before{ background-position: 0 -92px;}\n\
+        #searchResultNavigation .slideMenu ul li.folder5  a:before{ background-position: 0 -115px;}\n\
+        #searchResultNavigation .slideMenu ul li.folder6  a:before{ background-position: 0 -138px;}\n\
+        #searchResultNavigation .slideMenu ul li.folder7  a:before{ background-position: 0 -161px;}\n\
+        #searchResultNavigation .slideMenu ul li.folder8  a:before{ background-position: 0 -184px;}\n\
+        #searchResultNavigation .slideMenu ul li.folder9  a:before{ background-position: 0 -207px;}\n\
+\
+        #searchResultNavigation .slideMenu ul li.g_ent2 a:before     {  background-position: 0 -23px;}\n\
+        #searchResultNavigation .slideMenu ul li.g_life2 a:before    {  background-position: 0 -46px;}\n\
+        #searchResultNavigation .slideMenu ul li.g_politics a:before {  background-position: 0 -69px;}\n\
+        #searchResultNavigation .slideMenu ul li.g_tech a:before     {  background-position: 0 -92px;}\n\
+        #searchResultNavigation .slideMenu ul li.g_culture2 a:before {  background-position: 0 -115px;}\n\
+        #searchResultNavigation .slideMenu ul li.g_other a:before    {  background-position: 0 -138px;}\n\
+        #searchResultNavigation .slideMenu ul li.r18 a:before        {  background-position: 0 -207px;}\n\
+\
+\
+      #searchResultNavigation .slideMenu ul li a:after{\
         background: none !important;\
       }\n\
-      #searchResultNavigation .favTagsPopup ul li a:hover, #searchResultNavigation .favMylistsPopup ul li a:hover,, #searchResultNavigation .mylistListPopup ul li a:hover{\
+      #searchResultNavigation .slideMenu ul li a:hover{\
         background: #f0f0ff;\
       }\n\
-      #searchResultNavigation .favTagsPopup ul .reload, #searchResultNavigation .favMylistsPopup ul .reload, #searchResultNavigation .mylistListPopup ul .reload{\
+      #searchResultNavigation .slideMenu ul .reload{\
         cursor: pointer; border: 1px solid; padding: 0;\
       }\n\
 \
@@ -937,8 +957,11 @@
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a{\
         display: inline;\
       }\n\
+      body.videoSelection #searchResultExplorer.w_adjusted #resultlist .videoInformationOuter a:visited{\
+        color: #003ef9; /* 未読と既読の区別がつかないので#099ef0から変える */\
+      }\n\
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a p {\
-        display: inline; margin-right: 16px;\
+        display: inline; padding-right: 16px;\
       }\n\
 \
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter .itemVideoDescription {\
@@ -954,6 +977,11 @@
       body.videoSelection #resultContainer.dummyMylist #searchResultHeader {\
         display: none !important;\
       }\n\
+\
+      body.videoSelection #popupMarquee {  \
+        z-index: 1020; /* #contentがz-index: 1010なのでそれより上げる */\
+      }\n\
+\
       ',
     ''].join('');
     //console.log(style);
@@ -995,6 +1023,8 @@
       {title: '自動全画面化オンでも、ユーザーニコ割のある動画は', varName: 'disableAutoBrowserFullIfNicowari',
         values: {'全画面化しない': true, '全画面化する': false}},
       {title: '動画終了時に全画面化を解除(原宿と同じにする)', varName: 'autoNotFull',
+        values: {'する': true, 'しない': false}},
+      {title: 'プレイヤーを自動で検索画面にする(自動全画面化オフ時)', varName: 'autoOpenSearch',
         values: {'する': true, 'しない': false}},
       {title: 'プレイヤー位置に自動スクロール(自動全画面化オフ時)', varName: 'autoScrollToPlayer',
         values: {'する': true, 'しない': false}},
@@ -2251,8 +2281,13 @@
       },
       closeSearch: function() {
         WatchApp.ns.init.ComponentInitializer.videoSelection.panelOPC.close();
+      },
+      getMyNick: function() {
+        return watch.CommonModelInitializer.viewerInfoModel.nickname;
+      },
+      getMyUserId: function() {
+        return watch.CommonModelInitializer.viewerInfoModel.userId;
       }
-
     }
   })(w);
 
@@ -2346,10 +2381,10 @@
       try{
         var
           watch = w.WatchApp.ns.init, $ = w.$, url = '/my/history',
-          myInfo = watch.CommonModelInitializer.viewerInfoModel, myNick = myInfo.nickname, myId = myInfo.userId;
+          myNick = WatchController.getMyNick(), myId = WatchController.getMyUserId();
       } catch (e) {
         console.log(e);
-        return ;
+        throw { message: 'エラーが発生しました', status: 'fail'};
       }
       var now = Date.now();
       if (now - lastUpdate < 60 * 1000) {
@@ -2374,65 +2409,532 @@
         },
         sort: '1' // $('searchResultMylistSortOptions select').val()
       };
-      GM_xmlhttpRequest({
-        url: url,
-        onload: function(resp) {
-          var $dom = $(resp.responseText), $list = $dom.find('#historyList');
-          $list.find('.outer').each(function() {
-            var
-              $item = $(this), $meta = $item.find('.metadata'), $title = $item.find('.section h5 a'),
-              id = $title.attr('href').split('/').reverse()[0], title = $title.text(),
-              duration = $item.find('.videoTime').text(),
-              viewCnt   = $meta.find('.play')   .text().split(':')[1].replace(/,/g, ''),
-              resCnt    = $meta.find('.comment').text().split(':')[1].replace(/,/g, ''),
-              mylistCnt = $meta.find('.mylist') .text().split(':')[1].replace(/,/g, ''),
-              postedAt  = '20' + $meta.find('.posttime').text().replace(/(年|月)/g, '-').replace(/(日| *投稿)/g, ''),
-              thumbnail = $item.find('.thumbContainer a .video').attr('src'),
-              hoge
-            ;
+      setTimeout(function() {
+        GM_xmlhttpRequest({
+          url: url,
+          onload: function(resp) {
+            var $dom = $(resp.responseText), $list = $dom.find('#historyList');
+            $list.find('.outer').each(function() {
+              var
+                $item = $(this), $meta = $item.find('.metadata'), $title = $item.find('.section h5 a'),
+                id = $title.attr('href').split('/').reverse()[0], title = $title.text(),
+                duration = $item.find('.videoTime').text(),
+                viewCnt   = $meta.find('.play')   .text().split(':')[1].replace(/,/g, ''),
+                resCnt    = $meta.find('.comment').text().split(':')[1].replace(/,/g, ''),
+                mylistCnt = $meta.find('.mylist') .text().split(':')[1].replace(/,/g, ''),
+                postedAt  = '20' + $meta.find('.posttime').text().replace(/(年|月)/g, '-').replace(/(日| *投稿)/g, ''),
+                thumbnail = $item.find('.thumbContainer a .video').attr('src'),
+                hoge
+              ;
 
-            var item = {
-              id: id,
-              length: duration,
-              mylist_counter: mylistCnt,
-              view_counter: viewCnt,
-              num_res: resCnt,
-              first_retrieve: postedAt,
-              thumbnail_url: thumbnail,
-              title: title,
-              type: 'video',
-              description_short: $item.find('.section .posttime span').text(),
-              getType:        function() { return this.type; },
-              getInfo:        function() { return this;},
-              getName:        function() { return this.title;},
-              getId:          function() { return this.id; },
-              getDescription: function() { return ''},
+              var item = {
+                id: id,
+                length: duration,
+                mylist_counter: mylistCnt,
+                view_counter: viewCnt,
+                num_res: resCnt,
+                first_retrieve: postedAt,
+                thumbnail_url: thumbnail,
+                title: title,
+                type: 'video',
+                description_short: $item.find('.section .posttime span').text(),
+                getType:        function() { return this.type; },
+                getInfo:        function() { return this;},
+                getName:        function() { return this.title;},
+                getId:          function() { return this.id; },
+                getDescription: function() { return ''},
 
-              // マイリストAPIの応答にあるけど使ってなさそう？なので未実装
-              length_seconds: 0, // TODO:
-              create_time: parseInt(Date.now() / 1000, 10),  // TODO:
-              thread_update_time: '2000-01-01 00:00:00', // TODO:
-              mylist_comment: ''
+                // マイリストAPIの応答にあるけど使ってなさそう？なので未実装
+                length_seconds: 0, // TODO:
+                create_time: parseInt(Date.now() / 1000, 10),  // TODO:
+                thread_update_time: '2000-01-01 00:00:00', // TODO:
+                mylist_comment: ''
 
+              };
+              result.items.push(item);
+              result.itemCount++;
+            });
+            result.page = 1;
+            result.rawData = {
+              list: result.items,
+              name: '視聴履歴',
+              status: 'ok',
+              description: '',
+              is_watching_count_full: false,
+              is_watching_this_mylist: false,
+              user_nickname: myNick,
+              user_id: myId,
+              sort: '8'
             };
-            result.items.push(item);
-            result.itemCount++;
-          });
-          lastResult = result;
-          callback(result);
-        }
-      });
+            lastResult = result;
+            callback(result);
+          },
+          onerror: function() {
+            throw { message: '取得に失敗しました', status: 'fail'};
+          }
+        });
+      }, 0);
 
     }
     var self = {
-      load : function(onload, onerror) {
-        setTimeout(function() {
-          load(onload, onerror);
-        }, 0);
-      }
+      load : load
     };
     return self;
   })();
+
+  var VideoRecommendations = (function(){
+    var lastUpdate = 0, lastResult = {};
+    function load(callback) {
+      try{
+        var
+          watch = w.WatchApp.ns.init, $ = w.$, url = '/recommendations',
+          myNick = WatchController.getMyNick(), myId = WatchController.getMyUserId();
+      } catch (e) {
+        console.log(e);
+        throw { message: 'エラーが発生しました', status: 'fail'};
+      }
+      var now = Date.now();
+      if (now - lastUpdate < 1000 * 60 * 1) {
+        if (typeof callback === 'function') {
+          callback(lastResult);
+        }
+        return;
+      }
+      lastUpdate = now;
+
+      var result = {
+        banner: '',
+        id: '-2',
+        isDeflist: -1,
+        isWatchngCountFull: false,
+        isWatchngThisMylist: false,
+        itemCount: 0,
+        items: [],
+        rawData: {
+          name: 'あなたにオススメの動画',
+          user_id: myId,
+          user_name: 'ニコニコ動画'
+        },
+        sort: '1' // $('searchResultMylistSortOptions select').val()
+      };
+      setTimeout(function() {
+        GM_xmlhttpRequest({
+          url: url,
+          onload: function(resp) {
+            var text = resp.responseText, lines = text.split(/[\r\n]/), found = false, data;
+            for (var i = 0, len = lines.length; i < len; i++) {
+              var line = lines[i];
+              if (line.indexOf('var Nico_RecommendationsParams') >= 0 &&
+                  lines[i + 5] && lines[i + 5].indexOf('first_data') >= 0) {
+                var data = JSON.parse(lines[i + 5].replace(/^.*?:/, ''));
+                if (data && data.videos) {
+                  found = true;
+                  break;
+                }
+              }
+            }
+            if (!found) {
+              throw { message: '取得に失敗しました', status: 'fail'};
+            }
+            for (var i = 0, len = data.videos.length; i < len; i++) {
+              var video = data.videos[i];
+              var item = {
+                id: video.id,
+                length: video.length,
+                mylist_counter: video.mylist_counter,
+                view_counter:   video.view_counter,
+                num_res:        video.num_res,
+                first_retrieve: video.first_retrieve,
+                thumbnail_url:  video.thumbnail_url,
+                title:          video.title_short,
+                type:           'video',
+                description_short: '関連タグ: ' + video.recommend_tag,
+                getType: function() { return this.type; },
+                getInfo: function() { return this;},
+
+                // APIの応答みると必要そうだけど未実装
+                length_seconds: 0, // TODO:
+                create_time: parseInt(Date.now() / 1000, 10),  // TODO:
+                thread_update_time: '2000-01-01 00:00:00', // TODO:
+                mylist_comment: ''
+
+              };
+              result.items.push(item);
+            }
+            result.itemCount = result.items.length;
+            result.rawData.list = result.items;
+            lastResult = result;
+            callback(result);
+          },
+          onerror: function() {
+            throw { message: '取得に失敗しました', status: 'fail'};
+          }
+       });
+      }, 0);
+
+    }
+    var self = {
+      load : load
+    };
+    return self;
+  })();
+
+
+  /**
+   *  ランキングのRSSをマイリストAPIと互換のある形式に変換することで、ダミーマイリストとして表示してしまう作戦
+   */
+  var VideoRanking = (function() {
+    var $ = w.jQuery, WatchApp = w.WatchApp;
+
+    var
+      genreIdTable = {
+        all:        -100,
+        g_ent2:     -110,
+        g_life2:    -120,
+        g_politics: -130,
+        g_tech:     -140,
+        g_culture2: -150,
+        g_other:    -160,
+
+        ent:        -111,
+        music:      -112,
+        sing:       -113,
+        play:       -114,
+        dance:      -115,
+        vocaloid:   -116,
+        nicoindies: -117,
+
+        animal:     -121,
+        cooking:    -122,
+        nature:     -123,
+        travel:     -124,
+        sport:      -125,
+        lecture:    -126,
+        drive:      -127,
+        history:    -128,
+
+        science:    -141,
+        tech:       -142,
+        handcraft:  -143,
+        make:       -144,
+
+        anime:      -151,
+        game:       -152,
+        toho:       -153,
+        imas:       -154,
+        radio:      -155,
+        draw:       -156,
+
+        are:        -161,
+        diary:      -162,
+        other:      -163,
+
+        r18:        -170
+      },
+      genreNameTable = {
+        all:        'カテゴリ合算',
+        g_ent2:     'エンタメ・音楽',
+        g_life2:    '生活・一般・スポ',
+        g_politics: '政治',
+        g_tech:     '科学・技術',
+        g_culture2: 'アニメ・ゲーム・絵',
+        g_other:    'その他',
+
+        ent:        'エンターテイメント',
+        music:      '音楽',
+        sing:       '歌ってみた',
+        play:       '演奏してみた',
+        dance:      '踊ってみた',
+        vocaloid:   'VOCALOID',
+        nicoindies: 'ニコニコインディーズ',
+
+        animal:     '動物',
+        cooking:    '料理',
+        nature:     '自然',
+        travel:     '旅行',
+        sport:      'スポーツ',
+        lecture:    'ニコニコ動画講座',
+        drive:      '車載動画',
+        history:    '歴史',
+
+        science:    '科学',
+        tech:       'ニコニコ技術部',
+        handcraft:  'ニコニコ手芸部',
+        make:       '作ってみた',
+
+        anime:      'アニメ',
+        game:       'ゲーム',
+        toho:       '東方',
+        imas:       'アイドルマスター',
+        radio:      'ラジオ',
+        draw:       '描いてみた',
+
+        are:        '例のアレ',
+        diary:      '日記',
+        other:      'その他',
+
+        r18:        'R-18'
+      },
+      termIdTable = {
+        'hourly':      0,
+        'daily':   -1000,
+        'weekly':  -2000,
+        'monthly': -3000,
+        'total':   -4000
+      },
+      termNameTable = {
+        'hourly':      '(毎時)',
+        'daily':       '(24時間)',
+        'weekly':      '(週間)',
+        'monthly':     '(月間)',
+        'total':       '(合計)'
+      },
+      idTermTable = {},
+      idGenreTable = {}
+    ;
+    for (var genre in genreIdTable) { idGenreTable[genreIdTable[genre]] = genre;}
+    for (var term in termIdTable)   { idTermTable [termIdTable [term ]] = term; }
+
+    /**
+     *  ニコニコ動画ランキングのRSSをマイリストAPI互換のデータ形式に変換
+     */
+    function rss2mylist(xml) {
+      var
+        $x = $(xml),
+        title = $x.find('channel title:first').text(),
+        $items = $x.find('channel item'),
+        result = {
+          banner: '',
+          id: '-100',
+          name: title,
+          isDeflist: -1,
+          isWatchngCountFull: false,
+          isWatchngThisMylist: false,
+          itemCount: 0,
+          items: [],
+          rawData: {
+          },
+        };
+      $items.each(function() {
+        var video = parseRssItem($(this));
+        var item = {
+          id: video.id,
+          length: video.duration,
+          mylist_counter: video.mylistCnt,
+          view_counter: video.viewCnt,
+          num_res: video.resCnt,
+          first_retrieve: video.postedAt,
+          thumbnail_url: video.thumbnail,
+          title: video.title,
+          type: 'video',
+          description_short: video.description.substring(0, 50),
+          getType: function() { return this.type; },
+          getInfo: function() { return this;},
+
+          // APIの応答みると必要そうだけど未実装
+          length_seconds: 0, // TODO:
+          create_time: parseInt(Date.now() / 1000, 10),  // TODO:
+          thread_update_time: '2000-01-01 00:00:00', // TODO:
+          mylist_comment: ''
+        };
+        result.items.push(item);
+        result.itemCount++;
+      });
+      return result;
+    }
+
+    function parseRssItem($item) {
+      var
+        desc_cdata = $item.find('description')[0].innerHTML.replace(/^<!--\[CDATA\[/, '').replace(/ *\]\]&gt;$/, ''),
+        $desc      = $('<div>' + desc_cdata + '</div>');
+      return {
+        title       : $item.find('title')                  .text(),
+        id          : $item.find('guid')                   .text().split('/').reverse()[0],
+        duration    : $desc.find('.nico-info-length')      .text(),
+        viewCnt     : $desc.find('.nico-info-total-view')  .text().replace(/,/g, ''),
+        resCnt      : $desc.find('.nico-info-total-res')   .text().replace(/,/g, ''),
+        mylistCnt   : $desc.find('.nico-info-total-mylist').text().replace(/,/g, ''),
+        postedAt    : $desc.find('.nico-info-date')        .text()
+          .replace(/(年|月)/g, '-')
+          .replace(/：/g, ':')
+          .replace(/(日)/g, ''),
+        description : $desc.find('.nico-description')      .text(),
+        thumbnail   : $desc.find('.nico-thumbnail img').attr('src')
+      };
+    }
+
+    function xhr(callback, url) {
+      setTimeout(function() {
+        GM_xmlhttpRequest({
+          url: url,
+          onload: function(resp) {
+            if (typeof callback === 'function') {
+              callback(resp);
+            }
+          },
+          onerror: function() {
+            throw { message: '取得に失敗しました', status: 'fail'};
+          }
+        });
+      }, 0);
+    };
+
+    var lastUpdate = {}, lastResult = {}, CACHE_TIME = 1000 * 60 * 30;
+    function request(baseUrl, rssPage, maxRssPage, callback) {
+
+      if (!lastUpdate[baseUrl]) { lastUpdate[baseUrl] =  0; }
+      if (!lastResult[baseUrl]) { lastResult[baseUrl] = {}; }
+
+      var now = Date.now();
+      if (now - lastUpdate[baseUrl] < CACHE_TIME) {
+//        console.log('from cache', now - lastUpdate[baseUrl], CACHE_TIME);
+//        console.log(lastResult[baseUrl]);
+        callback(lastResult[baseUrl]);
+        return;
+      } else {
+//        console.log('new request', baseUrl, now - lastUpdate[baseUrl], CACHE_TIME);
+      }
+      lastUpdate[baseUrl] = now;
+
+      var result = {
+        banner: '',
+        id: '-100',
+        isDeflist: -1,
+        isWatchngCountFull: false,
+        isWatchngThisMylist: false,
+        itemCount: 0,
+        items: [],
+        rawData: {
+          status: 'ok',
+          list: [],
+          name: '総合ランキング',
+          description: '',
+          is_watching_count_full:  false,
+          is_watching_this_mylist: false,
+          user_nickname: WatchController.getMyNick(),
+          user_id:       WatchController.getMyUserId(),
+          sort: '8'
+        }
+      };
+
+      function req(rssPage, maxRssPage, callback) {
+        var url = baseUrl + '&page=' + rssPage;
+        xhr(
+          function(resp) {
+            var res = rss2mylist(resp.responseText);
+            for (var i = 0, len = res.items.length; i < len; i++) {
+              result.items.push(res.items[i]);
+            }
+            if (rssPage >= maxRssPage) {
+              result.itemCount    = result.items.length;
+              result.rawData.name = res.name;
+              result.rawData.list = result.items;
+
+              lastResult[baseUrl] = result;
+              callback(result);
+            } else {
+              setTimeout(function() {
+                req(rssPage + 1, maxRssPage, callback);
+              }, 500);
+            }
+          },
+          url
+        );
+      }
+      req(rssPage, maxRssPage, callback);
+    }
+
+    function parseParam(param) {
+      var
+        id = parseInt(param.id || -100, 10),
+        genreId  = getGenreId(id),
+        termId   = getTermId(id),
+        category = idGenreTable[genreId] || 'all', type = 'fav', term = 'daily', lang= 'ja-jp',
+        viewPage = (param && typeof param.page === 'number') ? param.page : 1,
+        maxRssPage = 1;
+        term = idTermTable[termId] || idTermTable[0];
+        maxRssPage = (category === 'all' && term !== 'hourly') ? 3 : 1;
+
+      return {
+        genreId: genreId,
+        category: category,
+        type: type,
+        term: term,
+        lang: lang,
+        viewPage: viewPage,
+        maxRssPage: maxRssPage,
+        baseUrl: '/ranking/'+ type +'/'+ term + '/'+ category +'?rss=2.0&lang=' + lang
+      }
+    }
+
+    function loadRanking(callback, param) {
+      var p = parseParam(param);
+
+      request(p.baseUrl, 1, p.maxRssPage, function(result) {
+        result.page  = p.viewPage;
+        result.items = result.rawData.list.slice(p.viewPage * 32 - 32, p.viewPage * 32);
+        if (typeof callback === 'function') {
+          callback(result);
+        }
+      });
+    }
+
+    function load(onload, p) {
+      loadRanking(onload, p);
+    }
+    function getTermId(t) {
+      if (typeof t === 'string') {
+        return termIdTable[t] || 0;
+      } else
+      if (typeof t === 'number'){
+        return (t - (t % 1000)) % 10000;
+      }
+      return 0;
+    }
+    function getGenreId(g, term) {
+      if (typeof g === 'string') {
+        return (genreIdTable[g] || 0) + getTermId(term);
+      } else
+      if (typeof g === 'number'){
+        return g % 1000;
+      } else {
+        return genreIdTable;
+      }
+    }
+    function getGenreName(g) {
+      if (typeof g === 'number') {
+        g = g % 1000;
+        var genre = idGenreTable[g];
+        return genreNameTable[genre];
+      } else
+      if (typeof g === 'string') {
+        return genreNameTable[g];
+      } else {
+        return genreNameTable;
+      }
+    }
+    function getCategory(g) {
+      if (typeof g === 'number') {
+        g = g % 1000;
+        return idGenreTable[g - (g %10)];
+      } else
+      if (typeof g === 'string') {
+        g  = genreIdTable[g];
+        return idGenreTable[g - (g %10)];
+      } else {
+        return 'all';
+      }
+    }
+    var self = {
+      load: load,
+      getTermId: getTermId,
+      getGenreId: getGenreId,
+      getGenreName: getGenreName,
+      getCategory: getCategory,
+    };
+    return self;
+  })();
+
 
 
   /**
@@ -2616,15 +3118,18 @@
           WatchController.changeScreenMode('browserFull');
           onWindowResize();
         }, 100);
-      } else
-      if (conf.autoScrollToPlayer) {
-        // 初回のみ、プレイヤーが画面内に納まっていてもタグの位置まで自動スクロールさせる。(ファーストビューを固定するため)
-        // 二回目以降は説明文や検索結果からの遷移なので、必要最小限の動きにとどめる
-        if (!$('body').hasClass('videoSelection')) {
-          WatchController.scrollToVideoPlayer(isFirst);
+      } else {
+        if (conf.autoOpenSearch && !$('body').hasClass('videoSelection')) {
+          $('#openSearchResultExplorer').click();
+        }
+        if (conf.autoScrollToPlayer) {
+          // 初回のみ、プレイヤーが画面内に納まっていてもタグの位置まで自動スクロールさせる。(ファーストビューを固定するため)
+          // 二回目以降は説明文や検索結果からの遷移なので、必要最小限の動きにとどめる
+          if (!$('body').hasClass('videoSelection') || isFirst) {
+            WatchController.scrollToVideoPlayer(isFirst);
+          }
         }
       }
-
 
       leftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
       resetSearchExplorerPos();
@@ -2777,10 +3282,11 @@
               WatchApp.ns.util.WindowUtil.scrollFitMinimum(target, dur);
             }
           };
-          watch.ComponentInitializer.videoSelection.scroll = function(dur) {
-            var target = '#playlistReplaceButton'/*, '#searchResultContent'*/, dur = dur || 200;
-            WatchApp.ns.util.WindowUtil.scrollFitMinimum(target, dur);
-          };
+//          watch.ComponentInitializer.videoSelection.scroll = function(dur) {
+//            var target = '#playlistReplaceButton'/*, '#searchResultContent'*/, dur = dur || 200;
+//            WatchApp.ns.util.WindowUtil.scrollFitMinimum(target, dur);
+//          };
+
       }
     }
     function leftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel) {
@@ -2939,11 +3445,11 @@
 
     var hidariue = null;
     function resetHidariue() {
+      if (!conf.hidariue) { return; }
       var dt = new Date();
       if (dt.getMonth() < 1 && dt.getDate() <=1) {
         $('#videoMenuTopList').append('<li style="position:absolute;left:300px;font-size:50%">　＼　│　／<br>　　／￣＼　　 ／￣￣￣￣￣￣￣￣￣<br>─（ ﾟ ∀ ﾟ ）＜　しんねんしんねん！<br>　　＼＿／　　 ＼＿＿＿＿＿＿＿＿＿<br>　／　│　＼</li>');
       }
-      if (!conf.hidariue) { return; }
       if (!hidariue) {
         $('#videoMenuTopList').append('<li style="position:absolute;top:21px;left:0px;"><a href="http://userscripts.org/scripts/show/151269" target="_blank" style="color:black;"><img id="hidariue"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:Q"></a></p><a href="http://nico.ms/sm18845030" class="itemEcoLink">…</a></li>');
         hidariue = $('#hidariue')[0];
@@ -2955,23 +3461,22 @@
 
     function loadFavMylists() {
       setTimeout(function() {
-        var $favmylists = $('<li style="display:none;"></li>'),
+        var $toggle = $('<li style="display:none;"></li>'),
             $a = $('<a>お気に入りマイリスト</a>'),
             $popup = $('<li><ul></ul></li>'), $ul = $popup.find('ul'),
             $reload = $('<li><button class="reload">リロード</button></li>'),
             $reloadButton = $reload.find('button');
-        $favmylists.attr('id','favoriteMylistsMenu');
+        $toggle.attr('id','favoriteMylistsMenu');
         $a.attr('href', '/my/fav/mylist').click(function(e) {
           if (e.button != 0 || e.metaKey) return;
           e.preventDefault();
-          $popup.toggleClass('open').toggle(200);
-          $favmylists.toggleClass('open');
-          return;
+          var isVisible = $popup.hasClass('open');
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500);
+          $toggle.toggleClass('open', !isVisible);
         });
-        $popup.addClass('favMylistsPopup')
-        $favmylists.append($a);//.append($popup)
-        $('#searchResultNavigation').find('ul:first li:first').after($popup).after($favmylists);
-//        $('#searchResultNavigation').find('ul:first li:first').after($favmylists);
+        $popup.addClass('slideMenu')
+        $toggle.append($a);//.append($popup)
+        $('#searchResultNavigation').find('ul:first li:first').after($popup).after($toggle);
 
         load();
         $reloadButton.click(reload);
@@ -2988,7 +3493,6 @@
         function load() {
           FavMylists.load(function(mylists) {
             if (mylists.length < 1) {
-              //$favmylists.remove();
               $ul.append($reload);
               return;
             }
@@ -3016,7 +3520,7 @@
               $ul.append($li.addClass(mylist.iconType).append($a));
             }
             $ul.append($reload);
-            $favmylists.fadeIn(500);
+            $toggle.fadeIn(500);
           });
         }
 
@@ -3027,26 +3531,24 @@
 
     function loadFavTags() {
       setTimeout(function() {
-        var $favtags = $('<li style="display:none;"></li>'),
+        var $toggle = $('<li style="display:none;"></li>'),
             $a = $('<a>お気に入りタグ</a>'),
             $popup = $('<li><ul></ul></li>'), $ul = $popup.find('ul');
-        $favtags.attr('id', 'favoriteTagsMenu');
+        $toggle.attr('id', 'favoriteTagsMenu');
         $a.attr('href', '/my/fav/tag').click(function(e) {
           if (e.button != 0 || e.metaKey) return;
           e.preventDefault();
-          $popup.toggleClass('open').toggle(200);
-          $favtags.toggleClass('open');
-          return;
+          var isVisible = $popup.hasClass('open');
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500);
+          $toggle.toggleClass('open', !isVisible);
         });
-        $popup.addClass('favTagsPopup')
-        $favtags.append($a);
-//        $('#searchResultNavigation ul:first').append($favtags).append($popup);
-        $('#searchResultNavigation').find('ul:first li:first').after($popup).after($favtags);
-//        $('#searchResultNavigation ul:first li:first').after($favtags);
+        $popup.addClass('slideMenu')
+        $toggle.append($a);
+        $('#searchResultNavigation').find('ul:first li:first').after($popup).after($toggle);
 
         FavTags.load(function(tags) {
           if (tags.length < 1) {
-            $favtags.remove();
+            $toggle.remove();
             return;
           }
           var sortOrder = '?sort=' + conf.searchSortType + '&order=' + conf.searchSortOrder;
@@ -3063,7 +3565,7 @@
               });
             $ul.append($li.append($a));
           }
-          $favtags.fadeIn(500);
+          $toggle.fadeIn(500);
         });
       }, 100);
     }
@@ -3072,21 +3574,21 @@
 
     function loadMylistList() {
       setTimeout(function() {
-        var $mylistList = $('<li style="display:none;"></li>'),
+        var $toggle = $('<li style="display:none;"></li>'),
             $a = $('<a>マイショートカット</a>'),
             $popup = $('<li><ul></ul></li>'), $ul = $popup.find('ul');
-        $mylistList.attr('id', 'mylistListMenu');
+        $toggle.attr('id', 'mylistListMenu');
         $a.attr('href', '/my/mylist').click(function(e) {
           if (e.button != 0 || e.metaKey) return;
           e.preventDefault();
-          $popup.toggleClass('open').toggle(200);
-          $mylistList.toggleClass('open');
-          return;
+          var isVisible = $popup.hasClass('open');
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500);
+          $toggle.toggleClass('open', !isVisible);
         });
-        $popup.addClass('mylistListPopup')
-        $mylistList.append($a);
-        $('#searchResultNavigation').find('ul:first li:first').after($popup).after($mylistList);
-//        $('#searchResultNavigation ul:first li:first').after($mylistList);
+        $popup.addClass('slideMenu')
+        $toggle.append($a);
+        $('#searchResultNavigation').find('ul:first li:first').after($popup).after($toggle);
+//        $('#searchResultNavigation ul:first li:first').after($toggle);
 
         Mylist.loadMylistList(function(mylistList) {
           $ul.append(
@@ -3107,7 +3609,7 @@
             $('<li/>').append(
               $('<a/>')
                 .attr({href: '/my/history'})
-                .text('視聴履歴(テスト中)')
+                .text('視聴履歴')
                 .addClass('mylistList')
                 .addClass('defMylist')
                 .click(function(e) {
@@ -3118,11 +3620,25 @@
               })
             )
          );
-
+          $ul.append(
+            $('<li/>').append(
+              $('<a/>')
+                .attr({href: '/recommendations'})
+                .text('あなたにオススメの動画')
+                .addClass('mylistList')
+                .addClass('defMylist')
+                .click(function(e) {
+                  if (e.button != 0 || e.metaKey) return;
+                  mylistHackInit();
+                  e.preventDefault();
+                  WatchController.showMylist(-2);
+              })
+            )
+         );
           for (var i = 0, len = mylistList.length; i < len; i++) {
             var mylist = mylistList[i], $li = $('<li/>'),
               $a = $('<a/>')
-              .attr({href: '/mylist/' + mylist.id})
+              .attr({href: '/my/mylist/#/' + mylist.id})
               .text(mylist.name)
               .addClass('mylistList')
               .click(
@@ -3136,10 +3652,61 @@
               );
             $ul.append($li.append($a));
           }
-          $mylistList.fadeIn(500);
+          $toggle.fadeIn(500);
         });
       }, 100);
     }
+
+    function loadVideoRanking() {
+      setTimeout(function() {
+        var $toggle = $('<li style="display:none;"></li>'),
+            $a = $('<a>動画ランキング</a>'),
+            $popup = $('<li><ul></ul></li>'), $ul = $popup.find('ul');
+        $toggle.attr('id', 'videoRankingMenu');
+        $a.attr('href', '/ranking').click(function(e) {
+          if (e.button != 0 || e.metaKey) return;
+          e.preventDefault();
+          var isVisible = $popup.hasClass('open');
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 200);
+          $toggle.toggleClass('open', !isVisible);
+        });
+        $popup.addClass('slideMenu')
+        $toggle.append($a);
+        $('#searchResultNavigation').find('ul:first li:first').after($popup).after($toggle);
+
+        var genreId = VideoRanking.getGenreId();
+
+        // TODO: マジックナンバーを
+        $ul.append(createMenu($, 'all',  -100, 'カテゴリ合算(毎時)',   'all', 'hourly'));
+        $ul.append(createMenu($, 'all', -1100, 'カテゴリ合算(24時間)', 'all', 'daily'));
+        $ul.append(createMenu($, 'all', -4100, 'カテゴリ合算(合計)',   'all', 'total'));
+
+        for (var genre in genreId) {
+          if (genre === 'all') { continue;}
+          var
+            id = genreId[genre], name = VideoRanking.getGenreName(genre), category = VideoRanking.getCategory(id);
+            $ul.append(createMenu($, genre, id, name, category, 'hourly'));
+        }
+        $toggle.show();
+
+        function createMenu($, genre, id, name, category, term) {
+          var $a =
+            $('<a/>')
+              .attr({href: '/ranking/fav/' + term + '/' + genre})
+              .text(name)
+              .addClass('videoRanking')
+              .click(function(e) {
+                if (e.button != 0 || e.metaKey) return;
+                mylistHackInit();
+                e.preventDefault();
+                WatchController.showMylist(id);
+              });
+          return $('<li/>').addClass(category).append($a)
+       }
+      }, 100);
+    }
+
+
     var isMylistHacked = false;
     function mylistHackInit() {
       if (isMylistHacked) { return; }
@@ -3152,15 +3719,29 @@
           self.load_org(p, onload, onerror);
         } else {
           // マイリストIDに負の数字(通常ないはず)が来たら乗っ取るサイン
-          $('#resultContainer').addClass('dummyMylist');
-          if (p.id == -1) {
-            VideoWatchHistory.load(onload, onerror);
+          try {
+            $('#resultContainer').addClass('dummyMylist');
+            if (p.id == -1) {
+              VideoWatchHistory.load(onload);
+            } else
+            if (p.id == -2) {
+              VideoRecommendations.load(onload);
+            } else
+            if (typeof VideoRanking.getGenreName(p.id) === 'string') {
+              VideoRanking.load(onload, p);
+            }
+          } catch(e) {
+            if (e.message && e.status) {
+              onerror(e);
+            } else {
+              console.log(e);
+              onerror({message: 'エラーが発生しました', status: 'fail'});
+            }
           }
         }
       };
       isMylistHacked = true;
     }
-
 
 
     function onVideoStopped() {
@@ -3179,6 +3760,7 @@
     var videoSelectOpenCount = 0;
     function onVideoSelectPanelOpened() {
       if (videoSelectOpenCount++ == 0) {
+       loadVideoRanking();
         if (conf.enableFavTags) {
           loadFavTags();
         }
@@ -3263,10 +3845,19 @@
         // 破滅！
         'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #leftPanel {',
           ' display: block; top: ', availableHeight, 'px !important; max-height: ', bottomHeight, 'px !important; width: ', (xdiff - 4), 'px !important; left: 0;',
-          ' height:', (Math.min(bottomHeight, 600) - 72 /* タグ領域3行分の高さ */) , 'px !important;',
+          ' height:', (Math.min(bottomHeight, 600) - 2) , 'px !important;',
         '}',
           'body.size_small.content-fix.no_setting_panel.videoSelection #content.w_adjusted #leftPanel {',
-            ' height:', Math.min(bottomHeight, 600) , 'px !important;',
+          '}',
+        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted .videoDetails, ',
+        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #searchResultNavigation {',
+          // タグ領域三行分 スクロール位置をタグの場所にしてる時でも末端までスクロールできるようにするための細工
+          // (四行以上あるときは表示しきれないが)
+          'padding-bottom: 72px; ',
+        '}',
+          'body.size_small.content-fix.no_setting_panel.videoSelection #content.w_adjusted .videoDetails, ',
+          'body.size_small.content-fix.no_setting_panel.videoSelection #content.w_adjusted #searchResultNavigation {',
+            'padding-bottom: 0; ',
           '}',
         'body.size_small.no_setting_panel.videoSelection #content.w_adjusted .leftVideoInfo, body.size_small.no_setting_panel.videoSelection #content.w_adjusted .leftIchibaPanel {',
           'width: ', (xdiff - 4), 'px !important;',
