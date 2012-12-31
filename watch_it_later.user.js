@@ -12,12 +12,16 @@
 // @match          http://www.nicovideo.jp/*
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
-// @grant          GM_addStyle
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121231
+// @version        1.121231b
 // ==/UserScript==
+
+// * ver 1.121231b
+// - 謎の技術によって、検索画面にコメントパネルを表示できるようにした
+// - 検索画面のランキング表示の並びを整理してを見やすく
+// - 検索画面のサムネを4:3にする設定を追加 (上下がカットされなくなる)
 
 // * ver 1.121231
 // - 謎の技術によって、検索画面に「あなたにオススメの動画」と動画ランキングを表示
@@ -207,6 +211,7 @@
       hidePlaylist: true, // プレイリストを閉じる
       hidariue: true, // てれびちゃんメニュー内に、原宿以前のランダム画像復活
       videoExplorerHack: true, // 検索画面を乗っ取る
+      squareThumbnail: false, // 検索画面のサムネを4:3にする
       enableHoverPopup: true, // 動画リンクのマイリストポップアップを有効にする
       enableFavTags: false, // 動画検索画面にお気に入りタグを表示
       enableFavMylists: false, // 動画検索画面にお気に入りマイリストを表示
@@ -230,12 +235,11 @@
   //===================================================
   //===================================================
 
-    function addStyle(styles, elm) {
-      if (!elm) {
-        elm = document.createElement('style');
-        elm.type = 'text/css';
-      } else {
-      }
+    function addStyle(styles, id) {
+       var elm = document.createElement('style');
+       elm.type = 'text/css';
+       if (id) { elm.id = id; }
+
        var text = styles.toString();
        text = document.createTextNode(text)
        elm.appendChild(text);
@@ -246,18 +250,6 @@
     }
 
     if (!isNativeGM) {
-      this.GM_addStyle = function(styles) {
-        return addStyle(styles);
-        var S = elm || document.createElement('style');
-        S.type = 'text/css';
-        var T = ''+styles+'';
-        T = document.createTextNode(T)
-        S.appendChild(T);
-        var head = document.getElementsByTagName('head');
-        head = head[0];
-        head.appendChild(S);
-        return S;
-      };
       this.GM_xmlhttpRequest = function(options) {
         try {
           var req = new XMLHttpRequest();
@@ -810,6 +802,15 @@
         #searchResultNavigation .slideMenu ul li.g_culture2 a:before {  background-position: 0 -115px;}\n\
         #searchResultNavigation .slideMenu ul li.g_other a:before    {  background-position: 0 -138px;}\n\
         #searchResultNavigation .slideMenu ul li.r18 a:before        {  background-position: 0 -207px;}\n\
+        #searchResultNavigation .slideMenu ul li.all        a.all,\
+        #searchResultNavigation .slideMenu ul li.g_ent2     a.g_ent2,\
+        #searchResultNavigation .slideMenu ul li.g_life2    a.g_life2,\
+        #searchResultNavigation .slideMenu ul li.g_politics a.g_politics,\
+        #searchResultNavigation .slideMenu ul li.g_tech     a.g_tech,\
+        #searchResultNavigation .slideMenu ul li.g_culture2 a.g_culture2,\
+        #searchResultNavigation .slideMenu ul li.g_other    a.g_other,\
+        #searchResultNavigation .slideMenu ul li.r18        a.r18 \
+        { font-weight: bolder; border-top: 1px dotted #ccc; }\n\
 \
 \
       #searchResultNavigation .slideMenu ul li a:after{\
@@ -961,11 +962,14 @@
         color: #003ef9; /* 未読と既読の区別がつかないので#099ef0から変える */\
       }\n\
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a p {\
-        display: inline; padding-right: 16px;\
+        display: inline;\
       }\n\
 \
-      body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter .itemVideoDescription {\
-        margin-right: 16px;\
+      body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .commentBlank {\
+        width: 96%;\
+      }\n\
+      body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column4 .commentBlank {\
+        width: 24%;\
       }\n\
 \
       body.videoSelection #resultlist.column4 .videoItem .balloon {\
@@ -985,7 +989,7 @@
       ',
     ''].join('');
     //console.log(style);
-    GM_addStyle(style);
+    addStyle(style, 'watchItLater');
   })();
 
   conf.load = function() {
@@ -1036,25 +1040,22 @@
         values: {'する': true, 'しない': false}},
       {title: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
         values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
-
       {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
         values: {'する': true, 'しない': false}},
       {title: 'てれびちゃんメニュー内に、原宿以前のランダム画像復活', varName: 'hidariue',
         values: {'する': true, 'しない': false}},
-      {title: '<b>動画検索画面を乗っ取る</b><br> (動画を大きくする・シークバー・コメント入力欄を表示etc)', varName: 'videoExplorerHack',
+      {title: '<b>動画検索画面を乗っ取る</b>', varName: 'videoExplorerHack',
         description: 'かなり重いしブラウザが不安定になるかも',
         values: {'する': true, 'しない': false}},
       {title: '動画検索画面にお気に入りタグを表示', varName: 'enableFavTags',
         values: {'する': true, 'しない': false}},
       {title: '動画検索画面にお気に入りマイリストを表示', varName: 'enableFavMylists',
         values: {'する': true, 'しない': false}},
-      {title: 'タグが2行以内なら自動で高さ調節(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
+      {title: '動画検索画面のサムネを4:3にする', varName: 'squareThumbnail',
         values: {'する': true, 'しない': false},
-          onchange: function(v) {
-            // ピン留めする
-            if (v) { w.WatchApp.ns.init.TagInitializer.tagViewController.setIsPinned(true); }
-          }
-       },
+        description: '(正確には13:10)'},
+      {title: 'タグが2行以内なら自動で高さ調節(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
+        values: {'する': true, 'しない': false}},
       {title: 'ポップアップからのタグ検索でもプレイヤーを小さくする', varName: 'autoSmallScreenSearch',
         values: {'する': true, 'しない': false}},
       {title: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory',
@@ -1068,11 +1069,17 @@
       {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
        description: '常に指定したいパラメータ指定するのに便利です\n例: 「-グロ -例のアレ」とすると、その言葉が含まれる動画が除外されます'},
 
-//      {title: '動画切り替え時にスライドするエフェクト(ただのお遊びです)', varName: 'enableSlideEffect',
-//        values: {'する': true, 'しない': false}},
       {title: '「@ジャンプ」を無効化', varName: 'ignoreJumpCommand',
         values: {'する': true, 'しない': false}}
     ];
+
+    var listener = [];
+    function dispatchEvent(name, value, lastValue) {
+      for (var i = 0; i < listener.length; i++) {
+        (listener[i])(name, value, lastValue);
+      }
+    }
+
     pt.createPanelDom = function() {
       if ($panel == null) {
         $panel = w.jQuery('<div id="watchItLaterConfigPanel"><h2>WatchItLater設定</h2><div class="inner"><ul></ul></div></div>');
@@ -1121,6 +1128,7 @@
             if (typeof menu.onchange === 'function') {
               menu.onchange(newValue, oldValue);
             }
+            dispatchEvent(menu.varName, newValue, oldValue);
           }
         });
         $label.append($chk).append(w.jQuery('<span>' + k + '</span>'));
@@ -1143,12 +1151,17 @@
           if (typeof menu.onchange === 'function') {
             menu.onchange(newValue, oldValue);
           }
+          dispatchEvent(menu.varName, newValue, oldValue);
         }
       });
       $menu.append($input);
       return $menu;
     };
 
+
+    pt.addChangeEventListener = function(callback) {
+      listener.push(callback);
+    };
     pt.open = function() { $panel.show(200); };
     pt.close = function() { $panel.hide(200); };
     pt.toggle = function() {
@@ -2590,89 +2603,77 @@
       genreIdTable = {
         all:        -100,
         g_ent2:     -110,
+          ent:        -111,
+          music:      -112,
+          sing:       -113,
+          play:       -114,
+          dance:      -115,
+          vocaloid:   -116,
+          nicoindies: -117,
         g_life2:    -120,
+          animal:     -121,
+          cooking:    -122,
+          nature:     -123,
+          travel:     -124,
+          sport:      -125,
+          lecture:    -126,
+          drive:      -127,
+          history:    -128,
         g_politics: -130,
         g_tech:     -140,
+          science:    -141,
+          tech:       -142,
+          handcraft:  -143,
+          make:       -144,
         g_culture2: -150,
+          anime:      -151,
+          game:       -152,
+          toho:       -153,
+          imas:       -154,
+          radio:      -155,
+          draw:       -156,
         g_other:    -160,
-
-        ent:        -111,
-        music:      -112,
-        sing:       -113,
-        play:       -114,
-        dance:      -115,
-        vocaloid:   -116,
-        nicoindies: -117,
-
-        animal:     -121,
-        cooking:    -122,
-        nature:     -123,
-        travel:     -124,
-        sport:      -125,
-        lecture:    -126,
-        drive:      -127,
-        history:    -128,
-
-        science:    -141,
-        tech:       -142,
-        handcraft:  -143,
-        make:       -144,
-
-        anime:      -151,
-        game:       -152,
-        toho:       -153,
-        imas:       -154,
-        radio:      -155,
-        draw:       -156,
-
-        are:        -161,
-        diary:      -162,
-        other:      -163,
-
+          are:        -161,
+          diary:      -162,
+          other:      -163,
         r18:        -170
       },
       genreNameTable = {
         all:        'カテゴリ合算',
         g_ent2:     'エンタメ・音楽',
+          ent:        'エンターテイメント',
+          music:      '音楽',
+          sing:       '歌ってみた',
+          play:       '演奏してみた',
+          dance:      '踊ってみた',
+          vocaloid:   'VOCALOID',
+          nicoindies: 'ニコニコインディーズ',
         g_life2:    '生活・一般・スポ',
+          animal:     '動物',
+          cooking:    '料理',
+          nature:     '自然',
+          travel:     '旅行',
+          sport:      'スポーツ',
+          lecture:    'ニコニコ動画講座',
+          drive:      '車載動画',
+          history:    '歴史',
         g_politics: '政治',
         g_tech:     '科学・技術',
+          science:    '科学',
+          tech:       'ニコニコ技術部',
+          handcraft:  'ニコニコ手芸部',
+          make:       '作ってみた',
         g_culture2: 'アニメ・ゲーム・絵',
+          anime:      'アニメ',
+          game:       'ゲーム',
+          toho:       '東方',
+          imas:       'アイドルマスター',
+          radio:      'ラジオ',
+          draw:       '描いてみた',
         g_other:    'その他',
-
-        ent:        'エンターテイメント',
-        music:      '音楽',
-        sing:       '歌ってみた',
-        play:       '演奏してみた',
-        dance:      '踊ってみた',
-        vocaloid:   'VOCALOID',
-        nicoindies: 'ニコニコインディーズ',
-
-        animal:     '動物',
-        cooking:    '料理',
-        nature:     '自然',
-        travel:     '旅行',
-        sport:      'スポーツ',
-        lecture:    'ニコニコ動画講座',
-        drive:      '車載動画',
-        history:    '歴史',
-
-        science:    '科学',
-        tech:       'ニコニコ技術部',
-        handcraft:  'ニコニコ手芸部',
-        make:       '作ってみた',
-
-        anime:      'アニメ',
-        game:       'ゲーム',
-        toho:       '東方',
-        imas:       'アイドルマスター',
-        radio:      'ラジオ',
-        draw:       '描いてみた',
-
-        are:        '例のアレ',
-        diary:      '日記',
-        other:      'その他',
-
+          are:        '例のアレ',
+          diary:      '日記',
+          other:      'その他',
         r18:        'R-18'
       },
       termIdTable = {
@@ -3132,7 +3133,6 @@
       }
 
       leftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
-      resetSearchExplorerPos();
       resetHidariue();
       onTagReset();
       if (!isFirst) {
@@ -3695,6 +3695,7 @@
               .attr({href: '/ranking/fav/' + term + '/' + genre})
               .text(name)
               .addClass('videoRanking')
+              .addClass(genre)
               .click(function(e) {
                 if (e.button != 0 || e.metaKey) return;
                 mylistHackInit();
@@ -3789,11 +3790,6 @@
       isSearchOpen = false;
       AnchorHoverPopup.hidePopup().updateNow();
       $('body').removeClass('w_searchOpen');
-      resetSearchExplorerPos();
-    }
-
-    function resetSearchExplorerPos() {
-      return;
     }
 
     /**
@@ -3807,7 +3803,8 @@
       $('#leftVideoInfo').find('.videoDetails').attr('style', '');
       $('#searchResultExplorer, #content').addClass('w_adjusted');
       var
-        availableWidth = $(window).innerWidth() - ($('#resultContainer').outerWidth()),
+        rightAreaWidth = $('#resultContainer').outerWidth(),
+        availableWidth = $(window).innerWidth() - rightAreaWidth,
         commentInputHeight = $('#playerContainer').hasClass('oldTypeCommentInput') ? 46 : 0, controlPanelHeight = $('#playerContainer').hasClass('controll_panel') ? 46 : 0;
       if (availableWidth <= 0) { return; }
       //var flashVars = watch.PlayerInitializer.playerInitializeModel.flashVars, isWide = flashVars.isWide === "1"; // 4:3対応しても額縁になるだけだった
@@ -3818,13 +3815,15 @@
         xdiff = (availableWidth - defPlayerWidth - 20), windowHeight = $(window).innerHeight(),
         bottomHeight = windowHeight - availableHeight - (isFixedHeader ? $('#siteHeader').outerHeight() : 0);
       if (ratio < 1) { return; }
+      // コメントパネル召喚
+      var commentPanelWidth = $('#playerCommentPanelOuter').outerWidth();
 
       if (availableWidth <= 0 || bottomHeight <= 0 || (lastAvailableWidth === availableWidth && lastBottomHeight === bottomHeight)) { return; }
 
       lastAvailableWidth = availableWidth;
       lastBottomHeight   = bottomHeight;
 
-      var css = ['<style type="text/css">',
+      var css = ['<style type="text/css" id="explorerHack">',
         'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerContainerWrapper, \n',
         'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerContainerSlideArea, \n',
         'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerContainer, \n',
@@ -3865,6 +3864,29 @@
         'body.size_small.no_setting_panel.videoSelection #content.w_adjusted .nicommendContentsOuter {',
           'width: ', (xdiff - 18), 'px !important;',
         '}',
+        // かなり 無理矢理 コメントパネルを 召喚するよ 不安定に なっても 知らない
+        // 破滅！
+        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #nicoplayerContainer {',
+          'z-index: 100;',
+        '}',
+        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerCommentPanelOuter {',
+          'right: -16px !important; top: 0px !important; height: 50px !important; background: #dfdfdf; border: 2px outset; border-radius: 4px;',
+          'z-index: 99;',
+          'transition: right 0.3s ease-out; -webkit-transition: right 0.3s ease-out;',
+        '}',
+          'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover {',
+            'right: -',(commentPanelWidth), 'px !important; top: 0 !important; height: ', availableHeight, 'px !important; background: transparent; border: 0;',
+          '}',
+        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerCommentPanelOuter #playerCommentPanel {',
+          'display: none;',
+        '}',
+          'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover #playerCommentPanel {',
+            'height: ', (availableHeight - 20 /* padding+borderの10x2pxを引く */), 'px !important; ',
+            'display: block; background: #dfdfdf; border: 2px outset;',
+          '}',
+        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerCommentPanelOuter #playerCommentPanel .panelClickHandler{',
+          'display: none !important;',
+        '}',
       '</style>'].join('');
       if ($smallVideoStyle) {
         $smallVideoStyle.remove();
@@ -3887,7 +3909,6 @@
       setTimeout(function() {
         AnchorHoverPopup.hidePopup();
 //        $('#content').css({zIndex: 2});
-        resetSearchExplorerPos();
         $('body').toggleClass('w_setting',   $('#playerSettingPanel').is(':visible'));
 
         // フル画面時プレイリストを閉じる
@@ -3902,7 +3923,6 @@
 
         if (sc.mode == 'browserFull') {
         } else {
-            resetSearchExplorerPos();
         }
       }, 500);
     }
@@ -3936,7 +3956,6 @@
               $toggle.addClass('twoLines');
             }
           }
-          setTimeout(function() {resetSearchExplorerPos();}, 1000); // このやっつけ感
           watch.TagInitializer.tagViewController.fitTagAreaAndVideoHeader();
         }
       }
@@ -4036,7 +4055,6 @@
         conf.setValue('hidePlaylist', !$('#playlist').hasClass('w_show'));
         $playlistToggle.toggleClass('w_show', $('#playlist').hasClass('w_show'));
         AnchorHoverPopup.hidePopup();
-        resetSearchExplorerPos();
       });
       $div.append($playlistToggle);
       $('#playerContainerWrapper').append($div);
@@ -4093,27 +4111,44 @@
       };
     }
 
+    var isSquareCssInitialized = false;
+    function initSquareThumbnail() {
+      var isSquare = !!conf.squareThumbnail;
+      if (isSquare && !isSquareCssInitialized) {
+        var squareCss = [
+          'body.videoSelection #resultlist.squareThumbnail li.gold   .videoItem .thumbContainer{',
+            'background: #e9d7b4;',
+          '}',
+          'body.videoSelection #resultlist.squareThumbnail li.silver .videoItem .thumbContainer{',
+            'background: #cecece;',
+          '}',
+          'body.videoSelection #resultlist.squareThumbnail .videoItem .thumbContainer {',
+            'width: 130px; height: 100px;',
+          '}',
+          'body.videoSelection #resultlist.squareThumbnail .videoItem .thumbContainer .itemLink {',
+            'width: 130px; height: 100px;',
+          '}',
+          'body.videoSelection #resultlist.squareThumbnail .videoItem .thumbContainer img {',
+            'max-width: 130px; top: 0; left: 0;',
+          '}',
+        ''].join('\n');
+        addStyle(squareCss, 'squareCss');
+        isSquareCssInitialized = true;
+      }
+      WatchApp.$('#resultlist').toggleClass('squareThumbnail', isSquare);
+    }
+
     function initOther() {
-      //$('#videoInformation').css({position: 'relative', top: '-85px'});
       if (conf.leftPanelJack) {
-        //$leftPanel.addClass('leftVideoInfo');
         var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
-//        panelSVC.contentSlider.left = panelSVC.innerLeftElements = [$leftInfoPanel, $('#leftPanelContent')];
-//        panelSVC.refresh(true);
       }
 
-
-      if (conf.autoTagPin) {
-        tagv.isPinned = true;
-        tagv.onMouseOverTagContainer();
-      }
       $('#siteHeaderInner').width(
         $('#siteHeaderInner').width() + 200
       );
 
-      resetSearchExplorerPos();
-
       initAdditionalButtons();
+      initSquareThumbnail();
 
 
       $('.showVideoInfoButton').click(function() { // 「動画情報をもっと見る」クリック時
@@ -4137,6 +4172,17 @@
         }
       }
 
+      ConfigPanel.addChangeEventListener(function(name, newValue, oldValue) {
+        //console.log('conf changed', name, newValue, oldValue);
+        if (name === 'squareThumbnail') {
+          initSquareThumbnail();
+        } else
+        if (name === 'enableAutoTagContainerHeight') {
+          if (newValue) { watch.TagInitializer.tagViewController.setIsPinned(true); }
+        }
+      });
+
+
       WatchJsApi.nicos.addEventListener('nicoSJump', function(e) {
         if (conf.ignoreJumpCommand) {
           e.cancel();
@@ -4147,6 +4193,7 @@
       onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
 
       fixUploadedVideoSorting();
+
 
     }
 
