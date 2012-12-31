@@ -15,8 +15,13 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.121231b
+// @version        1.130101
 // ==/UserScript==
+
+// * ver 1.130101
+// - 「あなたにオススメの動画」が最大128件まで蓄積されるようにした
+// - Qwatchが新バージョンになってから検索画面の視聴済と未視聴の区別がつかなくなってるので、わかるようにした
+// - コメントパネルが空っぽになる現象を無理矢理直す(検索画面時)
 
 // * ver 1.121231b
 // - 謎の技術によって、検索画面にコメントパネルを表示できるようにした
@@ -958,7 +963,7 @@
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a{\
         display: inline;\
       }\n\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultlist .videoInformationOuter a:visited{\
+      body.videoSelection #searchResultExplorer.w_adjusted #resultlist .videoItem a:visited{\
         color: #003ef9; /* 未読と既読の区別がつかないので#099ef0から変える */\
       }\n\
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a p {\
@@ -2496,8 +2501,8 @@
   })();
 
   var VideoRecommendations = (function(){
-    var lastUpdate = 0, lastResult = {};
-    function load(callback) {
+    var lastUpdate = 0, lastResult = {}, histories = {};
+    function request(callback) {
       try{
         var
           watch = w.WatchApp.ns.init, $ = w.$, url = '/recommendations',
@@ -2551,6 +2556,9 @@
             }
             for (var i = 0, len = data.videos.length; i < len; i++) {
               var video = data.videos[i];
+              if (histories[video.id]) {
+                delete histories[video.id];
+              }
               var item = {
                 id: video.id,
                 length: video.length,
@@ -2572,8 +2580,13 @@
                 mylist_comment: ''
 
               };
-              result.items.push(item);
+              histories[video.id] = item;
+              //result.items.push(item);
             }
+            for (var v in histories) {
+              result.items.unshift(histories[v]);
+            }
+            result.items = result.items.slice(0, 128);
             result.itemCount = result.items.length;
             result.rawData.list = result.items;
             lastResult = result;
@@ -2585,6 +2598,14 @@
        });
       }, 0);
 
+    }
+    function load(callback, param) {
+      request(function(result) {
+        var viewPage = (param && typeof param.page === 'number') ? param.page : 1;
+        result.page  = param.viewPage;
+        result.items = result.rawData.list.slice(viewPage * 32 - 32, viewPage * 32);
+        callback(result);
+      });
     }
     var self = {
       load : load
@@ -3723,10 +3744,10 @@
           try {
             $('#resultContainer').addClass('dummyMylist');
             if (p.id == -1) {
-              VideoWatchHistory.load(onload);
+              VideoWatchHistory.load(onload, p);
             } else
             if (p.id == -2) {
-              VideoRecommendations.load(onload);
+              VideoRecommendations.load(onload, p);
             } else
             if (typeof VideoRanking.getGenreName(p.id) === 'string') {
               VideoRanking.load(onload, p);
@@ -3891,8 +3912,27 @@
       if ($smallVideoStyle) {
         $smallVideoStyle.remove();
       }
+      // コメントパネルが白いままになるバグを対策
+      var $cp = $('#playerCommentPanelOuter');
+      $cp.unbind('mouseenter', refreshCommentPanelHeight);
+      $cp.bind(  'mouseenter', refreshCommentPanelHeight);
+
       $smallVideoStyle = $(css);
       $('head').append($smallVideoStyle);
+    }
+
+    var refreshCommentPanelTimer = null;
+    function refreshCommentPanelHeight() {
+      if (!$('body').hasClass('videoSelection')) {
+        return;
+      }
+      if (refreshCommentPanelTimer != null) {
+        clearTimeout(refreshCommentPanelTimer);
+      }
+      refreshCommentPanelTimer =
+        setTimeout(function() {
+          watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
+        }, 500);
     }
 
 
