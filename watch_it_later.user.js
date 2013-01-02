@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130103
+// @version        1.130103b
 // ==/UserScript==
 
 // * ver 1.130103
@@ -2355,13 +2355,13 @@
         watch.ComponentInitializer.videoSelection.showMylistgroup(mylistId);
       },
       clearDeflistCache: function() {
-        watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader.deleteElement({});
+        watch.ComponentInitializer.videoSelection.loaderAgent.deflistVideoLoader.clearCache();
       },
       clearMylistCache: function(id) {
         if (id) {
           watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader._cache.deleteElement({'id': id.toString()});
         } else {
-          watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader._cache.clear();
+          watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader._cache.clearCache();
         }
       },
       showDefMylist: function() {
