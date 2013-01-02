@@ -15,8 +15,13 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130101
+// @version        1.130103
 // ==/UserScript==
+
+// * ver 1.130103
+// - 謎の技術によって、検索画面で自分のマイリストから動画を外す機能を追加 (確認ダイアログは出ないので注意)
+//   デフォルトはOFFなので、必要な人だけ設定パネルで有効にしてください
+// - 細かい表示の不具合修正
 
 // * ver 1.130101
 // - 「あなたにオススメの動画」が最大128件まで蓄積されるようにした
@@ -217,9 +222,10 @@
       hidariue: true, // てれびちゃんメニュー内に、原宿以前のランダム画像復活
       videoExplorerHack: true, // 検索画面を乗っ取る
       squareThumbnail: false, // 検索画面のサムネを4:3にする
-      enableHoverPopup: true, // 動画リンクのマイリストポップアップを有効にする
       enableFavTags: false, // 動画検索画面にお気に入りタグを表示
       enableFavMylists: false, // 動画検索画面にお気に入りマイリストを表示
+      enableMylistDeleteButton: false, // 動画検索画面で、自分のマイリストから消すボタンを追加する
+      enableHoverPopup: true, // 動画リンクのマイリストポップアップを有効にする
       enableAutoTagContainerHeight: false, // タグが2行以内なら自動で高さ調節(ピン留め時のみ
       autoSmallScreenSearch: false, // ポップアップからのタグ検索でもプレイヤーを小さくする
       enableNewsHistory: false, // ニコニコニュースの履歴を保持する
@@ -747,6 +753,9 @@
       #content .openConfButton {\n\
         position: absolute; bottom:0; right: 0;\n\
       }\n\
+      #watchItLaterConfigPanel .section {\n\
+        font-size: 120%; font-weight: bolder; margin: 16px 0;\
+      }\
 \
 \
       /* 動画検索画面に出るお気に入りタグ・お気に入りマイリスト */\
@@ -987,13 +996,25 @@
         display: none !important;\
       }\n\
 \
+      #resultlist .videoItem .deleteFromMyMylist {\
+        cursor: pointer; font-size: 70%; border: 1px solid #ccc; position: absolute; bottom: 4px; left: 4px; padding: 0;\
+        display: none;\
+      }\
+      body.videoSelection #searchResultExplorer #resultContainer #resultlist .videoItem .columnVertical     .deleteFromMyMylist {\
+        bottom:  4px; left: 4px;\
+      }\
+      body.videoSelection #searchResultExplorer #resultContainer #resultlist .videoItem .columnHorizontal   .deleteFromMyMylist {\
+        bottom: 75px; left: 5px;\
+      }\
+      body.videoSelection #searchResultExplorer #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
+        display: block;\
+      }\n\
+\
       body.videoSelection #popupMarquee {  \
         z-index: 1020; /* #contentがz-index: 1010なのでそれより上げる */\
       }\n\
-\
       ',
     ''].join('');
-    //console.log(style);
     addStyle(style, 'watchItLater');
   })();
 
@@ -1025,57 +1046,61 @@
     var pt = function(){};
     var $panel = null;
     var menus = [
-      {title: '動画リンクへのポップアップを有効にする', varName: 'enableHoverPopup',
-        values: {'する': true, 'しない': false}},
+      {title: '動画再生開始・終了時の設定'},
       {title: 'プレイヤーを自動で全画面化', varName: 'autoBrowserFull',
         values: {'する': true, 'しない': false}},
       {title: '自動全画面化オンでも、ユーザーニコ割のある動画は', varName: 'disableAutoBrowserFullIfNicowari',
         values: {'全画面化しない': true, '全画面化する': false}},
-      {title: '動画終了時に全画面化を解除(原宿と同じにする)', varName: 'autoNotFull',
-        values: {'する': true, 'しない': false}},
       {title: 'プレイヤーを自動で検索画面にする(自動全画面化オフ時)', varName: 'autoOpenSearch',
         values: {'する': true, 'しない': false}},
       {title: 'プレイヤー位置に自動スクロール(自動全画面化オフ時)', varName: 'autoScrollToPlayer',
         values: {'する': true, 'しない': false}},
+      {title: '動画終了時に全画面化を解除(原宿と同じにする)', varName: 'autoNotFull',
+        values: {'する': true, 'しない': false}},
+      {title: 'ウィンドウがアクティブの時だけ自動再生する', varName: 'autoPlayIfWindowActive',
+        description: 'QWatch側の設定パネルの自動再生はオフにしてください。\n\n■こんな人におすすめ\n・自動再生ONにしたいけど別タブで開く時は自動再生したくない\n・複数タブ開いたままブラウザ再起動したら全部のタブで再生が始まって「うるせー！」という経験のある人',
+        values: {'する': 'yes', 'しない': 'no'}},
+      {title: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
+        values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
+
+      {title: '動画プレイヤーの設定'},
       {title: 'コメントパネルのワイド化', varName: 'wideCommentPanel',
         values: {'する': true, 'しない': false}},
       {title: '左のパネルに動画情報を表示', varName: 'leftPanelJack',
         values: {'する': true, 'しない': false}},
       {title: 'ヘッダに再生数表示', varName: 'headerViewCounter',
         values: {'する': true, 'しない': false}},
-      {title: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
-        values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
-      {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
-        values: {'する': true, 'しない': false}},
       {title: 'てれびちゃんメニュー内に、原宿以前のランダム画像復活', varName: 'hidariue',
         values: {'する': true, 'しない': false}},
-      {title: '<b>動画検索画面を乗っ取る</b>', varName: 'videoExplorerHack',
-        description: 'かなり重いしブラウザが不安定になるかも',
-        values: {'する': true, 'しない': false}},
-      {title: '動画検索画面にお気に入りタグを表示', varName: 'enableFavTags',
-        values: {'する': true, 'しない': false}},
-      {title: '動画検索画面にお気に入りマイリストを表示', varName: 'enableFavMylists',
-        values: {'する': true, 'しない': false}},
-      {title: '動画検索画面のサムネを4:3にする', varName: 'squareThumbnail',
-        values: {'する': true, 'しない': false},
-        description: '(正確には13:10)'},
       {title: 'タグが2行以内なら自動で高さ調節(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
-        values: {'する': true, 'しない': false}},
-      {title: 'ポップアップからのタグ検索でもプレイヤーを小さくする', varName: 'autoSmallScreenSearch',
         values: {'する': true, 'しない': false}},
       {title: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory',
         values: {'する': true, 'しない': false}},
-      {title: 'ウィンドウがアクティブの時だけ自動再生する', varName: 'autoPlayIfWindowActive',
-        description: 'QWatch側の設定パネルの自動再生はオフにしてください。\n\n■こんな人におすすめ\n・自動再生ONにしたいけど別タブで開く時は自動再生したくない\n・複数タブ開いたままブラウザ再起動したら全部のタブで再生が始まって「うるせー！」という経験のある人',
-        values: {'する': 'yes', 'しない': 'no'}},
 
+      {title: '動画検索画面の設定'},
+      {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack',
+        description: '便利ですがちょっと重いです',
+        values: {'する': true, 'しない': false}},
+      {title: 'お気に入りタグを表示', varName: 'enableFavTags',
+        values: {'する': true, 'しない': false}},
+      {title: 'お気に入りマイリストを表示', varName: 'enableFavMylists',
+        values: {'する': true, 'しない': false}},
+      {title: 'サムネを4:3にする', varName: 'squareThumbnail',
+        values: {'する': true, 'しない': false}},
+      {title: 'マイリストから外すボタンを追加(テスト中)', varName: 'enableMylistDeleteButton',
+        description: 'マイリストの整理に便利。\n ※ 消す時に確認ダイアログは出ないので注意',
+        values: {'する': true, 'しない': false}},
 
-
+      {title: 'その他の設定'},
+      {title: '動画リンクへのポップアップを有効にする', varName: 'enableHoverPopup',
+        values: {'する': true, 'しない': false}},
+      {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
+        values: {'する': true, 'しない': false}},
       {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
        description: '常に指定したいパラメータ指定するのに便利です\n例: 「-グロ -例のアレ」とすると、その言葉が含まれる動画が除外されます'},
-
       {title: '「@ジャンプ」を無効化', varName: 'ignoreJumpCommand',
         values: {'する': true, 'しない': false}}
+
     ];
 
     var listener = [];
@@ -1090,8 +1115,12 @@
         $panel = w.jQuery('<div id="watchItLaterConfigPanel"><h2>WatchItLater設定</h2><div class="inner"><ul></ul></div></div>');
         var $ul = $panel.find('ul');
         for (var i = 0, len = menus.length; i < len; i++) {
-          var $item = this.createMenuItem(menus[i]);
-          $ul.append($item);
+          if (menus[i].varName) {
+            var $item = this.createMenuItem(menus[i]);
+            $ul.append($item);
+          } else {
+            $ul.append('<li class="section">'+ menus[i].title + '</li>');
+          }
         }
         var $close = w.jQuery('<p class="bottom">項目によっては再読み込みが必要です<button class="closeButton">閉じる</button></p>'), self = this;
         $close.click(function() {
@@ -1181,6 +1210,10 @@
     return pt;
   })(conf, w);
 
+  /**
+   * 通信用
+   */
+  w.WatchItLater = {};
 
   /**
    *  動画タグ取得とポップアップ
@@ -1264,7 +1297,7 @@
           if (e.button != 0 || e.shiftKey || e.ctrlKey || e.altKey || e.target.className === 'icon' || e.target.tagName === 'A') {
             return;
           }
-          popup.style.display = 'none';
+          this.style.display = 'none';
           e.preventDefault();
         });
         return popup;
@@ -1358,7 +1391,7 @@
   var Mylist = (function(){
     var mylistlist = [];
     var initialized = false;
-    var defListItems = [];
+    var defListItems = [], mylistItems = {};
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
     var token = '';//
 
@@ -1387,12 +1420,12 @@
       return _token;
     }
 
-    var pt = Mylist.prototype, events = {defMylistUpdate: []};
+    var pt = Mylist.prototype, events = {defMylistUpdate: [], mylistUpdate: []};
 
     function dispatchEvent(name) {
       var e = events[name];
       for (var i =0, len = e.length; i < len; i++) {
-        e[i]();
+        e[i].apply(null, Array.prototype.slice.call(arguments, 1));
       }
     }
 
@@ -1400,6 +1433,9 @@
       events.defMylistUpdate.push(callback);
     };
 
+    pt.onMylistUpdate = function(callback) {
+      events.mylistUpdate.push(callback);
+    };
 
     pt.getUserId = function() {
       if (document.cookie.match(/user_session_(\d+)/)) {
@@ -1446,6 +1482,14 @@
       }
     };
 
+    pt.isMine = function(id) {
+      if (!initialized) { return false;}
+      for (var i = 0, len = mylistlist.length; i < len; i++) {
+        if (mylistlist[i].id == id) { return true; }
+      }
+      return false;
+    };
+
     pt.reloadDefList = function(callback) {
       var url = 'http://' + host + '/api/deflist/list';
       var self = this;
@@ -1455,11 +1499,40 @@
           var result = JSON.parse(resp.responseText);
           if (result.status == "ok" && result.mylistitem) {
             defListItems = result.mylistitem;
-            if (typeof callback == "function") callback(resp);
+            if (typeof callback == "function") callback(defListItems);
           }
         }
       });
     };
+
+    pt.loadMylist = function(groupId, callback) {
+      if (mylistItems[groupId]) {
+        callback(mylistItems[groupId]);
+        return;
+      }
+      var url = 'http://' + host + '/api/mylist/list?group_id=' + groupId;
+      var self = this;
+      GM_xmlhttpRequest({
+        url: url,
+        onload: function(resp) {
+          var result = JSON.parse(resp.responseText);
+          if (result.status == "ok" && result.mylistitem) {
+            mylistItems[groupId] = result.mylistitem;
+            if (typeof callback == "function") callback(result.mylistitem);
+          }
+        }
+      });
+    };
+
+    pt.clearMylistCache = function(groupId) {
+      delete mylistItems[groupId];
+    }
+
+    pt.reloadMylist = function(groupId, callback) {
+      this.clearMylistCache(groupId);
+      return this.loadMylist(groupId, callback);
+    };
+
 
     pt.findDefListByWatchId = function(watchId) {
       for (var i = 0, len = defListItems.length; i < len; i++) {
@@ -1469,11 +1542,21 @@
       return null;
     };
 
+    pt.findMylistByWatchId = function(watchId, groupId) {
+      var items = mylistItems[groupId];
+      if (!items) { return null; }
+      for (var i = 0, len = items.length; i < len; i++) {
+        var item = items[i], wid = item.item_data.watch_id;
+        if (wid == watchId) return item;
+      }
+      return null;
+    };
+
     // おもに参考にしたページ
     // http://uni.res.nimg.jp/js/nicoapi.js
     // http://d.hatena.ne.jp/lolloo-htn/20110115/1295105845
     // http://d.hatena.ne.jp/aTaGo/20100811/1281552243
-    pt.deleteDefList = function(watchId, callback) {
+    pt.deleteDefListItem = function(watchId, callback) {
       var item = this.findDefListByWatchId(watchId);
       if (!item) return false;
       var item_id = item.item_id;
@@ -1494,7 +1577,7 @@
       return true;
     };
 
-    pt.addDefList = function(watchId, callback) {
+    pt.addDefListItem = function(watchId, callback) {
       var self = this;
       var url = 'http://' + host + '/api/deflist/add';
 
@@ -1517,15 +1600,15 @@
         };
         GM_xmlhttpRequest(req);
       }
-      // とりあえずマイリストにある場合はdeleteDefList()のcallbackで追加、ない場合は即時追加
-      if (!this.deleteDefList(watchId, _add)) {
+      // とりあえずマイリストにある場合はdeleteDefListItem()のcallbackで追加、ない場合は即時追加
+      if (!this.deleteDefListItem(watchId, _add)) {
         replaced = false;
         _add();
         dispatchEvent('defMylistUpdate');
       }
     };
 
-    pt.addMylist = function(watchId, groupId, callback) {
+    pt.addMylistItem = function(watchId, groupId, callback) {
       var self = this;
       var url = 'http://' + host + '/api/mylist/add';
       var data = ['item_id=', watchId,
@@ -1542,16 +1625,56 @@
           method: 'POST',
           data: data,
           url: url,
-          headers: {'Content-Type': 'application/x-www-form-urlencoded' }, // これを忘れて小一時間はまった
+          headers: {'Content-Type': 'application/x-www-form-urlencoded' },
           onload: function(resp) {
             var result = JSON.parse(resp.responseText);
             if (typeof callback == "function") callback(result.status, result);
+            dispatchEvent('mylistUpdate', {action: 'add', groupId: groupId, watchId: watchId});
+            self.clearMylistCache(groupId);
+          },
+          error: function(resp) {
+            Popup.alert('ネットワークエラー');
           }
         };
         GM_xmlhttpRequest(req);
       }
       // 普通のマイリストに入れたら、とりあえずマイリストからは削除(≒移動)
-      if (!this.deleteDefList(watchId, _add)) _add();
+      if (!this.deleteDefListItem(watchId, _add)) _add();
+    };
+
+    pt.deleteMylistItem = function(watchId, groupId, callback) {
+      var self = this;
+      this.loadMylist(groupId, function() {
+        var item = self.findMylistByWatchId(watchId, groupId);
+        if (!item) {
+          Popup.alert('マイリスト中に該当する動画がみつかりませんでした');
+          return;
+        }
+        var
+          item_id = item.item_id,
+          url = 'http://' + host + '/api/mylist/delete';
+          data = [
+            'id_list[0][]=', item_id,
+            '&group_id=',    groupId,
+            '&token=',       token
+          ].join(''),
+          req = {
+            method: 'POST',
+            data: data,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            url: url,
+            onload: function(resp) {
+              var result = JSON.parse(resp.responseText);
+              if (typeof callback == "function") callback(result.status, result);
+              dispatchEvent('mylistUpdate', {action: 'delete', groupId: groupId, watchId: watchId});
+            },
+            error: function(resp) {
+              Popup.alert('ネットワークエラー');
+            }
+          };
+
+        GM_xmlhttpRequest(req);
+      });
     };
 
     /**
@@ -1655,7 +1778,7 @@
           setTimeout(function() {btn.disabled = false;}, 1000);
           var groupId = sel.value, name = sel.options[sel.selectedIndex].textContent;
           if (groupId == 'default') {
-            self.addDefList(_watchId, function(status, result, replaced) {
+            self.addDefListItem(_watchId, function(status, result, replaced) {
               self.reloadDefList();
               if (status != "ok") {
                 Popup.alert('とりあえずマイリストの登録に失敗: ' + result.error.description);
@@ -1668,7 +1791,7 @@
               }
             });
           } else {
-            self.addMylist(_watchId, groupId, function(status, result) {
+            self.addMylistItem(_watchId, groupId, function(status, result) {
               self.reloadDefList();
               if (status == 'ok') {
                 Popup.show( '<a href="/my/mylist/#/' + groupId + '">' + name + '</a>に登録しました');
@@ -1682,7 +1805,7 @@
         return btn;
       }
 
-      function createDeleteDeflistButton(sel) {
+      function createDeleteDeflistItemButton(sel) {
         var btn = document.createElement('button');
         btn.appendChild(document.createTextNode('消'));
         btn.className = 'deflistRemove';
@@ -1690,7 +1813,7 @@
         btn.addEventListener('click', function() {
           btn.disabled = true;
           setTimeout(function() {btn.disabled = false;}, 1000);
-          self.deleteDefList(_watchId, function(status, result) {
+          self.deleteDefListItem(_watchId, function(status, result) {
             self.reloadDefList();
             btn.style.display = 'none';
             if (status != "ok") {
@@ -1756,7 +1879,7 @@
       var tagBtn = createTagListButton();
       nobr.appendChild(tagBtn);
 
-      var deleteDef = createDeleteDeflistButton();
+      var deleteDef = createDeleteDeflistItemButton();
       nobr.appendChild(deleteDef);
 
 
@@ -2223,7 +2346,6 @@
           word,
           WatchApp.ns.components.selection.type.SearchType.valueOf(search_type)
         );
-        //if (conf.autoSmallScreenSearch) { this.changeScreenMode('small'); }
         AnchorHoverPopup.hidePopup();
         setTimeout(function() {
         //  $('#searchResultExplorer .searchText input').focus();
@@ -2233,7 +2355,14 @@
         watch.ComponentInitializer.videoSelection.showMylistgroup(mylistId);
       },
       clearDeflistCache: function() {
-        watch.ComponentInitializer.videoSelection.loaderAgent.deflistVideoLoader._cache.deleteElement({});
+        watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader.deleteElement({});
+      },
+      clearMylistCache: function(id) {
+        if (id) {
+          watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader._cache.deleteElement({'id': id.toString()});
+        } else {
+          watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader._cache.clear();
+        }
       },
       showDefMylist: function() {
         watch.ComponentInitializer.videoSelection.showDefMylist();
@@ -2427,71 +2556,69 @@
         },
         sort: '1' // $('searchResultMylistSortOptions select').val()
       };
-      setTimeout(function() {
-        GM_xmlhttpRequest({
-          url: url,
-          onload: function(resp) {
-            var $dom = $(resp.responseText), $list = $dom.find('#historyList');
-            $list.find('.outer').each(function() {
-              var
-                $item = $(this), $meta = $item.find('.metadata'), $title = $item.find('.section h5 a'),
-                id = $title.attr('href').split('/').reverse()[0], title = $title.text(),
-                duration = $item.find('.videoTime').text(),
-                viewCnt   = $meta.find('.play')   .text().split(':')[1].replace(/,/g, ''),
-                resCnt    = $meta.find('.comment').text().split(':')[1].replace(/,/g, ''),
-                mylistCnt = $meta.find('.mylist') .text().split(':')[1].replace(/,/g, ''),
-                postedAt  = '20' + $meta.find('.posttime').text().replace(/(年|月)/g, '-').replace(/(日| *投稿)/g, ''),
-                thumbnail = $item.find('.thumbContainer a .video').attr('src'),
-                hoge
-              ;
+      GM_xmlhttpRequest({
+        url: url,
+        onload: function(resp) {
+          var $dom = $(resp.responseText), $list = $dom.find('#historyList');
+          $list.find('.outer').each(function() {
+            var
+              $item = $(this), $meta = $item.find('.metadata'), $title = $item.find('.section h5 a'),
+              id = $title.attr('href').split('/').reverse()[0], title = $title.text(),
+              duration = $item.find('.videoTime').text(),
+              viewCnt   = $meta.find('.play')   .text().split(':')[1].replace(/,/g, ''),
+              resCnt    = $meta.find('.comment').text().split(':')[1].replace(/,/g, ''),
+              mylistCnt = $meta.find('.mylist') .text().split(':')[1].replace(/,/g, ''),
+              postedAt  = '20' + $meta.find('.posttime').text().replace(/(年|月)/g, '-').replace(/(日| *投稿)/g, ''),
+              thumbnail = $item.find('.thumbContainer a .video').attr('src'),
+              hoge
+            ;
 
-              var item = {
-                id: id,
-                length: duration,
-                mylist_counter: mylistCnt,
-                view_counter: viewCnt,
-                num_res: resCnt,
-                first_retrieve: postedAt,
-                thumbnail_url: thumbnail,
-                title: title,
-                type: 'video',
-                description_short: $item.find('.section .posttime span').text(),
-                getType:        function() { return this.type; },
-                getInfo:        function() { return this;},
-                getName:        function() { return this.title;},
-                getId:          function() { return this.id; },
-                getDescription: function() { return ''},
+            var item = {
+              id: id,
+              length: duration,
+              mylist_counter: mylistCnt,
+              view_counter: viewCnt,
+              num_res: resCnt,
+              first_retrieve: postedAt,
+              thumbnail_url: thumbnail,
+              title: title,
+              type: 'video',
+              description_short: $item.find('.section .posttime span').text(),
+              getType:        function() { return this.type; },
+              getInfo:        function() { return this;},
+              getName:        function() { return this.title;},
+              getId:          function() { return this.id; },
+              getDescription: function() { return ''},
 
-                // マイリストAPIの応答にあるけど使ってなさそう？なので未実装
-                length_seconds: 0, // TODO:
-                create_time: parseInt(Date.now() / 1000, 10),  // TODO:
-                thread_update_time: '2000-01-01 00:00:00', // TODO:
-                mylist_comment: ''
+              // マイリストAPIの応答にあるけど使ってなさそう？なので未実装
+              length_seconds: 0, // TODO:
+              create_time: parseInt(Date.now() / 1000, 10),  // TODO:
+              thread_update_time: '2000-01-01 00:00:00', // TODO:
+              mylist_comment: ''
 
-              };
-              result.items.push(item);
-              result.itemCount++;
-            });
-            result.page = 1;
-            result.rawData = {
-              list: result.items,
-              name: '視聴履歴',
-              status: 'ok',
-              description: '',
-              is_watching_count_full: false,
-              is_watching_this_mylist: false,
-              user_nickname: myNick,
-              user_id: myId,
-              sort: '8'
             };
-            lastResult = result;
-            callback(result);
-          },
-          onerror: function() {
-            throw { message: '取得に失敗しました', status: 'fail'};
-          }
-        });
-      }, 0);
+            result.items.push(item);
+            result.itemCount++;
+          });
+          result.page = 1;
+          result.rawData = {
+            list: result.items,
+            name: '視聴履歴',
+            status: 'ok',
+            description: '',
+            is_watching_count_full: false,
+            is_watching_this_mylist: false,
+            user_nickname: myNick,
+            user_id: myId,
+            sort: '8'
+          };
+          lastResult = result;
+          callback(result);
+        },
+        onerror: function() {
+          throw { message: '取得に失敗しました', status: 'fail'};
+        }
+      });
 
     }
     var self = {
@@ -2535,68 +2662,66 @@
         },
         sort: '1' // $('searchResultMylistSortOptions select').val()
       };
-      setTimeout(function() {
-        GM_xmlhttpRequest({
-          url: url,
-          onload: function(resp) {
-            var text = resp.responseText, lines = text.split(/[\r\n]/), found = false, data;
-            for (var i = 0, len = lines.length; i < len; i++) {
-              var line = lines[i];
-              if (line.indexOf('var Nico_RecommendationsParams') >= 0 &&
-                  lines[i + 5] && lines[i + 5].indexOf('first_data') >= 0) {
-                var data = JSON.parse(lines[i + 5].replace(/^.*?:/, ''));
-                if (data && data.videos) {
-                  found = true;
-                  break;
-                }
+      GM_xmlhttpRequest({
+        url: url,
+        onload: function(resp) {
+          var text = resp.responseText, lines = text.split(/[\r\n]/), found = false, data;
+          for (var i = 0, len = lines.length; i < len; i++) {
+            var line = lines[i];
+            if (line.indexOf('var Nico_RecommendationsParams') >= 0 &&
+                lines[i + 5] && lines[i + 5].indexOf('first_data') >= 0) {
+              var data = JSON.parse(lines[i + 5].replace(/^.*?:/, ''));
+              if (data && data.videos) {
+                found = true;
+                break;
               }
             }
-            if (!found) {
-              throw { message: '取得に失敗しました', status: 'fail'};
-            }
-            for (var i = 0, len = data.videos.length; i < len; i++) {
-              var video = data.videos[i];
-              if (histories[video.id]) {
-                delete histories[video.id];
-              }
-              var item = {
-                id: video.id,
-                length: video.length,
-                mylist_counter: video.mylist_counter,
-                view_counter:   video.view_counter,
-                num_res:        video.num_res,
-                first_retrieve: video.first_retrieve,
-                thumbnail_url:  video.thumbnail_url,
-                title:          video.title_short,
-                type:           'video',
-                description_short: '関連タグ: ' + video.recommend_tag,
-                getType: function() { return this.type; },
-                getInfo: function() { return this;},
-
-                // APIの応答みると必要そうだけど未実装
-                length_seconds: 0, // TODO:
-                create_time: parseInt(Date.now() / 1000, 10),  // TODO:
-                thread_update_time: '2000-01-01 00:00:00', // TODO:
-                mylist_comment: ''
-
-              };
-              histories[video.id] = item;
-              //result.items.push(item);
-            }
-            for (var v in histories) {
-              result.items.unshift(histories[v]);
-            }
-            result.items = result.items.slice(0, 128);
-            result.itemCount = result.items.length;
-            result.rawData.list = result.items;
-            lastResult = result;
-            callback(result);
-          },
-          onerror: function() {
+          }
+          if (!found) {
             throw { message: '取得に失敗しました', status: 'fail'};
           }
-       });
-      }, 0);
+          for (var i = 0, len = data.videos.length; i < len; i++) {
+            var video = data.videos[i];
+            if (histories[video.id]) {
+              delete histories[video.id];
+            }
+            var item = {
+              id: video.id,
+              length: video.length,
+              mylist_counter: video.mylist_counter,
+              view_counter:   video.view_counter,
+              num_res:        video.num_res,
+              first_retrieve: video.first_retrieve,
+              thumbnail_url:  video.thumbnail_url,
+              title:          video.title_short,
+              type:           'video',
+              description_short: '関連タグ: ' + video.recommend_tag,
+              getType: function() { return this.type; },
+              getInfo: function() { return this;},
+
+              // APIの応答みると必要そうだけど未実装
+              length_seconds: 0, // TODO:
+              create_time: parseInt(Date.now() / 1000, 10),  // TODO:
+              thread_update_time: '2000-01-01 00:00:00', // TODO:
+              mylist_comment: ''
+
+            };
+            histories[video.id] = item;
+            //result.items.push(item);
+          }
+          for (var v in histories) {
+            result.items.unshift(histories[v]);
+          }
+          result.items = result.items.slice(0, 128);
+          result.itemCount = result.items.length;
+          result.rawData.list = result.items;
+          lastResult = result;
+          callback(result);
+        },
+        onerror: function() {
+          throw { message: '取得に失敗しました', status: 'fail'};
+        }
+     });
 
     }
     function load(callback, param) {
@@ -2786,19 +2911,17 @@
     }
 
     function xhr(callback, url) {
-      setTimeout(function() {
-        GM_xmlhttpRequest({
-          url: url,
-          onload: function(resp) {
-            if (typeof callback === 'function') {
-              callback(resp);
-            }
-          },
-          onerror: function() {
-            throw { message: '取得に失敗しました', status: 'fail'};
+      GM_xmlhttpRequest({
+        url: url,
+        onload: function(resp) {
+          if (typeof callback === 'function') {
+            callback(resp);
           }
-        });
-      }, 0);
+        },
+        onerror: function() {
+          throw { message: '取得に失敗しました', status: 'fail'};
+        }
+      });
     };
 
     var lastUpdate = {}, lastResult = {}, CACHE_TIME = 1000 * 60 * 30;
@@ -2809,12 +2932,8 @@
 
       var now = Date.now();
       if (now - lastUpdate[baseUrl] < CACHE_TIME) {
-//        console.log('from cache', now - lastUpdate[baseUrl], CACHE_TIME);
-//        console.log(lastResult[baseUrl]);
         callback(lastResult[baseUrl]);
         return;
-      } else {
-//        console.log('new request', baseUrl, now - lastUpdate[baseUrl], CACHE_TIME);
       }
       lastUpdate[baseUrl] = now;
 
@@ -3635,7 +3754,6 @@
                 .addClass('defMylist')
                 .click(function(e) {
                   if (e.button != 0 || e.metaKey) return;
-                  mylistHackInit();
                   e.preventDefault();
                   WatchController.showMylist(-1);
               })
@@ -3650,7 +3768,6 @@
                 .addClass('defMylist')
                 .click(function(e) {
                   if (e.button != 0 || e.metaKey) return;
-                  mylistHackInit();
                   e.preventDefault();
                   WatchController.showMylist(-2);
               })
@@ -3719,7 +3836,6 @@
               .addClass(genre)
               .click(function(e) {
                 if (e.button != 0 || e.metaKey) return;
-                mylistHackInit();
                 e.preventDefault();
                 WatchController.showMylist(id);
               });
@@ -3732,36 +3848,81 @@
     var isMylistHacked = false;
     function mylistHackInit() {
       if (isMylistHacked) { return; }
+      var currentMylistId = 0;
+
+      watch.ComponentInitializer.videoSelection._show_org =
+        watch.ComponentInitializer.videoSelection._show;
+      watch.ComponentInitializer.videoSelection._show = function(a, b) {
+        currentMylistId = 0;
+        $('#resultContainer').removeClass('dummyMylist').removeClass('mylist').removeClass('isMine');
+        watch.ComponentInitializer.videoSelection._show_org(a, b);
+      }
+
       watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader.load_org =
-      watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader.load;
+        watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader.load;
       watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader.load = function (p, onload, onerror) {
         var self = watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader;
+        currentMylistId = p.id;
         if (p.id >= 0) {
-          $('#resultContainer').removeClass('dummyMylist');
+          $('#resultContainer').removeClass('dummyMylist').addClass('mylist').toggleClass('isMine', Mylist.isMine(p.id));
           self.load_org(p, onload, onerror);
         } else {
           // マイリストIDに負の数字(通常ないはず)が来たら乗っ取るサイン
-          try {
-            $('#resultContainer').addClass('dummyMylist');
-            if (p.id == -1) {
-              VideoWatchHistory.load(onload, p);
-            } else
-            if (p.id == -2) {
-              VideoRecommendations.load(onload, p);
-            } else
-            if (typeof VideoRanking.getGenreName(p.id) === 'string') {
-              VideoRanking.load(onload, p);
-            }
-          } catch(e) {
-            if (e.message && e.status) {
-              onerror(e);
-            } else {
-              console.log(e);
-              onerror({message: 'エラーが発生しました', status: 'fail'});
-            }
-          }
+            $('#resultContainer').addClass('dummyMylist').removeClass('mylist').removeClass('isMine');
+            setTimeout(function() {
+              try {
+                if (p.id == -1) {
+                  VideoWatchHistory.load(onload, p);
+                } else
+                if (p.id == -2) {
+                  VideoRecommendations.load(onload, p);
+                } else
+                if (typeof VideoRanking.getGenreName(p.id) === 'string') {
+                  VideoRanking.load(onload, p);
+                }
+              } catch(e) {
+                if (e.message && e.status) {
+                  onerror(e);
+                } else {
+                  console.log(e);
+                  onerror({message: 'エラーが発生しました', status: 'fail'});
+                }
+              }
+            }, 0);
         }
       };
+      watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder.$videoContentTemplate.find('.videoItem .columnVertical   .thumbContainer').append(
+        '<button class="deleteFromMyMylist" onclick="WatchItLater.onDeleteFromMyMylistClick(this);">マイリスト外す</button>');
+      watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder.$videoContentTemplate.find('.videoItem .columnHorizontal .balloon').before(
+        '<button class="deleteFromMyMylist" onclick="WatchItLater.onDeleteFromMyMylistClick(this);">マイリスト外す</button>');
+
+      function onDeleteFromMyMylistClick(elm) {
+        var
+          $videoItem = $(elm).parent(),
+          watchId    = $videoItem.find('.itemLink').attr('href').split('/').reverse()[0];
+        if (currentMylistId <= 0 || !Mylist.isMine(currentMylistId)) {
+          return;
+        }
+        setTimeout(function() {
+          try {
+            Mylist.deleteMylistItem(watchId, currentMylistId, function(status, result) {
+              if (status != "ok") {
+                Popup.alert('削除に失敗: ' + result.error.description);
+              } else {
+                $videoItem.parent().fadeOut(500);
+              }
+            });
+          } catch (e) {
+            if (e.message) { Popup.alert(e.message); }
+            else {
+              console.log(e);
+              throw e;
+            }
+          }
+        }, 0);
+      };
+      w.WatchItLater.onDeleteFromMyMylistClick = onDeleteFromMyMylistClick;
+
       isMylistHacked = true;
     }
 
@@ -3836,13 +3997,16 @@
         xdiff = (availableWidth - defPlayerWidth - 20), windowHeight = $(window).innerHeight(),
         bottomHeight = windowHeight - availableHeight - (isFixedHeader ? $('#siteHeader').outerHeight() : 0);
       if (ratio < 1) { return; }
-      // コメントパネル召喚
-      var commentPanelWidth = $('#playerCommentPanelOuter').outerWidth();
 
       if (availableWidth <= 0 || bottomHeight <= 0 || (lastAvailableWidth === availableWidth && lastBottomHeight === bottomHeight)) { return; }
 
       lastAvailableWidth = availableWidth;
       lastBottomHeight   = bottomHeight;
+      if ($smallVideoStyle) {
+        $smallVideoStyle.remove();
+      }
+      // コメントパネル召喚
+      var commentPanelWidth = $('#playerCommentPanelOuter').outerWidth();
 
       var css = ['<style type="text/css" id="explorerHack">',
         'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerContainerWrapper, \n',
@@ -3909,9 +4073,6 @@
           'display: none !important;',
         '}',
       '</style>'].join('');
-      if ($smallVideoStyle) {
-        $smallVideoStyle.remove();
-      }
       // コメントパネルが白いままになるバグを対策
       var $cp = $('#playerCommentPanelOuter');
       $cp.unbind('mouseenter', refreshCommentPanelHeight);
@@ -4078,6 +4239,9 @@
       Mylist.onDefMylistUpdate(function() {
         WatchController.clearDeflistCache();
       });
+      Mylist.onMylistUpdate(function(info) {
+        WatchController.clearMylistCache(info.groupId);
+      });
 
     }
 
@@ -4171,6 +4335,12 @@
           'body.videoSelection #resultlist.squareThumbnail .videoItem .thumbContainer img {',
             'max-width: 130px; top: 0; left: 0;',
           '}',
+          'body.videoSelection #resultlist.squareThumbnail .videoItem .thumbContainer img.playingIcon {',
+            'top: 50%; left: 50%;',
+          '}',
+          'body.videoSelection #searchResultExplorer #resultContainer #resultlist.squareThumbnail .videoItem .columnHorizontal .deleteFromMyMylist {',
+            'bottom: 47px;',
+          '}',
         ''].join('\n');
         addStyle(squareCss, 'squareCss');
         isSquareCssInitialized = true;
@@ -4219,8 +4389,13 @@
         } else
         if (name === 'enableAutoTagContainerHeight') {
           if (newValue) { watch.TagInitializer.tagViewController.setIsPinned(true); }
+        } else
+        if (name === 'enableMylistDeleteButton') {
+          $('#resultContainer').toggleClass('enableMylistDeleteButton', newValue);
         }
       });
+
+      $('#resultContainer').toggleClass('enableMylistDeleteButton', conf.enableMylistDeleteButton);
 
 
       WatchJsApi.nicos.addEventListener('nicoSJump', function(e) {
@@ -4232,8 +4407,9 @@
 
       onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
 
-      fixUploadedVideoSorting();
+      fixUploadedVideoSorting(); // TODO:Qwatch側で修正されたらこれ外す
 
+      mylistHackInit();
 
     }
 
