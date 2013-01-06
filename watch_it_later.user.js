@@ -15,8 +15,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130103b
+// @version        1.130106
 // ==/UserScript==
+
+// * ver 1.130106
+// - お気に入りマイリストのリロードボタンが効かなくなったりするのを修正
 
 // * ver 1.130103
 // - 謎の技術によって、検索画面で自分のマイリストから動画を外す機能を追加 (確認ダイアログは出ないので注意)
@@ -759,19 +762,19 @@
 \
 \
       /* 動画検索画面に出るお気に入りタグ・お気に入りマイリスト */\
-      #favoriteTagsMenu.open, #favoriteMylistsMenu.open, #mylistListMenu.open, #videoRankingMenu.open {\
+      #favoriteTagsMenu.open, #favoriteMylistsMenu.open, #mylistListMenu.open, #videoRankingMenu.open,\
+      #favoriteTagsMenu.opening, #favoriteMylistsMenu.opening, #mylistListMenu.opening, #videoRankingMenu.opening {\
         background: -moz-linear-gradient(center top , #D1D1D1, #FDFDFD) repeat scroll 0 0 transparent !important;\
         background: -webkit-gradient(linear, left top, left bottom, from(#D1D1D1), to(#FDFDFD)) !important;\
         border-bottom: 0 !important;\
       }\
       #searchResultNavigation .slideMenu{\
         width: 100%; height: auto !important;\
-        max-height: 0px;\
         overflow-x: hidden;\
         overflow-y: auto;\
         padding: 0;\
         background: #fdfdfd;\
-        display: none; \
+        /*display: none; */\
         border-top: 0 !important;\
       }\
       #searchResultNavigation .slideMenu.open{\
@@ -787,7 +790,7 @@
       }\n\
       #searchResultNavigation .slideMenu ul{\
       }\n\
-      #searchResultNavigation .slideMenu.open ul li{\
+      #searchResultNavigation .slideMenu ul li{\
         background: #fdfdfd; padding: 0; border: 0;font-size: 90%; height: auto !important;\
       }\n\
       #searchResultNavigation .slideMenu ul li a{\
@@ -838,7 +841,7 @@
       }\n\
 \
       #searchResultNavigation .tagSearchHistory {\
-        max-height: 300px; overflow-y: auto; border-radius: 4px; margin-top: 4px; padding: 4px; background: #ccc;\
+        border-radius: 4px; margin-top: 4px; padding: 4px; background: #ccc;\
       }\
 \
 \
@@ -2337,6 +2340,12 @@
       watch = (WatchApp && WatchApp.ns.init) || {},
       $ = w.$, WatchJsApi = w.WatchJsApi;
     return {
+      isZeroWatch: function() {
+        return (WatchApp) ? true : false;
+      },
+      isQwatch: function() {
+        return this.isZeroWatch();
+      },
       nicoSearch: function(word, search_type) {
         search_type = search_type || 'tag';
         // こっちだと勝手にスクロールしてしまうようになったので
@@ -3611,22 +3620,23 @@
           if (e.button != 0 || e.metaKey) return;
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
-          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500);
-          $toggle.toggleClass('open', !isVisible);
+          $toggle.addClass('opening');
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500, function() {
+            $toggle.toggleClass('open', !isVisible);
+            $toggle.removeClass('opening');
+          });
         });
-        $popup.addClass('slideMenu')
+        $popup.addClass('slideMenu').css('max-height', 0);
         $toggle.append($a);//.append($popup)
         $('#searchResultNavigation').find('ul:first li:first').after($popup).after($toggle);
 
         load();
-        $reloadButton.click(reload);
 
         function reload() {
-          $reloadButton.find('button').unbind('click', reload);
+          $reloadButton.unbind('click');
           $ul.hide(300, function() { $ul.empty().show()});
           setTimeout(function() {
             load();
-            $reloadButton.find('button').click(reload);
           }, 500);
         }
 
@@ -3636,6 +3646,7 @@
               $ul.append($reload);
               return;
             }
+            $reloadButton.click(reload);
             for (var i = 0, len = mylists.length; i < len; i++) {
               var mylist = mylists[i], lastVideo = mylist.lastVideo, $li = $('<li/>'),
                 title = [
@@ -3679,10 +3690,13 @@
           if (e.button != 0 || e.metaKey) return;
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
-          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500);
-          $toggle.toggleClass('open', !isVisible);
+          $toggle.addClass('opening');
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500, function() {
+            $toggle.toggleClass('open', !isVisible);
+            $toggle.removeClass('opening');
+          });
         });
-        $popup.addClass('slideMenu')
+        $popup.addClass('slideMenu').css('max-height', 0);
         $toggle.append($a);
         $('#searchResultNavigation').find('ul:first li:first').after($popup).after($toggle);
 
@@ -3722,10 +3736,13 @@
           if (e.button != 0 || e.metaKey) return;
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
-          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500);
-          $toggle.toggleClass('open', !isVisible);
+          $toggle.addClass('opening');
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500, function() {
+            $toggle.toggleClass('open', !isVisible);
+            $toggle.removeClass('opening');
+          });
         });
-        $popup.addClass('slideMenu')
+        $popup.addClass('slideMenu').css('max-height', 0);
         $toggle.append($a);
         $('#searchResultNavigation').find('ul:first li:first').after($popup).after($toggle);
 //        $('#searchResultNavigation ul:first li:first').after($toggle);
@@ -3805,10 +3822,13 @@
           if (e.button != 0 || e.metaKey) return;
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
-          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 200);
-          $toggle.toggleClass('open', !isVisible);
+          $toggle.addClass('opening');
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500, function() {
+            $toggle.toggleClass('open', !isVisible);
+            $toggle.removeClass('opening');
+          });
         });
-        $popup.addClass('slideMenu')
+        $popup.addClass('slideMenu').css('max-height', 0);
         $toggle.append($a);
         $('#searchResultNavigation').find('ul:first li:first').after($popup).after($toggle);
 
