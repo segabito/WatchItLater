@@ -15,8 +15,11 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130106
+// @version        1.130108
 // ==/UserScript==
+
+// * ver 1.130108
+// - マイリストから外す時のフェードを調整
 
 // * ver 1.130106
 // - お気に入りマイリストのリロードボタンが効かなくなったりするのを修正
@@ -3929,7 +3932,7 @@
               if (status != "ok") {
                 Popup.alert('削除に失敗: ' + result.error.description);
               } else {
-                $videoItem.parent().fadeOut(500);
+                $videoItem.parent().animate({opacity: 0.3}, 500);
               }
             });
           } catch (e) {
