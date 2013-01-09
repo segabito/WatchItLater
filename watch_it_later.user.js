@@ -15,8 +15,12 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130108
+// @version        1.130110
 // ==/UserScript==
+
+// * ver 1.130110
+// - プレイリストのランダム再生ボタンをShift+ダブルクリックするとリストをシャッフルする隠し機能
+//   (自分以外は誰もいらないと思う裏コマンド)
 
 // * ver 1.130108
 // - マイリストから外す時のフェードを調整
@@ -1014,6 +1018,9 @@
       }\
       body.videoSelection #searchResultExplorer #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
         display: block;\
+      }\n\
+      body.videoSelection #searchResultExplorer.w_adjusted #resultContainer #searchResultContainer {\
+        background: #fff;\
       }\n\
 \
       body.videoSelection #popupMarquee {  \
@@ -2436,16 +2443,36 @@
         watch.PlayerInitializer.nicoPlayerConnector.pauseVideo();
       },
       openSearch: function() {
-        WatchApp.ns.init.ComponentInitializer.videoSelection.panelOPC.open();
+        watch.ComponentInitializer.videoSelection.panelOPC.open();
       },
       closeSearch: function() {
-        WatchApp.ns.init.ComponentInitializer.videoSelection.panelOPC.close();
+        watch.ComponentInitializer.videoSelection.panelOPC.close();
       },
       getMyNick: function() {
         return watch.CommonModelInitializer.viewerInfoModel.nickname;
       },
       getMyUserId: function() {
         return watch.CommonModelInitializer.viewerInfoModel.userId;
+      },
+      shufflePlaylist: function() {
+        var x = watch.PlaylistInitializer.playlist.items;
+        x = x.map(function(a){return {weight:Math.random(), value:a}})
+          .sort(function(a, b){return a.weight - b.weight})
+          .map(function(a){return a.value});
+        var items = [];
+        for (var i = 0; i < x.length; i++) {
+          if (x[i]._isPlaying) {
+            items.unshift(x[i]);
+          } else {
+            items.push(x[i]);
+          }
+        }
+        console.log(x, items);
+        watch.PlaylistInitializer.playlist.reset(
+          items,
+          watch.PlaylistInitializer.playlist.type,
+          watch.PlaylistInitializer.playlist.option
+        );
       }
     }
   })(w);
@@ -4431,6 +4458,12 @@
       onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
 
       fixUploadedVideoSorting(); // TODO:Qwatch側で修正されたらこれ外す
+
+      $('.randomPlayback').dblclick(function(e) {
+        if (e.shiftKey) {
+          WatchController.shufflePlaylist();
+        }
+      });
 
       mylistHackInit();
 
