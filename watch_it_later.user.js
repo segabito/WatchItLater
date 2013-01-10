@@ -15,12 +15,19 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130110
+// @version        1.130111
 // ==/UserScript==
+
+// * ver 1.130111
+// - いじわるな位置に追加された広告に暫定対応
+// - 検索画面の:visitedの色が変わらない不具合が本家側で修正されたので、こっちで勝手にやっていた修正を削除
 
 // * ver 1.130110
 // - プレイリストのランダム再生ボタンをShift+ダブルクリックするとリストをシャッフルする隠し機能
 //   (自分以外は誰もいらないと思う裏コマンド)
+//   ランダム再生に対する利点は、
+//    - 次に何が再生されるのか、何件再生して何件残ってるのかがわかりやすい。 リストの状態≒視聴履歴になる
+//    - ドラッグによるリスト編集機能や動画選択の「次に再生」ボタンと共存できる
 
 // * ver 1.130108
 // - マイリストから外す時のフェードを調整
@@ -921,7 +928,7 @@
       }\
       /* 半透明だとflashの上に来ると描画されないので強制的に黒にする(Chromeは平気) */\
       body.full_with_browser #popupMarquee.popupMarqueeBottomLeft {\
-        background: #000 !important;left: 8px; bottom: 8px; width: 400px;\
+        background: #000 !important;left: 8px; bottom: 8px; width: 400px; opacity: 1;\
       }\
       body.full_with_browser #playerContainer {\
         margin-left: 0 !important;\
@@ -982,9 +989,6 @@
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a{\
         display: inline;\
       }\n\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultlist .videoItem a:visited{\
-        color: #003ef9; /* 未読と既読の区別がつかないので#099ef0から変える */\
-      }\n\
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a p {\
         display: inline;\
       }\n\
@@ -1022,6 +1026,18 @@
       body.videoSelection #searchResultExplorer.w_adjusted #resultContainer #searchResultContainer {\
         background: #fff;\
       }\n\
+\
+      body.videoSelection #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap {\
+        margin-right: -290px; padding: 0; transition: margin-right .2s; -webkit-transition: margin-right .2s;\
+      }\
+      body.videoSelection #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap:hover {\
+        margin-right: -0px; z-index: 1020;\
+      }\
+      body.videoSelection.content-fix #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap {\
+        display: none;\
+      }\
+      body.videoSelection.content-fix #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap:hover {\
+      }\
 \
       body.videoSelection #popupMarquee {  \
         z-index: 1020; /* #contentがz-index: 1010なのでそれより上げる */\
