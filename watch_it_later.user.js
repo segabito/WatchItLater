@@ -15,12 +15,15 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130117
+// @version        1.130118
 // ==/UserScript==
 
 // * ver 1.130117
+// - 検索画面で高解像度版サムネイルを表示する機能を追加 (ポップアップ機能を切ってると表示されません)
+
+// * ver 1.130117
 // - 謎の技術によって、ニコレポにあがった動画を検索画面に表示 (ニコレポの情報は再生数や動画長がないため表示できません)
-// - 動画のサムネをダブルクリックするとポップアップででっかいサムネを表示する隠しコマンドを追加 (大きいサムネがあるのは新しめの動画だけ)
+// - 動画のサムネをダブルクリックするとポップアップで高解像度版サムネを表示する隠しコマンドを追加 (高解像度版があるのは新しめの動画だけ)
 // - 設定メニューのボタンを目立たない色に
 // - CSSの細部調整
 
@@ -382,7 +385,7 @@
       }\n\n\
 \
       .mylistPopupPanel .mylistAdd, .mylistPopupPanel .tagGet, #content .playlistToggle, #content .quickIchiba, #content .openConfButton {\
-        border:1px solid #b7b7b7; -webkit-border-radius: 3px; -moz-border-radius: 3px;border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #d3d3d3;\
+        border:1px solid #b7b7b7; cursor: pointer; -webkit-border-radius: 3px; -moz-border-radius: 3px;border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #d3d3d3;\
         background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #d3d3d3), color-stop(100%, #707070));\
         background-image: -webkit-linear-gradient(top, #d3d3d3, #707070);\
         background-image: -moz-linear-gradient(top, #d3d3d3, #707070);\
@@ -710,16 +713,6 @@
       #content .playlistToggle.w_show:after {\
         content: "▲";\
       }\
-      #content .playlistToggle, #content .quickIchiba, #content .openConfButton {/*\n\
-        cursor: pointer;\n\
-        border:1px solid #7d99ca; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 0px 0px 0px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #a5b8da;\n\
-         background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #a5b8da), color-stop(100%, #7089b3));\n\
-         background-image: -webkit-linear-gradient(top, #a5b8da, #7089b3);\n\
-         background-image: -moz-linear-gradient(top, #a5b8da, #7089b3);\n\
-         background-image: -ms-linear-gradient(top, #a5b8da, #7089b3);\n\
-         background-image: -o-linear-gradient(top, #a5b8da, #7089b3);\n\
-         background-image: linear-gradient(top, #a5b8da, #7089b3);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#a5b8da, endColorstr=#7089b3);\n\
-      */}\n\n\
 \
 \
       /* ページャーの字が小さくてクリックしにくいよね */\
@@ -1002,6 +995,9 @@
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a p {\
         display: inline;\
       }\n\
+      body.videoSelection #searchResultExplorer.w_adjusted #resultlist .videoItem a:visited{\
+        color: #099EF9;\
+      }\n\
 \
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .commentBlank {\
         width: 96%;\
@@ -1020,18 +1016,31 @@
         display: none !important;\
       }\n\
 \
-      #resultlist .videoItem .deleteFromMyMylist {\
-        cursor: pointer; font-size: 70%; border: 1px solid #ccc; position: absolute; bottom: 4px; left: 4px; padding: 0;\
+      #resultlist .videoItem .thumbnailHoverMenu {\
+        position: absolute; padding: 0; box-shadow: 1px 1px 2px black;\
         display: none;\
       }\
-      body.videoSelection #searchResultExplorer #resultContainer #resultlist .videoItem .columnVertical     .deleteFromMyMylist {\
+      body.videoSelection #searchResultExplorer #resultContainer #resultlist .videoItem .columnVertical     .thumbnailHoverMenu {\
         bottom:  4px; left: 4px;\
       }\
-      body.videoSelection #searchResultExplorer #resultContainer #resultlist .videoItem .columnHorizontal   .deleteFromMyMylist {\
+      body.videoSelection #searchResultExplorer #resultContainer #resultlist .videoItem .columnHorizontal   .thumbnailHoverMenu {\
         bottom: 75px; left: 5px;\
       }\
-      body.videoSelection #searchResultExplorer #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
+      #resultlist .videoItem .deleteFromMyMylist {\
+        cursor: pointer; font-size: 70%; border: 1px solid #ccc; padding: 0;\
+        display: none;\
+      }\
+      #resultlist .videoItem .showLargeThumbnail {\
+        cursor: pointer; font-size: 70%; border: 1px solid #ccc;; \
+      }\
+      body.videoSelection #searchResultExplorer #resultContainer #resultlist .showLargeThumbnail {\
+        padding: 0 4px;\
+      }\
+      body.videoSelection #searchResultExplorer #resultContainer.enableMylistDeleteButton #resultlist .videoItem:hover .thumbnailHoverMenu {\
         display: block;\
+      }\n\
+      body.videoSelection #searchResultExplorer #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
+        display: inline-block;\
       }\n\
       body.videoSelection #searchResultExplorer.w_adjusted #resultContainer #searchResultContainer {\
         background: #fff;\
@@ -3725,16 +3734,8 @@
 
       var $videoThumbnailContainer = $template.find('.videoThumbnailContainer');//.css({maxHeight: 0});
       $videoThumbnailContainer.append($('#videoThumbnailImage').clone(true).attr('id', null)).click(function() {
-        var
-          src = $(this).find('img:last').attr('src'),
-          html = [
-            '<div onmousedown="if (event.button == 0) { $(\'#popupMarquee\').hide(); event.preventDefault(); }" style="background:#000;">',
-            '<img src="', src, '.L" style="width: 360px; height: 270px; position: absolute; display: none; z-index: 3;" onload="this.style.display = \'\';">',
-            '<img src="', src, '"   style="width: 360px; height: 270px; z-index: 2;">',
-            '</div>',
-          ''].join('');
-        conf.debugMode && console.log($(this), $(this).attr('src'), this.src, html);
-        Popup.show(html);
+        var src = $(this).find('img:last').attr('src');
+        showLargeThumbnail(src);
       });
 
       var $videoDetails = $template.find('.videoDetails');
@@ -4199,14 +4200,23 @@
             }, 0);
         }
       };
+
+      var menu =
+        '<div class="thumbnailHoverMenu">' +
+        '<button class="showLargeThumbnail" onclick="WatchItLater.onShowLargeThumbnailClick(this);" title="大きいサムネイルを表示">＋</button>' +
+        '<button class="deleteFromMyMylist" onclick="WatchItLater.onDeleteFromMyMylistClick(this);">マイリスト外す</button>' +
+        '</div>';
+
       watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder.$videoContentTemplate.find('.videoItem .columnVertical   .thumbContainer').append(
-        '<button class="deleteFromMyMylist" onclick="WatchItLater.onDeleteFromMyMylistClick(this);">マイリスト外す</button>');
+        menu
+      );
       watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder.$videoContentTemplate.find('.videoItem .columnHorizontal .balloon').before(
-        '<button class="deleteFromMyMylist" onclick="WatchItLater.onDeleteFromMyMylistClick(this);">マイリスト外す</button>');
+        menu
+      );
 
       function onDeleteFromMyMylistClick(elm) {
         var
-          $videoItem = $(elm).parent(),
+          $videoItem = $(elm).parent().parent(),
           watchId    = $videoItem.find('.itemLink').attr('href').split('/').reverse()[0];
         if (currentMylistId <= 0 || !Mylist.isMine(currentMylistId)) {
           return;
@@ -4229,9 +4239,35 @@
           }
         }, 0);
       }
+
+      function onShowLargeThumbnailClick(elm) {
+        var
+          $videoItem = $(elm).parent().parent(),
+          src        = $videoItem.find('.itemThumbnail').attr('src');
+        conf.debug && console.log(src);
+        if (!src) {
+          return;
+        }
+        showLargeThumbnail(src);
+      }
+
       w.WatchItLater.onDeleteFromMyMylistClick = onDeleteFromMyMylistClick;
+      w.WatchItLater.onShowLargeThumbnailClick = onShowLargeThumbnailClick;
 
       isMylistHacked = true;
+
+    }
+
+    function showLargeThumbnail(baseUrl) {
+      var
+        baseUrl,
+        html = [
+          '<div onmousedown="if (event.button == 0) { $(\'#popupMarquee\').hide(); event.preventDefault(); }" style="background:#000;">',
+          '<img src="', baseUrl, '.L" style="width: 360px; height: 270px; position: absolute; display: none; z-index: 3;" onload="this.style.display = \'\';">',
+          '<img src="', baseUrl, '"   style="width: 360px; height: 270px; z-index: 2;">',
+          '</div>',
+        ''].join('');
+      Popup.show(html);
     }
 
 
@@ -4645,7 +4681,7 @@
           'body.videoSelection #resultlist.squareThumbnail .videoItem .thumbContainer img.playingIcon {',
             'top: 50%; left: 50%;',
           '}',
-          'body.videoSelection #searchResultExplorer #resultContainer #resultlist.squareThumbnail .videoItem .columnHorizontal .deleteFromMyMylist {',
+          'body.videoSelection #searchResultExplorer #resultContainer #resultlist.squareThumbnail .videoItem .columnHorizontal .thumbnailHoverMenu {',
             'bottom: 47px;',
           '}',
         ''].join('\n');
