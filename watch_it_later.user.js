@@ -15,10 +15,16 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130118
+// @version        1.130124
 // ==/UserScript==
 
-// * ver 1.130117
+// TODO: プレイリスト拡張メニュー
+
+// * ver 1.130124
+// - 投稿者一覧のソート順おかしい問題が直ってたので、こっちで勝手にやっていた修正コードを削除
+// - 細かい調整
+
+// * ver 1.130118
 // - 検索画面で高解像度版サムネイルを表示する機能を追加 (ポップアップ機能を切ってると表示されません)
 
 // * ver 1.130117
@@ -191,15 +197,6 @@
 // - コメントパネルを広く
 // （＾ω＾）…
 
-
-
-// TODO:
-// - ランキング取得
-// - 検索部分を開閉するショートカットキーが欲くなった
-// - 段幕がちょっとだけ邪魔な時「CTRLを押してる間だけコメントが消える」とかやりたい
-// - いいかげんコード整理
-// - そろそろ設定パネルがごちゃってきたので整理
-// - 検索画面の軽量化
 
 (function() {
   var isNativeGM = true;
@@ -1036,7 +1033,7 @@
       body.videoSelection #searchResultExplorer #resultContainer #resultlist .showLargeThumbnail {\
         padding: 0 4px;\
       }\
-      body.videoSelection #searchResultExplorer #resultContainer.enableMylistDeleteButton #resultlist .videoItem:hover .thumbnailHoverMenu {\
+      body.videoSelection #searchResultExplorer #resultContainer #resultlist .videoItem:hover .thumbnailHoverMenu {\
         display: block;\
       }\n\
       body.videoSelection #searchResultExplorer #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
@@ -2650,6 +2647,7 @@
       var result = {
         banner: '',
         id: '-1',
+        sort: '0',
         isDeflist: -1,
         isWatchngCountFull: false,
         isWatchngThisMylist: false,
@@ -2752,6 +2750,7 @@
       var result = {
         banner: '',
         id: '-2',
+        sort: '0',
         isDeflist: -1,
         isWatchngCountFull: false,
         isWatchngThisMylist: false,
@@ -2880,6 +2879,7 @@
         result = {
           banner: '',
           id: '-10',
+          sort: '0',
           isDeflist: -1,
           isWatchngCountFull: false,
           isWatchngThisMylist: false,
@@ -3144,6 +3144,7 @@
           banner: '',
           id: '-100',
           name: title,
+          sort: '0',
           isDeflist: -1,
           isWatchngCountFull: false,
           isWatchngThisMylist: false,
@@ -3226,6 +3227,7 @@
       var result = {
         banner: '',
         id: '-100',
+        sort: '0',
         isDeflist: -1,
         isWatchngCountFull: false,
         isWatchngThisMylist: false,
@@ -3297,6 +3299,7 @@
       var p = parseParam(param);
 
       request(p.baseUrl, 1, p.maxRssPage, function(result) {
+        conf.debugMode && console.log(result);
         result.page  = p.viewPage;
         result.items = result.rawData.list.slice(p.viewPage * 32 - 32, p.viewPage * 32);
         if (typeof callback === 'function') {
@@ -3455,36 +3458,6 @@
       search();
       w.ichiba.showConsole();
     }
-
-    /**
-     * 動画検索ウィンドウのユーザー投稿動画一覧が、動画IDの文字列順でソートされてて探しづらい(sm1000 sm2000 sm3000 sm999)のを
-     * 強引に新しい動画順に直してみる
-     *
-     */
-    function fixUploadedVideoSorting() {
-      watch.ComponentInitializer.videoSelection.loaderAgent.uploadedVideoLoader.cachingLoad_org =
-          watch.ComponentInitializer.videoSelection.loaderAgent.uploadedVideoLoader.cachingLoad;
-      watch.ComponentInitializer.videoSelection.loaderAgent.uploadedVideoLoader.cachingLoad = function(param) {
-      var self = watch.ComponentInitializer.videoSelection.loaderAgent.uploadedVideoLoader;
-
-        self.cachingLoad_org({
-          filter: function(result) {
-            if (result.list) {
-              result.list.sort(function(a, b) { return (a.first_retrieve < b.first_retrieve) ? 1 : -1; });
-            }
-            return param.filter(result);
-          },
-          success: param.success,
-          url: param.url,
-          queryParams: param.queryParams,
-          cacheParams: param.queryParams,
-          isSuccess:   param.isSuccess,
-          cache:       param.cache,
-          error:       param.error
-        });
-      };
-    }
-
 
     function onVideoChange(newVideoId, newWatchId) {
     }
@@ -4750,7 +4723,6 @@
 
       onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
 
-      fixUploadedVideoSorting(); // TODO:Qwatch側で修正されたらこれ外す
 
       $('.randomPlayback').dblclick(function(e) {
         if (e.shiftKey) {
