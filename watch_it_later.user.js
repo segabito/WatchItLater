@@ -15,10 +15,17 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130124
+// @version        1.130126
 // ==/UserScript==
 
-// TODO: プレイリスト拡張メニュー
+// TODO:
+// プレイリスト拡張メニュー
+// マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
+
+// * ver 1.130126
+// - 【地味に便利】検索結果が1列表示の時は、投稿時間表示を "XXXX年XX月XX日" → "XXXX年XX月XX日 XX:XX:XX" にする
+// - 【地味に便利】市場やニコメンドに中身があるかどうか、いちいち開かなくてもタブの色だけでわかるように
+
 
 // * ver 1.130124
 // - 投稿者一覧のソート順おかしい問題が直ってたので、こっちで勝手にやっていた修正コードを削除
@@ -598,6 +605,9 @@
       #leftPanel.ichiba .tab.ichiba {\
         background: #eee;    border-style: outset;\
       }\
+      #leftPanel.ichibaEmpty #leftPanelTabContainer .ichiba, #leftPanel.nicommendEmpty #leftPanelTabContainer .nicommend {\
+        color: #ccc;\
+      }\
 \n\
       #leftIchibaPanel .ichibaPanelInner {\
         margin:0; color: #666;\
@@ -1111,7 +1121,7 @@
       {title: '動画プレイヤーの設定'},
       {title: 'コメントパネルのワイド化', varName: 'wideCommentPanel',
         values: {'する': true, 'しない': false}},
-      {title: '左のパネルに動画情報を表示', varName: 'leftPanelJack',
+      {title: '左のパネルに動画情報・市場を表示', varName: 'leftPanelJack',
         values: {'する': true, 'しない': false}},
       {title: 'ヘッダに再生数表示', varName: 'headerViewCounter',
         values: {'する': true, 'しない': false}},
@@ -1580,6 +1590,8 @@
 
 
     pt.findDefListByWatchId = function(watchId) {
+      if (/^[0-9]+$/.test(watchId)) return watchId; // スレッドIDが来た
+
       for (var i = 0, len = defListItems.length; i < len; i++) {
         var item = defListItems[i], wid = item.item_data.watch_id;
         if (wid == watchId) return item;
@@ -1588,6 +1600,7 @@
     };
 
     pt.findMylistByWatchId = function(watchId, groupId) {
+      if (/^[0-9]+$/.test(watchId)) return watchId; // スレッドIDが来た
       var items = mylistItems[groupId];
       if (!items) { return null; }
       for (var i = 0, len = items.length; i < len; i++) {
@@ -1747,6 +1760,8 @@
         if (w) {
           _watchId = w;
           _videoId = v || w;
+          var isThreadId = (/^[0-9]+$/.test(watchId));
+
           this.clearExtElement();
           deleteDef.disabled = false;
           if (self.findDefListByWatchId(w)) {
@@ -1852,9 +1867,9 @@
 
       function createDeleteDeflistItemButton(sel) {
         var btn = document.createElement('button');
-        btn.appendChild(document.createTextNode('消'));
+        btn.appendChild(document.createTextNode('×'));
         btn.className = 'deflistRemove';
-        btn.title = 'とりあえずマイリストから削除';
+        btn.title = 'とりあえずマイリストから外す';
         btn.addEventListener('click', function() {
           btn.disabled = true;
           setTimeout(function() {btn.disabled = false;}, 1000);
@@ -1864,7 +1879,7 @@
             if (status != "ok") {
               Popup.alert('とりあえずマイリストから削除に失敗: ' + result.error.description);
             } else {
-              Popup.show('とりあえずマイリストから削除しました');
+              Popup.show('とりあえずマイリストから外ししました');
             }
           });
         } ,false);
@@ -1928,8 +1943,8 @@
       nobr.appendChild(deleteDef);
 
 
-      var closeBtn = createCloseButton();
-      nobr.appendChild(closeBtn);
+//      var closeBtn = createCloseButton();
+//      nobr.appendChild(closeBtn);
 
 
       nobr.appendChild(extArea);
@@ -2687,6 +2702,7 @@
               thumbnail_url: thumbnail,
               title: title,
               type: 'video',
+              _info: {first_retrieve: postedAt},
               description_short: $item.find('.section .posttime span').text(),
               getType:        function() { return this.type; },
               getInfo:        function() { return this;},
@@ -2796,6 +2812,7 @@
               thumbnail_url:  video.thumbnail_url,
               title:          video.title_short,
               type:           'video',
+              _info: video,
               description_short: '関連タグ: ' + video.recommend_tag,
               getType: function() { return this.type; },
               getInfo: function() { return this;},
@@ -2936,6 +2953,7 @@
                 thumbnail_url: thumbnail,
                 title: title,
                 type: 'video',
+                _info: {first_retrieve: postedAt},
                 description_short: $item.find('.log-body').text(),
                 getType:        function() { return this.type; },
                 getInfo:        function() { return this;},
@@ -3165,6 +3183,7 @@
           thumbnail_url: video.thumbnail,
           title: video.title,
           type: 'video',
+          _info: {first_retrieve: video.postedAt},
           description_short: video.description.substring(0, 50),
           getType: function() { return this.type; },
           getInfo: function() { return this;},
@@ -3778,6 +3797,9 @@
       if ($ichibaPanel.is(':visible')) {
         resetLeftIchibaPanel($ichibaPanel, true);
       }
+      $leftPanel
+        .toggleClass('ichibaEmpty',    $('#ichibaMain').find('.ichiba_mainitem').length < 1)
+        .toggleClass('nicommendEmpty', $('#nicommendList').find('.content').length < 1);
     }
 
     var lastIchibaVideoId = 0;
@@ -4173,6 +4195,19 @@
             }, 0);
         }
       };
+      watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder.build_org =
+        watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder.build;
+      watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder.build = function(item) {
+        var
+          self = watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder,
+          $item = self.build_org(item);
+          if (!item._info || !item._info.first_retrieve) return;
+          // 検索結果が1列表示の時は、投稿時間を秒まで表示
+          $item.find('.columnVertical .created_time span').text(
+            item._info.first_retrieve.toString().replace('-', '年').replace('-', '月').replace(' ', '日 ')
+          );
+          return $item;
+      }
 
       var menu =
         '<div class="thumbnailHoverMenu">' +
