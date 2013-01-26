@@ -15,17 +15,20 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130126
+// @version        1.130127
 // ==/UserScript==
 
 // TODO:
-// プレイリスト拡張メニュー
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
+// 隠しコマンドでスロー再生
+
+// * ver 1.130127
+// - 【地味に便利】プレイリスト拡張メニュー追加 (シャッフル・消去・リストに追加)
+// - ニコレポ検索を少し見やすく修正
 
 // * ver 1.130126
 // - 【地味に便利】検索結果が1列表示の時は、投稿時間表示を "XXXX年XX月XX日" → "XXXX年XX月XX日 XX:XX:XX" にする
 // - 【地味に便利】市場やニコメンドに中身があるかどうか、いちいち開かなくてもタブの色だけでわかるように
-
 
 // * ver 1.130124
 // - 投稿者一覧のソート順おかしい問題が直ってたので、こっちで勝手にやっていた修正コードを削除
@@ -318,19 +321,30 @@
   (function() {
     var style = [
     '\
-    /* 動画タグのポップアップ */\n\
+    /* 動画タグとプレイリストのポップアップ */\n\
       .tagItemsPopup {\n\
+        background: #eef; \n\
+      }\
+      .playlistMenuPopup {\n\
+        background: #666; color: white; padding: 4px 8px;\n\
+      }\
+      .tagItemsPopup, .playlistMenuPopup {\n\
         position: absolute; \n\
         min-width: 150px; \n\
         font-Size: 10pt; \n\
-        background: #eef; \n\
         z-index: 2000000; \n\
         box-shadow: 2px 2px 2px #888;\n\
       }\n\n\
-      .tagItemsPopup ul,.tagItemsPopup ul li {\n\
+      .tagItemsPopup ul,.tagItemsPopup ul li, .playlistMenuPopup ul, .playlistMenuPopup ul li  {\n\
         position: relative; \n\
         list-style-type: none; \n\
         margin: 0; padding: 0; \n\
+      }\n\n\
+      .playlistMenuPopup ul li {\
+        cursor: pointer;\
+      }\n\n\
+      .playlistMenuPopup ul li:hover {\
+        text-decoration: underline;\
       }\n\n\
       .tagItemsPopup li a{\n\
       }\n\n\
@@ -1003,7 +1017,7 @@
         display: inline;\
       }\n\
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist .videoItem a:visited{\
-        color: #099EF9;\
+        color: #04618c;\
       }\n\
 \
       body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .commentBlank {\
@@ -1065,9 +1079,15 @@
       body.videoSelection.content-fix #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap:hover {\
       }\
 \
-      body.videoSelection #popupMarquee {  \
-        z-index: 1020; /* #contentがz-index: 1010なのでそれより上げる */\
-      }\n\
+      #playlist .generationMessage {\
+        cursor: pointer; max-width: 300px;\
+      }\
+      #playlist .generationMessage:hover {\
+        text-decoration: underline;\
+      }\
+      #playlist .generationMessage:after {\
+        content: "▼";\
+      }\
       ',
     ''].join('');
     addStyle(style, 'watchItLater');
@@ -1433,7 +1453,6 @@
 
 
 
-
   /**
    *  マイリスト登録API
    *
@@ -1590,7 +1609,7 @@
 
 
     pt.findDefListByWatchId = function(watchId) {
-      if (/^[0-9]+$/.test(watchId)) return watchId; // スレッドIDが来た
+//      if (/^[0-9]+$/.test(watchId)) return watchId; // スレッドIDが来た
 
       for (var i = 0, len = defListItems.length; i < len; i++) {
         var item = defListItems[i], wid = item.item_data.watch_id;
@@ -1600,7 +1619,7 @@
     };
 
     pt.findMylistByWatchId = function(watchId, groupId) {
-      if (/^[0-9]+$/.test(watchId)) return watchId; // スレッドIDが来た
+//      if (/^[0-9]+$/.test(watchId)) return watchId; // スレッドIDが来た
       var items = mylistItems[groupId];
       if (!items) { return null; }
       for (var i = 0, len = items.length; i < len; i++) {
@@ -1760,7 +1779,7 @@
         if (w) {
           _watchId = w;
           _videoId = v || w;
-          var isThreadId = (/^[0-9]+$/.test(watchId));
+          var isThreadId = (/^[0-9]+$/.test(w));
 
           this.clearExtElement();
           deleteDef.disabled = false;
@@ -1768,6 +1787,11 @@
             deleteDef.style.display = '';
           } else {
             deleteDef.style.display = 'none';
+          }
+          if (isThreadId) {
+            tagBtn.style.display = 'none'; // スレッドIDから動画IDを取る手段がないためタグ取得が難しい
+          } else {
+            tagBtn.style.display = '';
           }
           if (newTabLink) {
             newTabLink.href = 'http://nico.ms/' + _watchId; // QWatchに乗っ取られないようにnico.msをかます(せこい)
@@ -1879,7 +1903,7 @@
             if (status != "ok") {
               Popup.alert('とりあえずマイリストから削除に失敗: ' + result.error.description);
             } else {
-              Popup.show('とりあえずマイリストから外ししました');
+              Popup.show('とりあえずマイリストから外しました');
             }
           });
         } ,false);
@@ -2519,6 +2543,38 @@
           watch.PlaylistInitializer.playlist.type,
           watch.PlaylistInitializer.playlist.option
         );
+      },
+      clearPlaylist: function() {
+        var x = watch.PlaylistInitializer.playlist.items, items = [];
+        for (var i = 0; i < x.length; i++) {
+          if (x[i]._isPlaying) {
+            items.unshift(x[i]);
+          }
+        }
+        watch.PlaylistInitializer.playlist.reset(
+          items,
+          watch.PlaylistInitializer.playlist.type,
+          watch.PlaylistInitializer.playlist.option
+        );
+      },
+      appendSearchResultToPlaylist: function() {
+        var
+          items = watch.PlaylistInitializer.playlist.items, lr = watch.ComponentInitializer.videoSelection.lastLoadResponse,
+          searchItems = lr.sortedRawData ? lr.sortedRawData : lr.rawData.list,
+          uniq = {}, i, f = WatchApp.ns.model.playlist.PlaylistItem;
+        for (i = 0, len = items.length; i < len; i++) {
+          uniq[items[i].id] = true;
+        }
+        for (i = 0, len = searchItems.length; i < len; i++) {
+          var c = searchItems[i];
+          ("undefined" == typeof c.type || "video" == c.type) && uniq[c.id] === undefined && items.push(new f(c))
+        }
+        watch.PlaylistInitializer.playlist.reset(
+          items,
+          watch.PlaylistInitializer.playlist.type,
+          watch.PlaylistInitializer.playlist.option
+        );
+
       }
     }
   })(w);
@@ -2892,7 +2948,6 @@
 
       var
         last_timeline = false,
-        uniq = {},
         result = {
           banner: '',
           id: '-10',
@@ -2910,7 +2965,7 @@
           sort: '1' // $('searchResultMylistSortOptions select').val()
         };
       function req(callback, param, pageCount, maxPageCount) {
-        var WatchApp = w.WatchApp, watch = WatchApp.ns.init, $ = w.$, url = baseUrl;
+        var WatchApp = w.WatchApp, watch = WatchApp.ns.init, $ = w.$, url = baseUrl, escapeHTML = WatchApp.ns.util.StringUtil.escapeHTML;
         url += last_timeline ? ('&last_timeline=' + last_timeline) : '';
         conf.debugMode && console.log(url);
 
@@ -2937,11 +2992,11 @@
                 mylistCnt = '-',
                 postedAt  = WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date($item.find('.log-footer-date time').attr('datetime'))),
                 thumbnail = $item.find('.log-target-thumbnail .video').attr('data-src'),
+                description_short = $.trim($item.find('.log-body').text()).replace(/(しました|されました)。/g, ''),
                 hoge
               ;
+              $item.removeClass('log').removeClass('passive').removeClass('first');
 
-              if (uniq[id]) { return; }
-              uniq[id] = true;
 
               var item = {
                 id: id,
@@ -2953,8 +3008,12 @@
                 thumbnail_url: thumbnail,
                 title: title,
                 type: 'video',
-                _info: {first_retrieve: postedAt},
-                description_short: $item.find('.log-body').text(),
+                _info: {
+                  first_retrieve: postedAt,
+                  nicorepo_className: this.className,
+                  nicorepo_log: [escapeHTML(description_short)]
+                },
+                description_short: description_short,
                 getType:        function() { return this.type; },
                 getInfo:        function() { return this;},
                 getName:        function() { return this.title;},
@@ -3004,7 +3063,23 @@
           }
        });
       }
-      req(callback, param, 1, 3);
+      req(function (result) {
+        var uniq = {}, uniq_items = [];
+        for (var i = result.items.length - 1; i >= 0; i--) {
+          var item = result.items[i], id = item.id;
+          if (uniq[id]) {
+            uniq[id]._info.nicorepo_log.push(item.first_retrieve + '　' + item._info.nicorepo_log[0].replace(/^.*?さん(の|が)動画(が|を) ?/, ''));
+          } else {
+            uniq[id] = item;
+          }
+        }
+        for (var v in uniq) {
+          uniq_items.unshift(uniq[v]);
+        }
+        result.rawData.list = result.items = uniq_items;
+        result.itemCount = uniq_items.length;
+        callback(result);
+      }, param, 1, 3);
     }
     function load(callback, param) {
       request(function(result) {
@@ -3392,9 +3467,9 @@
    *  watch.jsを解析すればわかる
    *
    */
-  (function() { // Zero Watch
+  (function(w) { // Zero Watch
     var h, $ = w.$, $$ = w.$$;
-    if (!w.WatchApp) return;
+    if (!w.WatchApp || !w.WatchJsApi) return;
 
     $.fx.interval = conf.fxInterval;
 
@@ -3411,6 +3486,67 @@
       $ichibaPanel   = $('#leftPanelContent').clone().empty().attr({'id': 'leftIchibaPanel', 'class': 'leftIchibaPanel'}),
       $rightPanel = $('#playerCommentPanelOuter');
   //  var flashVars = pim.playerInitializeModel.flashVars;
+
+    var PlaylistMenu = (function(conf, w){
+      var $popup = null, $generationMessage = $('#playlist').find('.generationMessage'), self;
+
+
+      function createDom() {
+        $popup = $('<div></div>').addClass('playlistMenuPopup');//.css({});
+        var $ul = $('<ul/>');
+        $popup.click(function() {
+          self.hide();
+        });
+        var $shuffle = $('<li>リストをシャッフル</li>').click(function() {
+          WatchController.shufflePlaylist();
+        });
+        $ul.append($shuffle);
+        var $insert = $('<li>検索結果をリストに追加</li>').click(function() {
+          WatchController.appendSearchResultToPlaylist();
+        });
+        $ul.append($insert);
+        var $clear = $('<li>リストを消去</li>').click(function() {
+          WatchController.clearPlaylist();
+        });
+        $ul.append($clear);
+
+        $popup.append($ul);
+        $('body').append($popup);
+      }
+      function show() {
+        if ($popup === null) {
+          createDom();
+        }
+        var offset = $generationMessage.offset();
+        $popup.css({left: offset.left, top: (offset.top + $generationMessage.outerHeight() - 8)});
+        $popup.show();
+      }
+      function hide() {
+        if ($popup) { $popup.hide(); }
+      }
+      function toggle() {
+        if ($popup === null || !$popup.is(':visible')) {
+          show();
+        } else {
+          hide();
+        }
+      }
+      $generationMessage.click(function(e) {
+        e.preventDefault();
+        self.toggle();
+      });
+      $('body').on('click.watchItLater', function(e) {
+        var tagName = e.target.tagName, className = e.target.className;
+        if (className !== 'generationMessage') {
+          self.hide();
+        }
+      });
+      return self = {
+        show: show,
+        hide: hide,
+        toggle: toggle
+      };
+    })(conf, w);
 
     var initialExplorerWidth = null, resizeWatchTimer = null;
     function onWindowResize() {
@@ -4201,11 +4337,20 @@
         var
           self = watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder,
           $item = self.build_org(item);
-          if (!item._info || !item._info.first_retrieve) return;
-          // 検索結果が1列表示の時は、投稿時間を秒まで表示
-          $item.find('.columnVertical .created_time span').text(
-            item._info.first_retrieve.toString().replace('-', '年').replace('-', '月').replace(' ', '日 ')
-          );
+          if (!item._info) return $item;
+          if (item._info.first_retrieve) {
+            // 検索結果が1列表示の時は、投稿時間を秒まで表示
+            $item.find('.columnVertical .created_time span').text(
+              item._info.first_retrieve.toString().replace('-', '年').replace('-', '月').replace(' ', '日 ')
+            );
+          }
+          if (item._info.nicorepo_className) { // ニコレポ
+            $item.addClass(item.nicorepo_className);
+            if (item._info.nicorepo_log.length > 1) {
+              $item.find('.itemVideoDescription').html(item._info.nicorepo_log.join('<br>'));
+            }
+          }
+//          if (item._info.recommend_tag) {}
           return $item;
       }
 
@@ -4805,7 +4950,7 @@
       conf.debugMode && console.log(e);
       w.alert(e);
     }
-  })();
+  })(w);
 
 
   /**
