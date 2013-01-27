@@ -15,12 +15,16 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130127
+// @version        1.130128
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
-// 隠しコマンドでスロー再生
+// 最後まで再生したらとりマイから外す機能
+
+// * ver 1.130128
+// - 検索結果が1列表示の時「再生リストに追加しました」が上の動画に被るのを防ぐ
+// - 【地味に便利】左下にゆっくり再生(スロー再生)ボタンをつけてみた。スペース連打より少し融通が利く
 
 // * ver 1.130127
 // - 【地味に便利】プレイリスト拡張メニュー追加 (シャッフル・消去・リストに追加)
@@ -31,7 +35,7 @@
 // - 【地味に便利】市場やニコメンドに中身があるかどうか、いちいち開かなくてもタブの色だけでわかるように
 
 // * ver 1.130124
-// - 投稿者一覧のソート順おかしい問題が直ってたので、こっちで勝手にやっていた修正コードを削除
+// - ユーザーの投稿動画一覧のソート順おかしい問題が直ってたので、こっちで勝手にやっていた修正コードを削除
 // - 細かい調整
 
 // * ver 1.130118
@@ -264,6 +268,7 @@
       enableNewsHistory: false, // ニコニコニュースの履歴を保持する
       defaultSearchOption: '', // 検索時のデフォルトオプション
       autoPlayIfWindowActive: 'no', // 'yes' = ウィンドウがアクティブの時だけ自動再生する
+      enableYukkuriPlayButton: true, // スロー再生ボタンを表示する
 
       enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
 
@@ -344,7 +349,7 @@
         cursor: pointer;\
       }\n\n\
       .playlistMenuPopup ul li:hover {\
-        text-decoration: underline;\
+        text-decoration: underline; background: #888;\
       }\n\n\
       .tagItemsPopup li a{\n\
       }\n\n\
@@ -398,11 +403,14 @@
       .mylistPopupPanel button:active, #content .playlistToggle:active, #content .quickIchiba:active, #content .openConfButton:active {\n\
         border:1px inset !important\n\
       }\n\n\
-      .mylistPopupPanel button:hover, #content .playlistToggle:hover, #content .quickIchiba:hover, #content .openConfButton:hover {\n\
+      .mylistPopupPanel button:hover, #content .playlistToggle:hover, #content .quickIchiba:hover, #content .openConfButton:hover, #yukkuriPanel .yukkuriButton:hover {\n\
         border:1px outset\n\
       }\n\n\
+      #yukkuriPanel .yukkuriButton.active {\n\
+        border:1px inset\n\
+      }\n\n\
 \
-      .mylistPopupPanel .mylistAdd, .mylistPopupPanel .tagGet, #content .playlistToggle, #content .quickIchiba, #content .openConfButton {\
+      .mylistPopupPanel .mylistAdd, .mylistPopupPanel .tagGet, #content .playlistToggle, #content .quickIchiba, #content .openConfButton, #yukkuriPanel .yukkuriButton {\
         border:1px solid #b7b7b7; cursor: pointer; -webkit-border-radius: 3px; -moz-border-radius: 3px;border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #d3d3d3;\
         background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #d3d3d3), color-stop(100%, #707070));\
         background-image: -webkit-linear-gradient(top, #d3d3d3, #707070);\
@@ -414,7 +422,7 @@
         .mylistPopupPanel.deflistSelected {\
           color: #ff9;\
         }\n\
-        .mylistPopupPanel .deflistRemove{\
+        .mylistPopupPanel .deflistRemove, #yukkuriPanel .yukkuriButton.active{\
           border:1px solid #ebb7b7; border-radius: 3px;font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f7e3e3;\
            background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #f7e3e3), color-stop(100%, #ffd7d7));\
            background-image: -webkit-linear-gradient(top, #f7e3e3, #ffd7d7);\
@@ -734,6 +742,9 @@
       #content .playlistToggle.w_show:after {\
         content: "▲";\
       }\
+      #playlistContainerInner .thumbContainer{\n\
+        cursor: move;\n\
+      }\n\n\
 \
 \
       /* ページャーの字が小さくてクリックしにくいよね */\
@@ -1030,6 +1041,9 @@
       body.videoSelection #resultlist.column4 .videoItem .balloon {\
         bottom: auto; top: 10px;\
       }\n\
+      body.videoSelection #resultlist .videoItem .columnVertical     .balloon {\
+        top: -20px; /* 「再生リストに追加しました」が上の動画に被るのを防ぐ */\
+      }\
 \
       body.videoSelection #resultContainer.dummyMylist #searchResultContainer .favMylistEditContainer,\
       body.videoSelection #resultContainer.dummyMylist #searchResultMylistSortOptions,\
@@ -1087,6 +1101,10 @@
       }\
       #playlist .generationMessage:after {\
         content: "▼";\
+      }\
+\
+      #yukkuriPanel {\
+        position: fixed; z-index: 1500; bottom: 0; left: 0; display: inline-block;\
       }\
       ',
     ''].join('');
@@ -1170,6 +1188,8 @@
       {title: '動画リンクへのポップアップを有効にする', varName: 'enableHoverPopup',
         values: {'する': true, 'しない': false}},
       {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
+        values: {'する': true, 'しない': false}},
+      {title: 'ゆっくり再生(スロー再生)ボタンを表示する', varName: 'enableYukkuriPlayButton',
         values: {'する': true, 'しない': false}},
       {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
        description: '常に指定したいパラメータ指定するのに便利です\n例: 「-グロ -例のアレ」とすると、その言葉が含まれる動画が除外されます'},
@@ -2490,6 +2510,7 @@
           // 要素が画面内に収まっている場合はスクロールしない
           WatchApp.ns.util.WindowUtil.scrollFitMinimum(top, 600);
         }
+        $(window).scrollLeft(0);
         $('body').toggleClass('content-fix', isContentFix);
       },
       changeCommentPanelWidth: function(target) {
@@ -2557,17 +2578,29 @@
           watch.PlaylistInitializer.playlist.option
         );
       },
-      appendSearchResultToPlaylist: function() {
+      appendSearchResultToPlaylist: function(mode) {
         var
           items = watch.PlaylistInitializer.playlist.items, lr = watch.ComponentInitializer.videoSelection.lastLoadResponse,
           searchItems = lr.sortedRawData ? lr.sortedRawData : lr.rawData.list,
-          uniq = {}, i, f = WatchApp.ns.model.playlist.PlaylistItem;
+          uniq = {}, i, f = WatchApp.ns.model.playlist.PlaylistItem, playingIndex = 0;
+        if (!searchItems || searchItems.length < 1) {
+          return;
+        }
         for (i = 0, len = items.length; i < len; i++) {
           uniq[items[i].id] = true;
+          if (items[i]._isPlaying) { playingIndex = i; }
         }
-        for (i = 0, len = searchItems.length; i < len; i++) {
-          var c = searchItems[i];
-          ("undefined" == typeof c.type || "video" == c.type) && uniq[c.id] === undefined && items.push(new f(c))
+        if (mode === 'next') {
+          var tmp = [];
+          for (var i = searchItems.length - 1; i >= 0; i--) {
+            var c = searchItems[i];
+            ("undefined" == typeof c.type || "video" == c.type) && uniq[c.id] === undefined && items.splice(playingIndex + 1, 0, new f(c));
+          }
+        } else {
+          for (i = 0, len = searchItems.length; i < len; i++) {
+            var c = searchItems[i];
+            ("undefined" == typeof c.type || "video" == c.type) && uniq[c.id] === undefined && items.push(new f(c));
+          }
         }
         watch.PlaylistInitializer.playlist.reset(
           items,
@@ -3487,7 +3520,7 @@
       $rightPanel = $('#playerCommentPanelOuter');
   //  var flashVars = pim.playerInitializeModel.flashVars;
 
-    var PlaylistMenu = (function(conf, w){
+    var PlaylistMenu = (function($, conf, w){
       var $popup = null, $generationMessage = $('#playlist').find('.generationMessage'), self;
 
 
@@ -3501,10 +3534,17 @@
           WatchController.shufflePlaylist();
         });
         $ul.append($shuffle);
-        var $insert = $('<li>検索結果をリストに追加</li>').click(function() {
+
+        var $next = $('<li>検索結果を追加：次に再生</li>').click(function() {
+          WatchController.appendSearchResultToPlaylist('next');
+        });
+        $ul.append($next);
+
+        var $insert = $('<li>検索結果を追加：末尾</li>').click(function() {
           WatchController.appendSearchResultToPlaylist();
         });
         $ul.append($insert);
+
         var $clear = $('<li>リストを消去</li>').click(function() {
           WatchController.clearPlaylist();
         });
@@ -3546,7 +3586,81 @@
         hide: hide,
         toggle: toggle
       };
-    })(conf, w);
+    })($, conf, w);
+
+    /**
+     *  ゆっくり再生(スロー再生)メニュー
+     */
+    var Yukkuri = (function($, conf, w) {
+      var self, $content = null, $button = null, timer = null, cnt = 0, isActive = false;
+
+      function createDom() {
+        $content = $('<div id="yukkuriPanel" />');
+        $button = $('<button>Yu</button>').addClass('yukkuriButton').attr({title: 'ゆっくり(スロー再生)'});
+        $button.click(function() {
+          toggleActive();
+        });
+        $content.append($button);
+
+        $('body').append($content);
+      }
+
+      function show() {
+        if ($content === null) {
+          createDom();
+        }
+        updateView();
+        $content.show();
+      }
+      function hide() {
+        $content.hide();
+      }
+      function updateView() {
+        $button.toggleClass('active', isActive);
+      }
+
+      function start() {
+        if (timer !== null) {
+          clearInterval(timer);
+        }
+        isActive = true;
+        updateView();
+        timer = setInterval(function() {
+          var v = cnt++ % 4;
+          if (v == 0) {
+            WatchController.play();
+          } else
+          if (v == 1) {
+            WatchController.pause();
+          }
+        }, 20);
+      }
+      function stop() {
+        if (timer !== null) {
+          clearInterval(timer);
+          timer = null;
+        }
+        isActive = false;
+        updateView();
+        WatchController.pause();
+      }
+
+      function toggleActive() {
+        if (isActive) {
+          stop();
+        } else {
+          start();
+        }
+        return isActive;
+      }
+
+      return self = {
+        show: show,
+        hide: hide,
+        start: start,
+        stop: stop
+      };
+    })($, conf, w);
 
     var initialExplorerWidth = null, resizeWatchTimer = null;
     function onWindowResize() {
@@ -4888,6 +5002,9 @@
         } else
         if (name === 'enableMylistDeleteButton') {
           $('#resultContainer').toggleClass('enableMylistDeleteButton', newValue);
+        } else
+        if (name === 'enableYukkuriPlayButton') {
+          conf.enableYukkuriPlayButton ? Yukkuri.show() : Yukkuri.hide();
         }
       });
 
@@ -4903,15 +5020,9 @@
 
       onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
 
-
-      $('.randomPlayback').dblclick(function(e) {
-        if (e.shiftKey) {
-          WatchController.shufflePlaylist();
-        }
-      });
-
       mylistHackInit();
 
+      if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
     }
 
 
