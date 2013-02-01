@@ -20,7 +20,10 @@
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
-// 最後まで再生したらとりマイから外す機能
+// 最後まで再生したら自動でとりマイから外す機能
+
+// * ver 1.130201
+// - 検索結果にマイリストコメントが見えないのは不便ですよねーってことで追加 (一列の時だけ)
 
 // * ver 1.130128
 // - 検索結果が1列表示の時「再生リストに追加しました」が上の動画に被るのを防ぐ
@@ -989,7 +992,7 @@
         left: -256px; border-radius: 4px 0 0 4px ; \
       }\n\
 \n\n\n\n\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultContainer {\
+      body.videoSelection #searchResultExplorer.w_adjusted #resultContainer, body.videoSelection #searchResultExplorer.w_adjusted #resultlist {\
         width: 592px; padding-left: 0; min-width: 592px; max-width: auto;\
       }\n\
       body.videoSelection #searchResultExplorer.w_adjusted #resultContainer .resultContentsWrap, body.videoSelection #searchResultExplorer.w_adjusted #resultContainer .resutContentsWrap {\
@@ -1043,6 +1046,9 @@
       }\n\
       body.videoSelection #resultlist .videoItem .columnVertical     .balloon {\
         top: -20px; /* 「再生リストに追加しました」が上の動画に被るのを防ぐ */\
+      }\
+      body.videoSelection #resultlist .videoItem .columnVertical     .itemMylistComment {\
+        font-size: 85%; color: #666; border: 1px solid silver; border-radius: 8px; padding: 4px; margin: 0 2px; display: none;\
       }\
 \
       body.videoSelection #resultContainer.dummyMylist #searchResultContainer .favMylistEditContainer,\
@@ -4464,6 +4470,9 @@
               $item.find('.itemVideoDescription').html(item._info.nicorepo_log.join('<br>'));
             }
           }
+          if (item._info.mylist_comment) { // マイリストコメント
+            $item.find('.itemMylistComment').text(item._info.mylist_comment).css({display: 'block'});
+          }
 //          if (item._info.recommend_tag) {}
           return $item;
       }
@@ -4474,12 +4483,10 @@
         '<button class="deleteFromMyMylist" onclick="WatchItLater.onDeleteFromMyMylistClick(this);">マイリスト外す</button>' +
         '</div>';
 
-      watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder.$videoContentTemplate.find('.videoItem .columnVertical   .thumbContainer').append(
-        menu
-      );
-      watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder.$videoContentTemplate.find('.videoItem .columnHorizontal .balloon').before(
-        menu
-      );
+      var $template = watch.ComponentInitializer.videoSelection.contentsAreaVC.videoContentBuilder.$videoContentTemplate;
+      $template.find('.videoItem .columnVertical   .thumbContainer').append(menu);
+      $template.find('.videoItem .columnHorizontal .balloon').before(menu);
+      $template.find('.columnVertical').find('.itemVideoDescription').after('<p class="itemMylistComment"/>');
 
       function onDeleteFromMyMylistClick(elm) {
         var
