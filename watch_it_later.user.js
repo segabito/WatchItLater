@@ -15,12 +15,15 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130128
+// @version        1.130202
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
-// 最後まで再生したら自動でとりマイから外す機能
+// 最後まで再生したら自動でとりマイから外す機能with連続再生
+
+// * ver 1.130202
+// - ニコるを見えなくする設定を追加。(※見えなくなってるだけで、根本的な消滅はまだできていません)
 
 // * ver 1.130201
 // - 検索結果にマイリストコメントが見えないのは不便ですよねーってことで追加 (一列の時だけ)
@@ -272,6 +275,7 @@
       defaultSearchOption: '', // 検索時のデフォルトオプション
       autoPlayIfWindowActive: 'no', // 'yes' = ウィンドウがアクティブの時だけ自動再生する
       enableYukkuriPlayButton: true, // スロー再生ボタンを表示する
+      noNicoru: false, // ニコるボタンをなくす
 
       enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
 
@@ -745,7 +749,7 @@
       #content .playlistToggle.w_show:after {\
         content: "▲";\
       }\
-      #playlistContainerInner .thumbContainer{\n\
+      #playlistContainerInner .thumbContainer, #playlistContainerInner .balloon{\n\
         cursor: move;\n\
       }\n\n\
 \
@@ -1112,6 +1116,12 @@
       #yukkuriPanel {\
         position: fixed; z-index: 1500; bottom: 0; left: 0; display: inline-block;\
       }\
+      body.w_noNicoru .nicoru-button{\
+        left: -9999; display: none !important;\
+      }\
+      body.w_noNicoru .menuOpened #videoMenuTopList li.videoMenuListNicoru{\
+        display: none;\
+      }\
       ',
     ''].join('');
     addStyle(style, 'watchItLater');
@@ -1160,6 +1170,7 @@
         description: 'QWatch側の設定パネルの自動再生はオフにしてください。\n\n■こんな人におすすめ\n・自動再生ONにしたいけど別タブで開く時は自動再生したくない\n・複数タブ開いたままブラウザ再起動したら全部のタブで再生が始まって「うるせー！」という経験のある人',
         values: {'する': 'yes', 'しない': 'no'}},
       {title: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
+        description: '全画面状態だと再生数がわからなくて不便、という時に',
         values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
 
       {title: '動画プレイヤーの設定'},
@@ -1169,29 +1180,32 @@
         values: {'する': true, 'しない': false}},
       {title: 'ヘッダに再生数表示', varName: 'headerViewCounter',
         values: {'する': true, 'しない': false}},
-      {title: 'てれびちゃんメニュー内に、原宿以前のランダム画像復活', varName: 'hidariue',
+      {title: 'てれびちゃんメニュー内に、原宿以前の左上ロゴを復活', varName: 'hidariue',
         values: {'する': true, 'しない': false}},
-      {title: 'タグが2行以内なら自動で高さ調節(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
+      {title: 'タグが2行以内なら自動で領域を細くする(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
+        description: '無駄な空白がなくなって画面の節約になります',
         values: {'する': true, 'しない': false}},
       {title: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory',
         values: {'する': true, 'しない': false}},
 
       {title: '動画検索画面の設定'},
       {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack',
-        description: '便利ですがちょっと重いです',
+        description: '便利ですがちょっと重いです。\n大きめのモニターだと快適ですが、小さいといまいちかも',
         values: {'する': true, 'しない': false}},
       {title: 'お気に入りタグを表示', varName: 'enableFavTags',
         values: {'する': true, 'しない': false}},
       {title: 'お気に入りマイリストを表示', varName: 'enableFavMylists',
         values: {'する': true, 'しない': false}},
       {title: 'サムネを4:3にする', varName: 'squareThumbnail',
+        description: '上下がカットされなくなり、サムネの全体が見えるようになります。',
         values: {'する': true, 'しない': false}},
       {title: 'マイリストから外すボタンを追加(テスト中)', varName: 'enableMylistDeleteButton',
         description: 'マイリストの整理に便利。\n ※ 消す時に確認ダイアログは出ないので注意',
         values: {'する': true, 'しない': false}},
 
       {title: 'その他の設定'},
-      {title: '動画リンクへのポップアップを有効にする', varName: 'enableHoverPopup',
+      {title: '動画リンクにマイリストメニューを表示', varName: 'enableHoverPopup',
+        description: 'マウスカーソルを重ねた時に出るのが邪魔な人はオフにしてください',
         values: {'する': true, 'しない': false}},
       {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
         values: {'する': true, 'しない': false}},
@@ -1200,6 +1214,8 @@
       {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
        description: '常に指定したいパラメータ指定するのに便利です\n例: 「-グロ -例のアレ」とすると、その言葉が含まれる動画が除外されます'},
       {title: '「@ジャンプ」を無効化', varName: 'ignoreJumpCommand',
+        values: {'する': true, 'しない': false}},
+      {title: '「ニコる」ボタンをなくす', varName: 'noNicoru',
         values: {'する': true, 'しない': false}}
 
     ];
@@ -4130,7 +4146,7 @@
         $('#videoMenuTopList').append('<li style="position:absolute;left:300px;font-size:50%">　＼　│　／<br>　　／￣＼　　 ／￣￣￣￣￣￣￣￣￣<br>─（ ﾟ ∀ ﾟ ）＜　しんねんしんねん！<br>　　＼＿／　　 ＼＿＿＿＿＿＿＿＿＿<br>　／　│　＼</li>');
       }
       if (!hidariue) {
-        $('#videoMenuTopList').append('<li style="position:absolute;top:21px;left:0px;"><a href="http://userscripts.org/scripts/show/151269" target="_blank" style="color:black;"><img id="hidariue"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:Q"></a></p><a href="http://nico.ms/sm18845030" class="itemEcoLink">…</a></li>');
+        $('#videoMenuTopList').append('<li style="position:absolute;top:21px;left:0px;"><a href="http://userscripts.org/scripts/show/151269" target="_blank" style="color:black;"><img id="hidariue" style="border-radius: 8px; box-shadow: 1px 1px 2px #ccc;"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:Q"></a></p><!--<a href="http://nico.ms/sm18845030" class="itemEcoLink">…</a>--></li>');
         hidariue = $('#hidariue')[0];
       }
       hidariue.src = 'http://res.nimg.jp/img/base/head/icon/nico/' +
@@ -5011,11 +5027,18 @@
           $('#resultContainer').toggleClass('enableMylistDeleteButton', newValue);
         } else
         if (name === 'enableYukkuriPlayButton') {
-          conf.enableYukkuriPlayButton ? Yukkuri.show() : Yukkuri.hide();
+          newValue ? Yukkuri.show() : Yukkuri.hide();
+        } else
+        if (name === 'noNicoru') {
+          $('body').toggleClass('w_noNicoru', newValue);
         }
+
       });
 
-      $('#resultContainer').toggleClass('enableMylistDeleteButton', conf.enableMylistDeleteButton);
+
+      if (conf.enableMylistDeleteButton) $('#resultContainer').addClass('enableMylistDeleteButton');
+
+      if (conf.noNicoru) $('body').addClass('w_noNicoru');
 
 
       WatchJsApi.nicos.addEventListener('nicoSJump', function(e) {
