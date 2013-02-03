@@ -15,12 +15,16 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130202
+// @version        1.130204
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
+
+// * ver 1.130204
+// - 一部のキーボードについている[一時停止/再生]・[次の曲]・[前の曲]ボタンに対応させてみた。 Chromeしか使えないぽい
+// - AdBlockが有効な状態でもある程度動くようにしてみた
 
 // * ver 1.130202
 // - ニコるを見えなくする設定を追加。(※見えなくなってるだけで、根本的な消滅はまだできていません)
@@ -1216,7 +1220,7 @@
       {title: '「@ジャンプ」を無効化', varName: 'ignoreJumpCommand',
         values: {'する': true, 'しない': false}},
       {title: '「ニコる」ボタンをなくす', varName: 'noNicoru',
-        values: {'する': true, 'しない': false}}
+        values: {'なくす': true, 'なくさない': false}}
 
     ];
 
@@ -2555,6 +2559,27 @@
       },
       pause: function() {
         watch.PlayerInitializer.nicoPlayerConnector.pauseVideo();
+      },
+      togglePlay: function() {
+        var status = $("#external_nicoplayer")[0].ext_getStatus();
+        if (status === 'playing') {
+          this.pause();
+        } else {
+          this.play();
+        }
+      },
+      nextVideo: function() {
+        return watch.PlayerInitializer.nicoPlayerConnector.playNextVideo();
+      },
+      prevVideo: function() {
+        return watch.PlayerInitializer.nicoPlayerConnector.playPreviousVideo();
+      },
+      vpos: function(v) {
+        if (typeof v === 'number') {
+          return watch.PlayerInitializer.nicoPlayerConnector.seekVideo(v);
+        } else {
+          return watch.PlayerInitializer.nicoPlayerConnector.getVpos();
+        }
       },
       openSearch: function() {
         watch.ComponentInitializer.videoSelection.panelOPC.open();
@@ -5053,6 +5078,37 @@
       mylistHackInit();
 
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
+
+      $('body').on('keydown.watchItLater', function(e) {
+        // 一部のキーボードについているMusic Key(正式名称不明)に対応 Chromeしか拾えない？
+        if (e.keyCode == 178) {  // 停止
+          WatchController.togglePlay();
+        } else
+        if (e.keyCode == 179) { // 一時停止
+          WatchController.togglePlay();
+        } else
+        if (e.keyCode == 177) { // 前の曲
+          if (WatchController.vpos() > 2000) {
+            WatchController.vpos(0);
+          } else {
+            WatchController.prevVideo();
+          }
+        } else
+        if (e.keyCode == 176) { // 次の曲
+          WatchController.nextVideo();
+        }
+      });
+
+      // AdBlockがあってもとりあえず動くように(初回はAdBlockのほうが速いので無理)
+      if (!w.Ads) {
+        conf.debugMode && console.log('adblocked?');
+        Popup.show('Adblockを使っていると一部誤動作します');
+        w.Ads = {
+          Advertisement: function() { conf.debugMode && console.log('dummy Advertisement');},
+          Category:      function() { conf.debugMode && console.log('dummy Category'); },
+          SwitchView:    function() { conf.debugMode && console.log('dummy SwitchView'); }
+        };
+      }
     }
 
 
