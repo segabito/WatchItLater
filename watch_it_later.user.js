@@ -15,12 +15,22 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130204
+// @version        1.130209
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
+
+// * ver 1.130209
+// - 【地味に便利】マウスの左か右ボタン＋ホイールでどこでも音量調整。とっさに音量を変えたい時に便利 (デフォルトは無効)
+// - マイリスト登録ボタンをShift+クリックするとマイリストコメントが入力できる隠しコマンド
+//　 Firefoxだとプレイヤー上では効きません
+// - 各種ショートカットキーの設定を追加 (デフォルトは無効・キーは変更可能)
+//　 ※Chromeだとコメント入力中も反応してしまいます。 逆にFirefoxでは、プレイヤーにフォーカスがあると反応しません。いい解決法がないか調査中
+//　 「一発とりマイ登録」「とりマイを開く」「検索を開く」「コメント表示ON/OFF」「プレイヤーの位置にスクロール」等
+//　 徐々に追加していく予定
+// - タッチパネルで検索メニューを触った時に行間を広くする隠し機能 (指で選択しやすくするため)
 
 // * ver 1.130204
 // - 一部のキーボードについている[一時停止/再生]・[次の曲]・[前の曲]ボタンに対応させてみた。 Chromeしか使えないぽい
@@ -280,8 +290,17 @@
       autoPlayIfWindowActive: 'no', // 'yes' = ウィンドウがアクティブの時だけ自動再生する
       enableYukkuriPlayButton: true, // スロー再生ボタンを表示する
       noNicoru: false, // ニコるボタンをなくす
+      enoubleTouchPanel: false, // タッチパネルへの対応を有効にする
+      mouseClickWheelVolume: 0, // マウスボタン+ホイールで音量調整を有効にする 1 = 左ボタン 2 = 右ボタン
 
       enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
+
+      shortcutDefMylist:          {char: 'M', shift: true, ctrl: false, alt: false, enable: false}, // とりマイ登録のショートカット
+      shortcutOpenSearch:         {char: 'S', shift: true, ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
+      shortcutOpenDefMylist:      {char: 'D', shift: true, ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
+      shortcutCommentVisibility:  {char: 'V', shift: true, ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
+      shortcutScrollToNicoPlayer: {char: 'P', shift: true, ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
+
 
       lastLeftTab: 'videoInfo',
       enableSortTypeMemory: true, // 検索のソート順を記憶する
@@ -741,11 +760,8 @@
         display: none;\
       }\
       /* プレイリスト出したり隠したり */\
-      body.w_notFull #playlist{\n\
+      body.w_notFull #playlist:not(.w_show){\n\
         position: absolute; top: -9999px;\n\
-      }\n\n\
-      body.w_notFull #playlist.w_show{\n\
-        position: relative; top: 0;\n\
       }\n\n\
       #content .playlistToggle:after {\
         content: "▼";\
@@ -791,8 +807,6 @@
       #watchItLaterConfigPanel li.buggy{\n\
         color: #888;\n\
       }\n\n\
-      #watchItLaterConfigPanel .description{\n\
-      }\n\n\
       #watchItLaterConfigPanel label{\n\
         margin: 0 5px;\n\
       }\n\n\
@@ -815,7 +829,28 @@
       }\n\
       #watchItLaterConfigPanel .section {\n\
         font-size: 120%; font-weight: bolder; margin: 16px 0;\
-      }\
+      }\n\
+      #watchItLaterConfigPanel .section .description{\n\
+        display: block; font-size: 80%; margin: 4px;\
+      }\n\n\
+      #watchItLaterConfigPanel .shortcutSetting:not(.enable) span :not(.enable){\n\
+        color: silver;\
+      }\n\
+      #watchItLaterConfigPanel .shortcutSetting .enable {\n\
+        cursor: pointer; margin: auto 10px;\
+      }\n\
+      #watchItLaterConfigPanel .shortcutSetting        .enable:before {\n\
+        content: \'○ \';\
+      }\n\
+      #watchItLaterConfigPanel .shortcutSetting.enable .enable:before {\n\
+        content: \'㋹ \'; color: blue;\
+      }\n\
+      #watchItLaterConfigPanel .shortcutSetting      .ctrl, #watchItLaterConfigPanel .shortcutSetting     .alt, #watchItLaterConfigPanel .shortcutSetting       .shift {\n\
+        cursor: pointer; border: 2px outset; margin: 4px 4px; padding: 2px 4px; width: 180px; border-radius: 4px;background: #eee;\
+      }\n\
+      #watchItLaterConfigPanel .shortcutSetting.ctrl .ctrl, #watchItLaterConfigPanel .shortcutSetting.alt .alt, #watchItLaterConfigPanel .shortcutSetting.shift .shift {\n\
+        border: 2px inset; color: blue;\
+      }\n\
 \
 \
       /* 動画検索画面に出るお気に入りタグ・お気に入りマイリスト */\
@@ -851,7 +886,10 @@
         background: #fdfdfd; padding: 0; border: 0;font-size: 90%; height: auto !important;\
       }\n\
       #searchResultNavigation .slideMenu ul li a{\
-        line-height: 165% !important; background: none\
+        line-height: 165%; background: none\
+      }\n\
+      #searchResultNavigation.w_touch .slideMenu ul li a{\
+        line-height: 300%;\
       }\n\
         #searchResultNavigation .slideMenu ul li a:before{\
           background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;\
@@ -1006,10 +1044,10 @@
       body.videoSelection #searchResultExplorer.w_adjusted #resultContainer .resultContentsWrap, body.videoSelection #searchResultExplorer.w_adjusted #resultContainer .resutContentsWrap {\
         width: 592px; padding: 16px 0px;\
       }\n\
-      body.videoSelection.no_setting_panel.size_small #content.w_adjusted #searchResultNavigation ul li,  body.videoSelection #content.w_adjusted #searchResultExplorerExpand {\
+      body.videoSelection.no_setting_panel.size_small #content.w_adjusted #searchResultNavigation:not(.w_touch)>ul>li,  body.videoSelection #content.w_adjusted #searchResultExplorerExpand {\
         height: 26px;\
       }\n\
-      body.videoSelection.no_setting_panel.size_small #content.w_adjusted #searchResultNavigation ul li a,body.videoSelection #content.w_adjusted #searchResultExplorerExpand a{\
+      body.videoSelection.no_setting_panel.size_small #content.w_adjusted #searchResultNavigation:not(.w_touch)>ul>li>a,body.videoSelection #content.w_adjusted #searchResultExplorerExpand a{\
         line-height: 26px; font-size: 100%;\
       }\n\
       body.videoSelection #searchResultNavigation > ul > li a:after, body.videoSelection #content.w_adjusted #searchResultExplorerExpand a#closeSearchResultExplorer:after {\
@@ -1220,7 +1258,17 @@
       {title: '「@ジャンプ」を無効化', varName: 'ignoreJumpCommand',
         values: {'する': true, 'しない': false}},
       {title: '「ニコる」ボタンをなくす', varName: 'noNicoru',
-        values: {'なくす': true, 'なくさない': false}}
+        values: {'なくす': true, 'なくさない': false}},
+
+      {title: 'ショートカット設定', description: '※Chromeはコメント入力中も反応してしまいます'},
+      {title: 'マウスのボタン＋ホイールで音量調整', varName: 'mouseClickWheelVolume',
+        description: 'とっさに音量を変えたい時に便利',
+        values: {'無効': 0 , '左ボタン': 1, '右ボタン': 2}},
+      {title: 'とりあえずマイリスト登録',       varName: 'shortcutDefMylist',          type: 'keyInput'},
+      {title: 'とりあえずマイリストを開く',     varName: 'shortcutOpenDefMylist',      type: 'keyInput'},
+      {title: '検索画面オープン',               varName: 'shortcutOpenSearch',         type: 'keyInput'},
+      {title: 'コメント表示ON/OFF',             varName: 'shortcutCommentVisibility',  type: 'keyInput'},
+      {title: 'プレイヤーの位置までスクロール', varName: 'shortcutScrollToNicoPlayer', type: 'keyInput'}
 
     ];
 
@@ -1240,7 +1288,11 @@
             var $item = this.createMenuItem(menus[i]);
             $ul.append($item);
           } else {
-            $ul.append('<li class="section">'+ menus[i].title + '</li>');
+            if (menus[i].description) {
+              $ul.append('<li class="section">'+ menus[i].title + '<span class="description">'+ menus[i].description + '</span></li>');
+            } else {
+              $ul.append('<li class="section">'+ menus[i].title + '</li>');
+            }
           }
         }
         var $close = w.jQuery('<p class="bottom">項目によっては再読み込みが必要です<button class="closeButton">閉じる</button></p>'), self = this;
@@ -1254,6 +1306,9 @@
     pt.createMenuItem = function(menu) {
       if (menu.type === 'text') {
         return this.createTextMenuItem(menu);
+      } else
+      if (menu.type === 'keyInput') {
+        return this.createKeyInputMenuItem(menu);
       } else {
         return this.createRadioMenuItem(menu);
       }
@@ -1310,6 +1365,46 @@
         }
       });
       $menu.append($input);
+      return $menu;
+    };
+
+    pt.createKeyInputMenuItem = function(menu) {
+      var title = menu.title, varName = menu.varName, values = menu.values;
+      var currentValue = conf.getValue(varName), currentKey = currentValue.char;
+
+      var $menu = w.jQuery('<li class="shortcutSetting"><p class="title">' + title + '</p></li>');
+      var sel = ['<select>'], $sel;
+      for (var v = 48; v <= 90; v++) {
+        if (v >= 0x3c && v <= 0x3f) continue;
+        var c = String.fromCharCode(v);
+        var op = ['<option value="', c, '">', c, '</option>'  ].join('');
+        sel.push(op);
+      }
+      sel.push('</select>');
+      $sel = w.jQuery(sel.join(''));
+      var $meta = w.jQuery('<span class="enable" data-meta="enable">有効</span><span class="ctrl" data-meta="ctrl">ctrl</span><span class="alt" data-meta="alt">alt</span><span class="shift" data-meta="shift">shift</span>').on('click', function(e) {
+          var meta = w.jQuery(e.target).attr('data-meta');
+          $menu.toggleClass(meta);
+          update();
+      });
+      $sel.change(update);
+
+      $menu.toggleClass('enable', currentValue.enable).toggleClass('ctrl', currentValue.ctrl).toggleClass('alt', currentValue.alt).toggleClass('shift', currentValue.shift);
+      $sel.val(currentKey);
+
+      if (menu.className) { $menu.addClass(menu.className);}
+      if (menu.description) { $menu.attr('title', menu.description); }
+
+      $menu.append(w.jQuery('<span/>').append($meta).append($sel));
+
+      function update() {
+        var newValue = {char: $sel.val(), ctrl: $menu.hasClass('ctrl'), alt: $menu.hasClass('alt'), shift: $menu.hasClass('shift'), enable: $menu.hasClass('enable')};
+        conf.setValue(varName, newValue);
+        if (typeof menu.onchange === 'function') {
+          menu.onchange(newValue, oldValue);
+        }
+        dispatchEvent(menu.varName, newValue, conf.getValue(varName));
+      }
       return $menu;
     };
 
@@ -1700,7 +1795,7 @@
       return true;
     };
 
-    pt.addDefListItem = function(watchId, callback) {
+    pt.addDefListItem = function(watchId, callback, description) {
       var self = this;
       var url = 'http://' + host + '/api/deflist/add';
 
@@ -1709,6 +1804,9 @@
       // なので、重複時にエラーを出すのではなく、「消してから追加」することによって先頭に持ってくる。
       // 「重複してたら先頭に持ってきて欲しいな～」って要望掲示板にこっそり書いたりしたけど相手にされないので自分で実装した。
       var data = "item_id=" + watchId + "&token=" + token, replaced = true;
+      if (description) {
+        data += '&description='+ encodeURIComponent(description);
+      }
 
       var _add = function(status, resp) {
         var req = {
@@ -1731,13 +1829,13 @@
       }
     };
 
-    pt.addMylistItem = function(watchId, groupId, callback) {
+    pt.addMylistItem = function(watchId, groupId, callback, description) {
       var self = this;
       var url = 'http://' + host + '/api/mylist/add';
       var data = ['item_id=', watchId,
                   '&group_id=', groupId,
                   '&item_type=', 0, // video=0 seiga=5
-                  '&description=', '',
+                  '&description=', (typeof description === 'string') ? encodeURIComponent(description) : '',
                   '&token=', token,
       ].join('');
       // 普通のマイリストのほうは重複しても「消してから追加」という処理を行っていない。
@@ -1903,9 +2001,14 @@
         btn.appendChild(document.createTextNode('マ'));
         btn.className = 'mylistAdd';
         btn.title = 'マイリストに追加';
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function(e) {
+          var description = undefined;
+          if (e.shiftKey) {
+            description = prompt('マイリストコメントの入力');
+            if (!description) return;
+          }
           btn.disabled = true;
-          setTimeout(function() {btn.disabled = false;}, 1000);
+          setTimeout(function() { btn.disabled = false;}, 1000);
           var groupId = sel.value, name = sel.options[sel.selectedIndex].textContent;
           if (groupId == 'default') {
             self.addDefListItem(_watchId, function(status, result, replaced) {
@@ -1919,7 +2022,7 @@
                   (replaced ? 'の先頭に移動しました' : 'に登録しました')
                 );
               }
-            });
+            }, description);
           } else {
             self.addMylistItem(_watchId, groupId, function(status, result) {
               self.reloadDefList();
@@ -1928,10 +2031,9 @@
               } else {
                 Popup.alert(name + 'の登録に失敗: ' + result.error.description);
               }
-            });
+            }, description);
           }
         } ,false);
-
         return btn;
       }
 
@@ -2245,6 +2347,45 @@
   })();
 
 
+  var KeyMatch = (function() {
+    var self;
+
+    function create(def) {
+      var char = def.char[0].toUpperCase();
+      return {
+        prop: {
+          char: char,
+          code: typeof char.code === 'number' ? char.code : char.charCodeAt(0),
+          shift:  !!def.shift,
+          ctrl:   !!def.ctrl,
+          alt:    !!def.alt,
+          enable: !!def.enable,
+        },
+        test: function(event) {
+          if (
+            this.prop.enable === true           &&
+            this.prop.shift   === event.shiftKey &&
+            this.prop.ctrl    === event.ctrlKey  &&
+            this.prop.alt     === event.altKey   &&
+            this.prop.code    === event.which
+          ) {
+            event.preventDefault();
+            return true;
+          }
+          return false;
+        },
+        json: function() {
+          return JSON.stringify(this.prop);
+        }
+      }
+    }
+
+    return self = {
+      create: create
+    };
+  })();
+
+
   /**
    *  リンクのマウスオーバーに仕込む処理
    *  ここの表示は再考の余地あり
@@ -2319,7 +2460,7 @@
     function bind(force, target) {
       if (!conf.enableHoverPopup) { return; }
 
-      var a = document.links;
+      var a = Array.prototype.slice.apply(document.links);
         for (var i = 0, len = a.length; i < len; i++) {
           var e = a[i];
           try {
@@ -2465,10 +2606,10 @@
   var WatchController = (function(w) {
     var WatchApp = w.WatchApp,
       watch = (WatchApp && WatchApp.ns.init) || {},
-      $ = w.$, WatchJsApi = w.WatchJsApi;
+      $ = w.$, WatchJsApi = w.WatchJsApi, exp = null;
     return {
       isZeroWatch: function() {
-        return (WatchApp) ? true : false;
+        return (WatchApp && WatchJsApi) ? true : false;
       },
       isQwatch: function() {
         return this.isZeroWatch();
@@ -2655,6 +2796,44 @@
           watch.PlaylistInitializer.playlist.option
         );
 
+      },
+      addDefMylist: function(description) {
+        var watchId = watch.CommonModelInitializer.watchInfoModel.id;
+        setTimeout(function() {
+          Mylist.addDefListItem(watchId, function(status, result, replaced) {
+            Mylist.reloadDefList();
+            if (status != "ok") {
+              Popup.alert('とりあえずマイリストの登録に失敗: ' + result.error.description);
+            } else {
+              var torimai = '<a href="/my/mylist">とりあえずマイリスト</a>';
+              Popup.show(
+                torimai +
+                (replaced ? 'の先頭に移動しました' : 'に登録しました')
+              );
+            }
+          }, description);
+        }, 0);
+      },
+      commentVisibility: function(v) {
+        if (v === 'toggle') {
+          this.commentVisibility(!this.commentVisibility());
+        } else
+        if (typeof v === 'boolean') {
+          watch.PlayerInitializer.nicoPlayerConnector.playerConfig.set({commentVisible: v});
+        } else {
+          var pc = watch.PlayerInitializer.nicoPlayerConnector.playerConfig.get();
+          return pc.commentVisible;
+        }
+      },
+      volume: function(v) {
+        var exp = w.document.getElementById('external_nicoplayer');
+        if (typeof v === 'string' && v.match(/^[+-]\d+$/)) {
+          this.volume(this.volume() + v * 1);
+        } else
+        if (typeof v === 'number' || (typeof v === 'string' && v.match(/^\d+$/))) {
+          exp.ext_setVolume(Math.max(0, Math.min(v * 1, 100)));
+        }
+        return exp.ext_getVolume();
       }
     }
   })(w);
@@ -3931,20 +4110,22 @@
 
         resizeLeftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
 
-        $tab.click(function(e) {
-          AnchorHoverPopup.hidePopup();
-          var selection = $(e.target).attr('data-selection');
-          if (typeof selection === 'string') {
-            conf.setValue('lastLeftTab', selection);
-            changeTab(selection);
-          }
-        });
+
 
         var leftPanelMap = {
           nicommend: [$leftPanel],
           videoInfo: [$leftInfoPanel],
           ichiba:    [$ichibaPanel]
         };
+        function onTabSelect(e) {
+          e.preventDefault();
+          AnchorHoverPopup.hidePopup();
+          var selection = $(e.target).attr('data-selection');
+          if (typeof selection === 'string') {
+            conf.setValue('lastLeftTab', selection);
+            changeTab(selection);
+          }
+        }
         function changeTab(selection) {
           $leftPanel.removeClass('videoInfo nicommend ichiba').addClass(selection);
           var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
@@ -3957,6 +4138,8 @@
           $leftInfoPanel.animate({scrollTop: 0}, 600);
         });
 
+        $tab.on('click',    onTabSelect);
+        $tab.on('touchend', onTabSelect);
         changeTab(conf.lastLeftTab);
 
         $leftPanelTemplate = $([
@@ -4692,16 +4875,12 @@
         '}',
           'body.size_small.content-fix.no_setting_panel.videoSelection #content.w_adjusted #leftPanel {',
           '}',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted .videoDetails, ',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #searchResultNavigation {',
+        'body.size_small.no_setting_panel.videoSelection:not(.content-fix) #content.w_adjusted .videoDetails, ',
+        'body.size_small.no_setting_panel.videoSelection:not(.content-fix) #content.w_adjusted #searchResultNavigation {',
           // タグ領域三行分 スクロール位置をタグの場所にしてる時でも末端までスクロールできるようにするための細工
           // (四行以上あるときは表示しきれないが)
           'padding-bottom: 72px; ',
         '}',
-          'body.size_small.content-fix.no_setting_panel.videoSelection #content.w_adjusted .videoDetails, ',
-          'body.size_small.content-fix.no_setting_panel.videoSelection #content.w_adjusted #searchResultNavigation {',
-            'padding-bottom: 0; ',
-          '}',
         'body.size_small.no_setting_panel.videoSelection #content.w_adjusted .leftVideoInfo, body.size_small.no_setting_panel.videoSelection #content.w_adjusted .leftIchibaPanel {',
           'width: ', (xdiff - 4), 'px !important;',
         '}',
@@ -4739,6 +4918,11 @@
 
       $smallVideoStyle = $(css);
       $('head').append($smallVideoStyle);
+      if (!$('#searchResultNavigation').hasClass('w_touch')) {
+        $('#searchResultNavigation').on('touchstart.watchItLater', function() {
+          $('#searchResultNavigation').addClass('w_touch').unbind('touchstart.watchItLater');
+        });
+      }
     }
 
     var refreshCommentPanelTimer = null;
@@ -4822,7 +5006,7 @@
 
 
     function initIframe() {
-      iframe.id = "mylyst_add_frame";
+      iframe.id = "mylist_add_frame";
       iframe.className += " fixed";
       $(iframe).css({position: 'fixed', right: 0, bottom: 0});
       w.document.body.appendChild(iframe);
@@ -5006,6 +5190,112 @@
       WatchApp.$('#resultlist').toggleClass('squareThumbnail', isSquare);
     }
 
+    function initShortcutKey() {
+      var
+        defMylist         = KeyMatch.create(conf.shortcutDefMylist),
+        openDefMylist      = KeyMatch.create(conf.shortcutOpenDefMylist),
+        openSearch        = KeyMatch.create(conf.shortcutOpenSearch),
+        scrollToPlayer    = KeyMatch.create(conf.shortcutScrollToNicoPlayer),
+        commentVisibility = KeyMatch.create(conf.shortcutCommentVisibility)
+        ;
+
+      ConfigPanel.addChangeEventListener(function(name, newValue, oldValue) {
+        if (name === 'shortcutDefMylist') {
+          defMylist = KeyMatch.create(conf.shortcutDefMylist);
+        } else
+        if (name === 'shortcutOpenDefMylist') {
+          openDefMylist = KeyMatch.create(conf.shortcutOpenDefMylist);
+        } else
+        if (name === 'shortcutOpenSearch') {
+          openSearch = KeyMatch.create(conf.shortcutOpenSearch);
+        } else
+        if (name === 'shortcutScrollToNicoPlayer') {
+          scrollToPlayer = KeyMatch.create(conf.shortcutScrollToNicoPlayer);
+        } else
+        if (name === 'shortcutCommentVisibility') {
+          commentVisibility = KeyMatch.create(conf.shortcutCommentVisibility);
+        }
+      });
+
+      $('body').on('keydown.watchItLater', function(e) {
+        // 一部のキーボードについているMusic Key(正式名称不明)に対応 Chromeしか拾えない？
+        if (e.keyCode == 178) {  // 停止
+          WatchController.togglePlay();
+        } else
+        if (e.keyCode == 179) { // 一時停止
+          WatchController.togglePlay();
+        } else
+        if (e.keyCode == 177) { // 前の曲
+          if (WatchController.vpos() > 2000) {
+            WatchController.vpos(0);
+          } else {
+            WatchController.prevVideo();
+          }
+        } else
+        if (e.keyCode == 176) { // 次の曲
+          WatchController.nextVideo();
+        }
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+          return;
+        }
+        defMylist.test(e)         && WatchController.addDefMylist();
+        openDefMylist.test(e)     && (WatchController.showDefMylist() || WatchController.scrollToVideoPlayer(true));
+        openSearch.test(e)        && (WatchController.openSearch() || WatchController.scrollToVideoPlayer(true));
+        scrollToPlayer.test(e)    && WatchController.scrollToVideoPlayer(true);
+        commentVisibility.test(e) && WatchController.commentVisibility('toggle');
+      });
+    }
+
+    function initMouse() {
+      ConfigPanel.addChangeEventListener(function(name, newValue, oldValue) {
+        if (name === 'mouseClickWheelVolume') {
+          if (oldValue === 0) {
+            initWheelWatch();
+          } else
+          if (newValue === 0) {
+            $('body')
+              .unbind('mousewheel.watchItLaterWheelWatch')
+              .unbind('mousedown.watchItLaterWheelWatch')
+              .unbind('mouseup.watchItLaterWheelWatch');
+          }
+        }
+      });
+
+      function initWheelWatch() {
+        var leftDown = false, rightDown = false;
+        $('body').on('mousewheel.watchItLaterWheelWatch', function(e, delta) {
+          // TODO: マジックナンバーを
+          if (typeof e.buttons === 'number') { // firefox
+            if (e.buttons < 1 || conf.mouseClickWheelVolume != e.buttons) { return; }
+          } else { // chrome
+            if (conf.mouseClickWheelVolume === 1 && !leftDown)  { return; }
+            if (conf.mouseClickWheelVolume === 2 && !rightDown) { return; }
+          }
+
+          var v = WatchController.volume();
+          // 音量を下げる時は「うわ音でけぇ！」
+          // 音量を上げる時は「ちょっと聞こえにくいな」…というパターンが多いので、変化の比率が異なる
+          if (delta > 0) {
+            v = Math.max(v, 1);
+            r = (v < 5) ? 1.3 : 1.1;
+            v = WatchController.volume(v * r);
+          } else {
+            v = WatchController.volume(Math.floor(v / 1.2));
+          }
+          e.preventDefault();
+        }).on('mousedown.watchItLaterWheelWatch', function(e) { // chromeはホイールイベントでe.buttonsが取れないため
+          if (e.which == 1) leftDown  = true;
+          if (e.which == 3) rightDown = true;
+        }).on('mouseup.watchItLaterWheelWatch', function(e) {
+          if (e.which == 1) leftDown  = false;
+          if (e.which == 3) rightDown = false;
+        });
+      }
+      if (conf.mouseClickWheelVolume > 0) {
+        initWheelWatch();
+      }
+    }
+
     function initOther() {
       if (conf.leftPanelJack) {
         var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
@@ -5041,7 +5331,6 @@
       }
 
       ConfigPanel.addChangeEventListener(function(name, newValue, oldValue) {
-        //console.log('conf changed', name, newValue, oldValue);
         if (name === 'squareThumbnail') {
           initSquareThumbnail();
         } else
@@ -5057,14 +5346,11 @@
         if (name === 'noNicoru') {
           $('body').toggleClass('w_noNicoru', newValue);
         }
-
       });
-
 
       if (conf.enableMylistDeleteButton) $('#resultContainer').addClass('enableMylistDeleteButton');
 
       if (conf.noNicoru) $('body').addClass('w_noNicoru');
-
 
       WatchJsApi.nicos.addEventListener('nicoSJump', function(e) {
         if (conf.ignoreJumpCommand) {
@@ -5079,37 +5365,15 @@
 
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
 
-      $('body').on('keydown.watchItLater', function(e) {
-        // 一部のキーボードについているMusic Key(正式名称不明)に対応 Chromeしか拾えない？
-        if (e.keyCode == 178) {  // 停止
-          WatchController.togglePlay();
-        } else
-        if (e.keyCode == 179) { // 一時停止
-          WatchController.togglePlay();
-        } else
-        if (e.keyCode == 177) { // 前の曲
-          if (WatchController.vpos() > 2000) {
-            WatchController.vpos(0);
-          } else {
-            WatchController.prevVideo();
-          }
-        } else
-        if (e.keyCode == 176) { // 次の曲
-          WatchController.nextVideo();
-        }
-      });
-
       // AdBlockがあってもとりあえず動くように(初回はAdBlockのほうが速いので無理)
       if (!w.Ads) {
         conf.debugMode && console.log('adblocked?');
         Popup.show('Adblockを使っていると一部誤動作します');
-        w.Ads = {
-          Advertisement: function() { conf.debugMode && console.log('dummy Advertisement');},
-          Category:      function() { conf.debugMode && console.log('dummy Category'); },
-          SwitchView:    function() { conf.debugMode && console.log('dummy SwitchView'); }
-        };
       }
+
     }
+
+
 
 
     function hideAds() {
@@ -5121,6 +5385,8 @@
     {
       initIframe();
       initSidePanel();
+      initShortcutKey();
+      initMouse();
       initEvents();
       initPager();
       initSearchOption();
@@ -5160,7 +5426,7 @@
     if (!w.Video) return;
     var Video = w.Video, watchId = Video.v, videoId = Video.id;
     var iframe = Mylist.getPanel('');
-    iframe.id = "mylyst_add_frame";
+    iframe.id = "mylist_add_frame";
     iframe.style.position = 'fixed';
     iframe.style.right = 0;
     iframe.style.bottom = 0;
@@ -5204,7 +5470,7 @@
   // Chromeに対応させるための処理
   // いったん<script>として追加してから実行する
   try {
-    if (!this.GM_getValue || this.GM_getValue.toString().indexOf("not supported")>-1) {
+    if (location.host.indexOf('www.') === 0 || !this.GM_getValue || this.GM_getValue.toString().indexOf("not supported")>-1) {
       isNativeGM = false;
       var inject = document.createElement("script");
       inject.id = "monkey";
