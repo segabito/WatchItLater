@@ -15,12 +15,21 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130209
+// @version        1.130215
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
+// 軽量化
+
+// * ver 1.130215
+// - タッチパネルへの対応テスト。(Chromeでしかうまく動かない)
+//   マウスがなくても、動画リンクを右フリックでマイリストメニューが出るように。
+//   画面を右クリックすると一部のボタンやリンクが大きくなるモード
+// - ショートカットキーの追加「動画投稿者の関連動画を表示」「右下で選択中のマイリストに登録」
+// - CSSを少し軽量化
+// - 細かい修正
 
 // * ver 1.130209
 // - 【地味に便利】マウスの左か右ボタン＋ホイールでどこでも音量調整。とっさに音量を変えたい時に便利 (デフォルトは無効)
@@ -292,14 +301,18 @@
       noNicoru: false, // ニコるボタンをなくす
       enoubleTouchPanel: false, // タッチパネルへの対応を有効にする
       mouseClickWheelVolume: 0, // マウスボタン+ホイールで音量調整を有効にする 1 = 左ボタン 2 = 右ボタン
+      enableAutoPlaybackContinue: false, // 一定時間操作しなかくても自動再生を続行
+      enableQTouch: false, // タッチパネルモード有効
 
       enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
 
-      shortcutDefMylist:          {char: 'M', shift: true, ctrl: false, alt: false, enable: false}, // とりマイ登録のショートカット
-      shortcutOpenSearch:         {char: 'S', shift: true, ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
-      shortcutOpenDefMylist:      {char: 'D', shift: true, ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
-      shortcutCommentVisibility:  {char: 'V', shift: true, ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
-      shortcutScrollToNicoPlayer: {char: 'P', shift: true, ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
+      shortcutDefMylist:          {char: 'M', shift: true,  ctrl: false, alt: false, enable: false}, // とりマイ登録のショートカット
+      shortcutMylist:             {char: 'M', shift: false, ctrl: true , alt: false, enable: false}, // マイリスト登録のショートカット
+      shortcutOpenSearch:         {char: 'S', shift: true,  ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
+      shortcutOpenDefMylist:      {char: 'D', shift: true,  ctrl: false, alt: false, enable: false}, // とりマイオープンのショートカット
+      shortcutCommentVisibility:  {char: 'V', shift: true,  ctrl: false, alt: false, enable: false}, // コメント表示ON/OFFのショートカット
+      shortcutScrollToNicoPlayer: {char: 'P', shift: true,  ctrl: false, alt: false, enable: false}, // プレイヤーまでスクロールのショートカット
+      shortcutShowOtherVideo:     {char: 'U', shift: true,  ctrl: false, alt: false, enable: false}, // 投稿者の関連動画表示のショートカット
 
 
       lastLeftTab: 'videoInfo',
@@ -357,12 +370,20 @@
     var style = [
     '\
     /* 動画タグとプレイリストのポップアップ */\n\
+      #videoTagPopupContainer {\n\
+      }\n\
+      #videoTagPopupContainer.w_touch {\n\
+        line-height: 200%; font-size: 130%;\n\
+      }\n\
+      #videoTagPopupContainer.w_touch .nicodic{\n\
+        margin: 4px 14px;\n\
+      }\n\
       .tagItemsPopup {\n\
         background: #eef; \n\
-      }\
+      }\n\
       .playlistMenuPopup {\n\
         background: #666; color: white; padding: 4px 8px;\n\
-      }\
+      }\n\
       .tagItemsPopup, .playlistMenuPopup {\n\
         position: absolute; \n\
         min-width: 150px; \n\
@@ -403,6 +424,9 @@
         display: inline-block; \n\
         background: #eee; \n\
       }\n\n\
+      .mylistPopupPanel.w_touch {\n\
+        height: 40px;\
+      }\
     /* マウスホバーで出るほうのマイリスト登録パネル */\
       .mylistPopupPanel.popup {\n\
         position: absolute; \n\
@@ -420,6 +444,12 @@
         border: 1px solid silver;\n\
       }\n\
     /* 誤操作を減らすため、とりマイの時だけスタイルを変える用 */\
+      .mylistPopupPanel.w_touch button {\n\
+        padding: 8px 18px;\
+      }\n\n\
+      .mylistPopupPanel.w_touch .mylistSelect {\n\
+        font-size: 170%; width: 130px;\
+      }\n\n\
       .mylistPopupPanel.deflistSelected button {\n\
       }\n\n\
       .mylistPopupPanel.mylistSelected  button {\n\
@@ -642,12 +672,18 @@
       #leftPanelTabContainer {\
         display:none; background: #666; position: absolute; right: 0; top: -27px; list-style-type: none; padding: 4px 6px 3px 60px; height: 20px; border-radius: 4px 4px 0px 4px;\
       }\
+      #leftPanelTabContainer.w_touch {\
+        top: -40px; height: 33px;\
+      }\
       #leftPanel:hover #leftPanelTabContainer{\
         display:block;\
       }\
       #leftPanelTabContainer .tab {\
         display: inline-block; cursor: pointer; background: #999; padding: 2px 4px 0px; border-radius: 4px 4px 0px 0px; border-width: 1px 1px 0px; \
       }\
+        #leftPanelTabContainer.w_touch .tab {\
+          padding: 8px 12px 8px;\
+        }\
       #leftPanel.nicommend .tab.nicommend{\
         background: #dfdfdf; border-style: outset;\
       }\
@@ -886,10 +922,10 @@
         background: #fdfdfd; padding: 0; border: 0;font-size: 90%; height: auto !important;\
       }\n\
       #searchResultNavigation .slideMenu ul li a{\
-        line-height: 165%; background: none\
+        line-height: 165%; background: none;\
       }\n\
       #searchResultNavigation.w_touch .slideMenu ul li a{\
-        line-height: 300%;\
+        line-height: 300%; font-size: 120%;\
       }\n\
         #searchResultNavigation .slideMenu ul li a:before{\
           background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;\
@@ -1038,68 +1074,68 @@
         left: -256px; border-radius: 4px 0 0 4px ; \
       }\n\
 \n\n\n\n\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultContainer, body.videoSelection #searchResultExplorer.w_adjusted #resultlist {\
+      #searchResultExplorer.w_adjusted #resultContainer, #searchResultExplorer.w_adjusted #resultlist {\
         width: 592px; padding-left: 0; min-width: 592px; max-width: auto;\
       }\n\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultContainer .resultContentsWrap, body.videoSelection #searchResultExplorer.w_adjusted #resultContainer .resutContentsWrap {\
+      #searchResultExplorer.w_adjusted #resultContainer .resultContentsWrap, #searchResultExplorer.w_adjusted #resultContainer .resutContentsWrap {\
         width: 592px; padding: 16px 0px;\
       }\n\
-      body.videoSelection.no_setting_panel.size_small #content.w_adjusted #searchResultNavigation:not(.w_touch)>ul>li,  body.videoSelection #content.w_adjusted #searchResultExplorerExpand {\
+      #content.w_adjusted #searchResultNavigation:not(.w_touch)>ul>li,  body.videoSelection #content.w_adjusted #searchResultExplorerExpand {\
         height: 26px;\
       }\n\
-      body.videoSelection.no_setting_panel.size_small #content.w_adjusted #searchResultNavigation:not(.w_touch)>ul>li>a,body.videoSelection #content.w_adjusted #searchResultExplorerExpand a{\
+      #content.w_adjusted #searchResultNavigation:not(.w_touch)>ul>li>a,body.videoSelection #content.w_adjusted #searchResultExplorerExpand a{\
         line-height: 26px; font-size: 100%;\
       }\n\
-      body.videoSelection #searchResultNavigation > ul > li a:after, body.videoSelection #content.w_adjusted #searchResultExplorerExpand a#closeSearchResultExplorer:after {\
+      #searchResultNavigation > ul > li a:after, #content.w_adjusted #searchResultExplorerExpand a#closeSearchResultExplorer:after {\
         top: 8px;\
       }\n\
-      body.videoSelection #searchResultExplorer.w_adjusted {\
+      #searchResultExplorer.w_adjusted {\
         background: #333333;\
       }\n\
-      body.videoSelection .openOuter #searchResultExplorerContentWrapper {\
+      /*body.videoSelection .openOuter #searchResultExplorerContentWrapper {\
         display: none;\
       }\n\
       body.videoSelection .openOuter #outline {\
         display: block;\
-      }\n\
+      }*/\n\
       body.videoSelection #footer.w_adjusted {\
         display: none;\
       }\n\
 \
     /* 1列表示の時、動画タイトルの横の空白部分にまでクリック判定があるのはVistaのエクスプローラみたいで嫌なので、文字部分だけにしたい */\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter .create_time {\
+      #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter .created_time {\
         display: block;\
       }\n\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a{\
+      #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a{\
         display: inline;\
       }\n\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a p {\
+      #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a p {\
         display: inline;\
       }\n\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultlist .videoItem a:visited{\
+      /*#searchResultExplorer.w_adjusted #resultlist .videoItem a:visited{\
         color: #04618c;\
-      }\n\
+      }*/\n\
 \
-      body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column1 .commentBlank {\
+      #searchResultExplorer.w_adjusted #resultlist.column1 .commentBlank {\
         width: 96%;\
       }\n\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultlist.column4 .commentBlank {\
+      #searchResultExplorer.w_adjusted #resultlist.column4 .commentBlank {\
         width: 24%;\
       }\n\
 \
-      body.videoSelection #resultlist.column4 .videoItem .balloon {\
+      /* body.videoSelection */#resultlist.column4 .videoItem .balloon {\
         bottom: auto; top: 10px;\
       }\n\
-      body.videoSelection #resultlist .videoItem .columnVertical     .balloon {\
+      #resultlist .videoItem .columnVertical     .balloon {\
         top: -20px; /* 「再生リストに追加しました」が上の動画に被るのを防ぐ */\
       }\
-      body.videoSelection #resultlist .videoItem .columnVertical     .itemMylistComment {\
+      #resultlist .videoItem .columnVertical     .itemMylistComment {\
         font-size: 85%; color: #666; border: 1px solid silver; border-radius: 8px; padding: 4px; margin: 0 2px; display: none;\
       }\
 \
-      body.videoSelection #resultContainer.dummyMylist #searchResultContainer .favMylistEditContainer,\
-      body.videoSelection #resultContainer.dummyMylist #searchResultMylistSortOptions,\
-      body.videoSelection #resultContainer.dummyMylist #searchResultHeader {\
+      #resultContainer.dummyMylist #searchResultContainer .favMylistEditContainer,\
+      #resultContainer.dummyMylist #searchResultMylistSortOptions,\
+      #resultContainer.dummyMylist #searchResultHeader {\
         display: none !important;\
       }\n\
 \
@@ -1107,10 +1143,10 @@
         position: absolute; padding: 0; box-shadow: 1px 1px 2px black;\
         display: none;\
       }\
-      body.videoSelection #searchResultExplorer #resultContainer #resultlist .videoItem .columnVertical     .thumbnailHoverMenu {\
+      #searchResultExplorer #resultContainer #resultlist .videoItem .columnVertical     .thumbnailHoverMenu {\
         bottom:  4px; left: 4px;\
       }\
-      body.videoSelection #searchResultExplorer #resultContainer #resultlist .videoItem .columnHorizontal   .thumbnailHoverMenu {\
+      #searchResultExplorer #resultContainer #resultlist .videoItem .columnHorizontal   .thumbnailHoverMenu {\
         bottom: 75px; left: 5px;\
       }\
       #resultlist .videoItem .deleteFromMyMylist {\
@@ -1120,23 +1156,23 @@
       #resultlist .videoItem .showLargeThumbnail {\
         cursor: pointer; font-size: 70%; border: 1px solid #ccc;; \
       }\
-      body.videoSelection #searchResultExplorer #resultContainer #resultlist .showLargeThumbnail {\
+      #searchResultExplorer #resultContainer #resultlist .showLargeThumbnail {\
         padding: 0 4px;\
       }\
-      body.videoSelection #searchResultExplorer #resultContainer #resultlist .videoItem:hover .thumbnailHoverMenu {\
+      #searchResultExplorer #resultContainer #resultlist .videoItem:hover .thumbnailHoverMenu {\
         display: block;\
       }\n\
-      body.videoSelection #searchResultExplorer #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
+      #searchResultExplorer #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
         display: inline-block;\
       }\n\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultContainer #searchResultContainer {\
+      #searchResultExplorer.w_adjusted #resultContainer #searchResultContainer {\
         background: #fff;\
       }\n\
 \
-      body.videoSelection #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap {\
+      #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap {\
         margin-right: -290px; padding: 0; transition: margin-right .2s; -webkit-transition: margin-right .2s;\
       }\
-      body.videoSelection #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap:hover {\
+      #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap:hover {\
         margin-right: -0px; z-index: 1020;\
       }\
       body.videoSelection.content-fix #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap {\
@@ -1163,6 +1199,19 @@
       }\
       body.w_noNicoru .menuOpened #videoMenuTopList li.videoMenuListNicoru{\
         display: none;\
+      }\
+\
+      .userProfile.w_touch {\
+        font-size: 150%; line-height: 120%;\
+      }\
+      .resultPagination.w_touch {\
+        font-size: 200%;\
+      }\
+      .resultPagination.w_touch li{\
+        padding: 4px 16px;\
+      }\
+      #searchResultOptions select.w_touch {\
+        font-size: 150%;\
       }\
       ',
     ''].join('');
@@ -1220,7 +1269,7 @@
         values: {'する': true, 'しない': false}},
       {title: '左のパネルに動画情報・市場を表示', varName: 'leftPanelJack',
         values: {'する': true, 'しない': false}},
-      {title: 'ヘッダに再生数表示', varName: 'headerViewCounter',
+      {title: 'ページのヘッダに再生数表示', varName: 'headerViewCounter',
         values: {'する': true, 'しない': false}},
       {title: 'てれびちゃんメニュー内に、原宿以前の左上ロゴを復活', varName: 'hidariue',
         values: {'する': true, 'しない': false}},
@@ -1241,15 +1290,13 @@
       {title: 'サムネを4:3にする', varName: 'squareThumbnail',
         description: '上下がカットされなくなり、サムネの全体が見えるようになります。',
         values: {'する': true, 'しない': false}},
-      {title: 'マイリストから外すボタンを追加(テスト中)', varName: 'enableMylistDeleteButton',
+      {title: '「マイリストから外す」ボタンを表示', varName: 'enableMylistDeleteButton',
         description: 'マイリストの整理に便利。\n ※ 消す時に確認ダイアログは出ないので注意',
         values: {'する': true, 'しない': false}},
 
       {title: 'その他の設定'},
-      {title: '動画リンクにマイリストメニューを表示', varName: 'enableHoverPopup',
+      {title: 'マウスを重ねるとマイリストメニューを表示', varName: 'enableHoverPopup',
         description: 'マウスカーソルを重ねた時に出るのが邪魔な人はオフにしてください',
-        values: {'する': true, 'しない': false}},
-      {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
         values: {'する': true, 'しない': false}},
       {title: 'ゆっくり再生(スロー再生)ボタンを表示する', varName: 'enableYukkuriPlayButton',
         values: {'する': true, 'しない': false}},
@@ -1259,16 +1306,26 @@
         values: {'する': true, 'しない': false}},
       {title: '「ニコる」ボタンをなくす', varName: 'noNicoru',
         values: {'なくす': true, 'なくさない': false}},
+      {title: 'タッチパネル向けモード(画面を右フリックで開始)', varName: 'enableQTouch',
+        values: {'使う': true, '使わない': false}},
 
-      {title: 'ショートカット設定', description: '※Chromeはコメント入力中も反応してしまいます'},
-      {title: 'マウスのボタン＋ホイールで音量調整', varName: 'mouseClickWheelVolume',
+
+      {title: 'マウスとキーボードの設定', description: '※Chromeはコメント入力中も反応してしまいます'},
+      {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
+        values: {'する': true, 'しない': false}},
+      {title: 'マウスのボタン＋ホイールで音量調整機能', varName: 'mouseClickWheelVolume',
         description: 'とっさに音量を変えたい時に便利',
-        values: {'無効': 0 , '左ボタン': 1, '右ボタン': 2}},
+        values: {'使わない': 0 , '左ボタン＋ホイール': 1, '右ボタン＋ホイール': 2}},
       {title: 'とりあえずマイリスト登録',       varName: 'shortcutDefMylist',          type: 'keyInput'},
+      {title: 'マイリスト登録',                 varName: 'shortcutMylist',             type: 'keyInput',
+        description: '右下で選択中のマイリストに登録'},
       {title: 'とりあえずマイリストを開く',     varName: 'shortcutOpenDefMylist',      type: 'keyInput'},
-      {title: '検索画面オープン',               varName: 'shortcutOpenSearch',         type: 'keyInput'},
+      {title: '動画投稿者の関連動画を開く',     varName: 'shortcutShowOtherVideo',     type: 'keyInput'},
+      {title: '検索画面を開く',                 varName: 'shortcutOpenSearch',         type: 'keyInput'},
       {title: 'コメント表示ON/OFF',             varName: 'shortcutCommentVisibility',  type: 'keyInput'},
       {title: 'プレイヤーの位置までスクロール', varName: 'shortcutScrollToNicoPlayer', type: 'keyInput'}
+
+
 
     ];
 
@@ -1464,9 +1521,10 @@
       }
     };
 
-    var uniq = null, $history = null;
+    var uniq = null, $history = null, popupContainer = null;
     pt.popupItems = function(watchId, baseX, baseY) {
       var self = this;
+      popupContainer.innerHTML = '';
       this.get(watchId, function(status, resp) {
         if (status == 'ok') {
           var tags = resp.tags;
@@ -1483,7 +1541,8 @@
 
       function createPopup(tags, baseX, baseY) {
         var popup = createDOM(tags, baseX, baseY);
-        document.body.appendChild(popup);
+        //document.body.appendChild(popup);
+        popupContainer.appendChild(popup);
         popup.style.right = null;
         popup.style.left = baseX + 'px';
         popup.style.top = Math.max(baseY - popup.offsetHeight, 0, document.body.scrollTop, document.documentElement.scrollTop) + 'px';
@@ -1583,6 +1642,9 @@
         return dic;
       }
     };
+    popupContainer = document.createElement('div');
+    popupContainer.id = 'videoTagPopupContainer';
+    document.body.appendChild(popupContainer);
 
     return pt;
   })(conf, w);
@@ -2008,7 +2070,9 @@
             if (!description) return;
           }
           btn.disabled = true;
-          setTimeout(function() { btn.disabled = false;}, 1000);
+          btn.style.opacity = 0.5;
+          btn.style.cursor = 'wait';
+          setTimeout(function() { btn.disabled = false; btn.style.opacity = 1; btn.style.cursor = 'pointer';}, 1000);
           var groupId = sel.value, name = sel.options[sel.selectedIndex].textContent;
           if (groupId == 'default') {
             self.addDefListItem(_watchId, function(status, result, replaced) {
@@ -2065,7 +2129,9 @@
         btn.title = 'タグ取得';
         btn.addEventListener('click', function(e) {
           btn.disabled = true;
-          setTimeout(function() {btn.disabled = false;}, 1000);
+          btn.style.opacity = 0.5;
+          btn.style.cursor = 'wait';
+          setTimeout(function() {btn.disabled = false; btn.style.opacity = 1; btn.style.cursor = 'pointer'; }, 1000);
           if (w.jQuery) {
             var $btn = w.jQuery(btn), o = $btn.offset();
             VideoTags.popupItems(_videoId, o.left, o.top + $btn.outerHeight());
@@ -2385,19 +2451,86 @@
     };
   })();
 
+  var TouchEventDispatcher = (function(target) {
+    var
+      self,
+      touchStartEvent = null,
+      touchEndEvent = null,
+      events = {
+      onflick: []
+    };
+    function dispatchEvent(name) {
+      var e = events[name];
+      for (var i =0, len = e.length; i < len; i++) {
+        e[i].apply(null, Array.prototype.slice.call(arguments, 1));
+      }
+    }
+
+    target.addEventListener('touchstart', function(e) {
+      touchStartEvent = e;
+    });
+    target.addEventListener('touchcancel', function(e) {
+      touchStartEvent = null;
+    });
+    target.addEventListener('touchend', function(e) {
+      touchEndEvent = e;
+      if (touchStartEvent !== null) {
+        var stTraget = touchStartEvent.target, enTarget = touchEndEvent.target;
+        var
+          sx = touchStartEvent.changedTouches[0].pageX, sy = touchStartEvent.changedTouches[0].pageY,
+          ex = touchEndEvent.changedTouches[0].pageX,   ey = touchEndEvent.changedTouches[0].pageY,
+          dx = (sx - ex), dy = (sy - ey), len = Math.sqrt(dx * dx + dy * dy), s;
+          if (len > 150) {
+            s = dy / len;
+            var a = Math.abs(s), ss = Math.round(s);
+            if (a <= 0.2 || a >= 0.8) {
+              var d;
+              if (ss < 0) { d = 'down'; } else if (ss > 0) { d = 'up'; }
+              else if (dx < 0) { d = 'right';} else { d = 'left'; }
+              dispatchEvent('onflick', {
+                direction: d,
+                distance: len,
+                x: dx, y: dy,
+                startEvent: touchStartEvent,
+                endEvent: touchEndEvent
+              });
+            }
+          }
+      }
+      touchStartEvent = touchEndEvent = null;
+    });
+
+    function onflick(callback) {
+      events.onflick.push(callback);
+    }
+
+    return self = {
+      onflick: onflick
+    };
+  })(w.document);
+
+
 
   /**
    *  リンクのマウスオーバーに仕込む処理
    *  ここの表示は再考の余地あり
    */
-  var AnchorHoverPopup = (function() {
+  var AnchorHoverPopup = (function(w) {
     var mylistPanel = Mylist.getPanel('');
     mylistPanel.className += ' popup';
     mylistPanel.style.display    = 'none';
     document.body.appendChild(mylistPanel);
 
-    function showPanel(watchId, baseX, baseY) {
+    function showPanel(watchId, baseX, baseY, w_touch) {
       VideoTags.hidePopup();
+
+      var cn = mylistPanel.className.toString();
+      if (w_touch === true) {
+        cn = cn.replace(' w_touch', '') + ' w_touch';
+      } else {
+        cn = cn.replace(' w_touch', '');
+      }
+      if (mylistPanel.className !== cn) mylistPanel.className = cn;
 
       mylistPanel.style.display = '';
       mylistPanel.watchId(watchId);
@@ -2460,7 +2593,7 @@
     function bind(force, target) {
       if (!conf.enableHoverPopup) { return; }
 
-      var a = Array.prototype.slice.apply(document.links);
+      var a = Array.prototype.slice.apply(document.links), vreg = videoReg, ereg = excludeReg;
         for (var i = 0, len = a.length; i < len; i++) {
           var e = a[i];
           try {
@@ -2468,8 +2601,8 @@
             if (
               href &&
               !e.added &&
-              (m = videoReg.exec(href)) != null &&
-              !excludeReg.test(href) &&
+              (m = vreg.exec(href)) != null &&
+              !ereg.test(href) &&
               e.className != "itemEcoLink" &&
               true
             ) {
@@ -2479,8 +2612,36 @@
             conf.debugMode && console.log(ex);
           }
         }
-
-
+    }
+    function bindTouch() {
+      TouchEventDispatcher.onflick(function(e) {
+        var se = e.startEvent;
+        if (e.direction === 'right' && (se.target.tagName === 'A' || se.target.parentElement.tagName === 'A')) {
+          var
+            a = (se.target.tagName === 'A') ? e.startEvent.target : e.startEvent.target.parentElement,
+            href = a.href, vreg = videoReg, ereg = excludeReg, m, watchId;
+          if (
+            href &&
+            (m = vreg.exec(href)) != null &&
+            !ereg.test(href) &&
+            e.className != "itemEcoLink" &&
+            true
+          ) {
+            watchId = m[2];
+            if (w.jQuery) {
+              var $a = w.jQuery(a);
+              var t = $a.text();
+              var o = t != "" ? $a.offset() : $a.find('*').offset();
+              showPanel(watchId, o.left, o.top, true);
+            } else {
+              var o = (a.firstChild && a.firstChild.tagName == 'IMG') ? a.firstChild.getBoundingClientRect() : a.getBoundingClientRect();
+              var top  = Math.max(w.document.documentElement.scrollTop,  w.document.body.scrollTop),
+                  left = Math.max(w.document.documentElement.scrollLeft, w.document.body.scrollLeft);
+              showPanel(watchId, left + o.left, top + o.top, true);
+            }
+          }
+        }
+      });
     }
 
     var lastUpdate = 0;
@@ -2512,6 +2673,7 @@
       }
     };
 
+
     if (location.host == "ext.nicovideo.jp") {
       bind();
     } else {
@@ -2525,11 +2687,12 @@
           }
         });
       }
+      bindTouch();
       bind();
       setInterval(bindLoop, 500);
     }
     return self;
-  })();
+  })(w);
 
 
   //===================================================
@@ -4083,6 +4246,9 @@
             }
           }
         }
+        if (conf.enableAutoPlaybackContinue && watch.PlayerInitializer.noUserOperationController.autoPlaybackModel._isAutoPlayback) {
+          watch.PlayerInitializer.noUserOperationController.autoPlaybackModel.setCount(0);
+        }
       }
     }
 
@@ -4375,7 +4541,7 @@
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
           $toggle.addClass('opening');
-          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500, function() {
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 2000 )}, 1000, function() {
             $toggle.toggleClass('open', !isVisible);
             $toggle.removeClass('opening');
           });
@@ -4491,7 +4657,7 @@
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
           $toggle.addClass('opening');
-          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500, function() {
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 2000 )}, 1000, function() {
             $toggle.toggleClass('open', !isVisible);
             $toggle.removeClass('opening');
           });
@@ -4574,7 +4740,7 @@
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
           $toggle.addClass('opening');
-          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500, function() {
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 2000 )}, 1000, function() {
             $toggle.toggleClass('open', !isVisible);
             $toggle.removeClass('opening');
           });
@@ -4851,63 +5017,71 @@
       var commentPanelWidth = $('#playerCommentPanelOuter').outerWidth();
 
       var css = ['<style type="text/css" id="explorerHack">',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerContainerWrapper, \n',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerContainerSlideArea, \n',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerContainer, \n',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #nicoplayerContainer ,\n',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #external_nicoplayer \n',
+        'body.videoSelection #content.w_adjusted #playerContainerWrapper, \n',
+        'body.videoSelection #content.w_adjusted #playerContainerSlideArea, \n',
+        'body.videoSelection #content.w_adjusted #playerContainer, \n',
+        'body.videoSelection #content.w_adjusted #nicoplayerContainer ,\n',
+        'body.videoSelection #content.w_adjusted #external_nicoplayer \n',
         '{',
           'width: ', availableWidth, 'px !important; height: ', availableHeight, 'px !important;padding: 0; margin: 0; ',
         '}\n',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #searchResultExplorerContentWrapper { ',
+        'body.videoSelection #content.w_adjusted #searchResultExplorerContentWrapper { ',
           'margin-top: ',  availableHeight, 'px !important; left: ', xdiff, 'px; ',
           'max-height: ', bottomHeight + 'px; overflow-y: auto; overflow-x: hidden; height: auto;',
         '}\n',
-        'body.size_small.no_setting_panel.videoSelection #searchResultExplorer.w_adjusted #resultContainerWrapper             { margin-left: ', availableWidth,  'px !important; }\n',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playlist { padding-left: ', xdiff, 'px; }\n',
-        'body.size_small.no_setting_panel.videoSelection #searchResultExplorer.w_adjusted { min-height: ', (windowHeight + 200) ,'px !important; }\n',
+        'body.videoSelection #searchResultExplorer.w_adjusted #resultContainerWrapper             { margin-left: ', availableWidth,  'px !important; }\n',
+        'body.videoSelection #content.w_adjusted #playlist { padding-left: ', xdiff, 'px; }\n',
+        'body.videoSelection #searchResultExplorer.w_adjusted { min-height: ', (windowHeight + 200) ,'px !important; }\n',
 
         // かなり 無理矢理 左パネルを 召喚するよ 不安定に なっても 知らない
         // 破滅！
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #leftPanel {',
+        'body.videoSelection #content.w_adjusted #leftPanel {',
           ' display: block; top: ', availableHeight, 'px !important; max-height: ', bottomHeight, 'px !important; width: ', (xdiff - 4), 'px !important; left: 0;',
           ' height:', (Math.min(bottomHeight, 600) - 2) , 'px !important;',
         '}',
-          'body.size_small.content-fix.no_setting_panel.videoSelection #content.w_adjusted #leftPanel {',
+          'body.videoSelection #content.w_adjusted #leftPanel {',
           '}',
-        'body.size_small.no_setting_panel.videoSelection:not(.content-fix) #content.w_adjusted .videoDetails, ',
-        'body.size_small.no_setting_panel.videoSelection:not(.content-fix) #content.w_adjusted #searchResultNavigation {',
+        'body.videoSelection:not(.content-fix) #content.w_adjusted .videoDetails, ',
+        'body.videoSelection:not(.content-fix) #content.w_adjusted #searchResultNavigation {',
           // タグ領域三行分 スクロール位置をタグの場所にしてる時でも末端までスクロールできるようにするための細工
           // (四行以上あるときは表示しきれないが)
           'padding-bottom: 72px; ',
         '}',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted .leftVideoInfo, body.size_small.no_setting_panel.videoSelection #content.w_adjusted .leftIchibaPanel {',
+        'body.videoSelection #content.w_adjusted .leftVideoInfo, body.size_small.no_setting_panel.videoSelection #content.w_adjusted .leftIchibaPanel {',
           'width: ', (xdiff - 4), 'px !important;',
         '}',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted .nicommendContentsOuter {',
+        'body.videoSelection #content.w_adjusted .nicommendContentsOuter {',
           'width: ', (xdiff - 18), 'px !important;',
         '}',
         // かなり 無理矢理 コメントパネルを 召喚するよ 不安定に なっても 知らない
         // 破滅！
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #nicoplayerContainer {',
+        'body.videoSelection #content.w_adjusted #nicoplayerContainer {',
           'z-index: 100;',
         '}',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerCommentPanelOuter {',
-          'right: -16px !important; top: 0px !important; height: 50px !important; background: #dfdfdf; border: 2px outset; border-radius: 4px;',
+        'body.videoSelection #content.w_adjusted #playerCommentPanelOuter {',
+          '; top: 0px !important; height: 50px !important; background: #dfdfdf; border: 2px outset; border-radius: 4px;',
           'z-index: 99;',
           'transition: right 0.3s ease-out, height 0.3s ease-out;  -webkit-transition: right 0.3s ease-out, height 0.3s ease-out;',
         '}',
-          'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover {',
+        'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_touch {',
+          'right: -32px !important;',
+        '}',
+        'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:not(.w_touch) {',
+          'right: -16px !important;',
+        '}',
+          'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover,',
+          'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_active {',
             'right: -',(commentPanelWidth), 'px !important; top: 0 !important; height: ', availableHeight, 'px !important; background: transparent; border: 0;',
           '}',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerCommentPanelOuter #playerCommentPanel {',
+        'body.videoSelection #content.w_adjusted #playerCommentPanelOuter #playerCommentPanel {',
           'display: none;',
         '}',
-          'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover #playerCommentPanel {',
+          'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover #playerCommentPanel,',
+          'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_active            #playerCommentPanel {',
             'height: ', (availableHeight - 20 /* padding+borderの10x2pxを引く */), 'px !important; ',
             'display: block; background: #dfdfdf; border: 2px outset;',
           '}',
-        'body.size_small.no_setting_panel.videoSelection #content.w_adjusted #playerCommentPanelOuter #playerCommentPanel .panelClickHandler{',
+        'body.videoSelection #content.w_adjusted #playerCommentPanelOuter #playerCommentPanel .panelClickHandler{',
           'display: none !important;',
         '}',
       '</style>'].join('');
@@ -5193,10 +5367,12 @@
     function initShortcutKey() {
       var
         defMylist         = KeyMatch.create(conf.shortcutDefMylist),
-        openDefMylist      = KeyMatch.create(conf.shortcutOpenDefMylist),
+        mylist            = KeyMatch.create(conf.shortcutMylist),
+        openDefMylist     = KeyMatch.create(conf.shortcutOpenDefMylist),
         openSearch        = KeyMatch.create(conf.shortcutOpenSearch),
         scrollToPlayer    = KeyMatch.create(conf.shortcutScrollToNicoPlayer),
-        commentVisibility = KeyMatch.create(conf.shortcutCommentVisibility)
+        commentVisibility = KeyMatch.create(conf.shortcutCommentVisibility),
+        showOtherVideo    = KeyMatch.create(conf.shortcutShowOtherVideo)
         ;
 
       ConfigPanel.addChangeEventListener(function(name, newValue, oldValue) {
@@ -5214,6 +5390,12 @@
         } else
         if (name === 'shortcutCommentVisibility') {
           commentVisibility = KeyMatch.create(conf.shortcutCommentVisibility);
+        } else
+        if (name === 'shortcutMylist') {
+          mylist = KeyMatch.create(conf.shortcutMylist);
+        } else
+        if (name === 'shortcutShowOtherVideo') {
+          showOtherVideo = KeyMatch.create(conf.shortcutShowOtherVideo);
         }
       });
 
@@ -5243,6 +5425,8 @@
         openSearch.test(e)        && (WatchController.openSearch() || WatchController.scrollToVideoPlayer(true));
         scrollToPlayer.test(e)    && WatchController.scrollToVideoPlayer(true);
         commentVisibility.test(e) && WatchController.commentVisibility('toggle');
+        mylist.test(e)    && $('#mylist_add_frame').find('.mylistAdd').click();
+        showOtherVideo.test(e)    && $('.showOtherVideos:visible:first').click();
       });
     }
 
@@ -5294,6 +5478,29 @@
       if (conf.mouseClickWheelVolume > 0) {
         initWheelWatch();
       }
+    }
+    function initTouch() {
+      var touchInitialized = false;
+      TouchEventDispatcher.onflick(function(e) {
+        var se = e.startEvent;
+        if (!conf.enableQTouch) {return; }
+        if (e.direction === 'right') {
+          if (se.target.id === 'playerCommentPanelOuter') {
+            $(se.target).addClass('w_active');
+          }
+          if (!touchInitialized) {
+            $('#mylist_add_frame, #leftPanelTabContainer, #searchResultNavigation, #playerCommentPanelOuter').addClass('w_touch');
+            $('.userProfile, .resultPagination, #searchResultOptions select').addClass('w_touch');
+            touchInitialized = true;
+          }
+        } else
+        if (e.direction === 'left') {
+          if (se.target.tagName === 'DIV' &&
+              $.contains('#playerCommentPanelOuter', se.target)) {
+            $('#playerCommentPanelOuter').removeClass('w_active');
+          }
+        }
+      });
     }
 
     function initOther() {
@@ -5381,38 +5588,32 @@
       $('playerBottomAd').hide();
     }
 
-    try
-    {
-      initIframe();
-      initSidePanel();
-      initShortcutKey();
-      initMouse();
-      initEvents();
-      initPager();
-      initSearchOption();
-      initLeftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
-      initOther();
+    initIframe();
+    initSidePanel();
+    initShortcutKey();
+    initMouse();
+    initTouch();
+    initEvents();
+    initPager();
+    initSearchOption();
+    initLeftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
+    initOther();
 
-      onWindowResize();
-      setTimeout(function() {
-        if (conf.videoExplorerHack) {
-          $('#searchResultExplorer, #content, #footer').addClass('w_adjusted');
-          $('#nicommendPanelCreateOpen').mousedown(function() {
-            if ($('body').hasClass('videoSelection')) { // ガックガックするけど動かないよりはマシ
-              WatchController.closeSearch();
-              setTimeout(function() {
-                WatchApp.ns.util.WindowUtil.scrollFit('#nicommendCreateStart', 200);
-              }, 1000);
-            }
-          });
-        }
+    onWindowResize();
+    setTimeout(function() {
+      if (conf.videoExplorerHack) {
+        $('#searchResultExplorer, #content, #footer').addClass('w_adjusted');
+        $('#nicommendPanelCreateOpen').mousedown(function() {
+          if ($('body').hasClass('videoSelection')) { // ガックガックするけど動かないよりはマシ
+            WatchController.closeSearch();
+            setTimeout(function() {
+              WatchApp.ns.util.WindowUtil.scrollFit('#nicommendCreateStart', 200);
+            }, 1000);
+          }
+        });
+      }
 
-      }, 3000);
-
-    } catch(e) {
-      conf.debugMode && console.log(e);
-      w.alert(e);
-    }
+    }, 3000);
   })(w);
 
 
@@ -5453,8 +5654,17 @@
         AnchorHoverPopup.hidePopup();
       } else {
       }
-    });
 
+    });
+    var touchInitialized = false;
+    TouchEventDispatcher.onflick(function(e) {
+      if (e.direction === 'right') {
+        if (!touchInitialized) {
+          document.getElementById('videoTagPopupContainer').className += ' w_touch';
+          touchInitialized = true;
+        }
+      }
+    });
 //    w.document.body.addEventListener('dblclick', function(e) {var tagName = e.target.tagName, className = e.target.className;console.log(tagName, className);});
 
   })(w);
