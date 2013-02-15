@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130216
+// @version        1.130216b
 // ==/UserScript==
 
 // TODO:
@@ -24,6 +24,8 @@
 // 軽量化
 
 // * ver 1.130216
+// - 説明文の動画やマイリストリンクの下に、タイトルとサムネを表示
+//　 (※ニコメンド領域から情報を拾ってるだけなので、出せない場合もあります)
 // - ショートカットキー「ミュート」追加
 // - 細かい修正
 
@@ -639,6 +641,16 @@
       #leftPanel .leftVideoInfo .userIconContainer .usericon, #leftPanel .leftVideoInfo .ch_profile img{\n\
         max-width: 130px; width: auto; height: auto; border: 0;\n\
       }\n\n\
+      #leftPanel .leftVideoInfo .descriptionThumbnail {\
+        text-align: left; font-size: 90%; padding: 4px; border-radius: 4px; background: #ccc;/*box-shadow: 2px 2px 2px #666;*/\
+        min-height: 50px; margin-bottom: 4px; font-weight: normal; color: black;\
+      }\
+      #leftPanel .leftVideoInfo .descriptionThumbnail.video img{\
+        height: 50px; cursor: pointer; float: left;\
+      }\
+      #leftPanel .leftVideoInfo .descriptionThumbnail.mylist img{\
+        height: 40px; cursor: pointer;\
+      }\
       body.videoSelection #content.w_adjusted #leftIchibaPanel .ichiba_mainitem {\
         width: 180px; display:inline-block; vertical-align: top;\
         margin: 4px 3px; border 1px solid silver; border-radius: 8px\
@@ -4077,6 +4089,48 @@
       };
     })($, conf, w);
 
+    var NicommendReader = (function($, conf, w) {
+      var self, dataCache = {};
+
+      function update() {
+        dataCache = {};
+        $('#nicommendPanelContent').find('.nicommendItemList>.item').each(function() {
+          var $item = $(this);
+          if ($item.hasClass('video')) {
+            var url = $item.find('.itemThumb>a').attr('href').split('?')[0];
+            dataCache[url] = {
+              type: 'video',
+              title: $.trim($item.find('.itemName a').text()),
+              thumbnail: [$item.find('.itemThumb img').attr('src')]
+            };
+          } else
+          if ($item.hasClass('mylist')) {
+            var url = $item.find('.itemThumb>a').attr('href').split('?')[0], img = $item.find('.itemThumb img');
+
+            dataCache[url] = {
+              type: 'mylist',
+              title: $.trim($item.find('.itemName a').text()),
+              count: $item.find('.itemName .value').text().replace('件', ''),
+              thumbnail: []
+            };
+            img[0] && (dataCache[url].thumbnail[0] = img[0].src);
+            img[1] && (dataCache[url].thumbnail[1] = img[1].src);
+            img[2] && (dataCache[url].thumbnail[2] = img[2].src);
+
+          }
+        });
+      }
+
+      function info(url) {
+        return dataCache[url] || {};
+      }
+
+      return self = {
+        update: update,
+        info: info
+      };
+    })($, conf, w);
+
     var initialExplorerWidth = null, resizeWatchTimer = null;
     function onWindowResize() {
       if (resizeWatchTimer != null) {
@@ -4391,6 +4445,7 @@
       var addComma = WatchApp.ns.util.StringUtil.addComma;
       var $template = $leftPanelTemplate.clone();
 
+
       $template.css('opacity', 0);
 
       var $videoTitleContainer = $template.find('.videoTitleContainer');
@@ -4421,6 +4476,32 @@
       $videoDescription.find('.videoDescriptionInner').append($('.videoDescription:first').clone(true));
       $videoDescription.find('.watch').unbind('click');
 
+      NicommendReader.update();
+      $videoDescription.find('.videoDescriptionInner a').each(function() {
+        var url = this.href, info = NicommendReader.info(url), text, $this = $(this);
+        if (info.type === 'video') {
+            text = $this.text();
+            $this.after([
+                '<div class="descriptionThumbnail video" style="">',
+                '<img src="', info.thumbnail[0], '">',
+                '<p>', info.title, '</p>',
+                '</div>',
+            ''].join(''));
+        } else
+        if (info.type === 'mylist') {
+            text = $this.text();
+            var dom = [
+                '<div class="descriptionThumbnail mylist">',
+                '<p>', info.title, '</p>'
+            ];
+            info.thumbnail[0] && (dom.push('<img src="' + info.thumbnail[0] + '">'));
+            info.thumbnail[1] && (dom.push('<img src="' + info.thumbnail[1] + '">'));
+            info.thumbnail[2] && (dom.push('<img src="' + info.thumbnail[2] + '">'));
+            dom.push('</div>');
+            $this.after(dom.join(''));
+        }
+      });
+      $videoDescription.find('.descriptionThumbnail img').on('click', function() { showLargeThumbnail(this.src);});
 
       var $videoOwnerInfoContainer = $template.find('.videoOwnerInfoContainer');
       $videoOwnerInfoContainer
