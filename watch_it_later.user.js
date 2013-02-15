@@ -15,13 +15,17 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130215
+// @version        1.130216
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130216
+// - ショートカットキー「ミュート」追加
+// - 細かい修正
 
 // * ver 1.130215
 // - タッチパネルへの対応テスト。(Chromeでしかうまく動かない)
@@ -313,6 +317,7 @@
       shortcutCommentVisibility:  {char: 'V', shift: true,  ctrl: false, alt: false, enable: false}, // コメント表示ON/OFFのショートカット
       shortcutScrollToNicoPlayer: {char: 'P', shift: true,  ctrl: false, alt: false, enable: false}, // プレイヤーまでスクロールのショートカット
       shortcutShowOtherVideo:     {char: 'U', shift: true,  ctrl: false, alt: false, enable: false}, // 投稿者の関連動画表示のショートカット
+      shortcutMute:               {char: 'T', shift: true,  ctrl: false, alt: false, enable: false}, // 音量ミュートのショートカット
 
 
       lastLeftTab: 'videoInfo',
@@ -383,6 +388,9 @@
       }\n\
       .playlistMenuPopup {\n\
         background: #666; color: white; padding: 4px 8px;\n\
+      }\n\
+      .playlistMenuPopup.w_touch {\n\
+        line-height: 250%;\n\
       }\n\
       .tagItemsPopup, .playlistMenuPopup {\n\
         position: absolute; \n\
@@ -805,6 +813,10 @@
       #content .playlistToggle.w_show:after {\
         content: "▲";\
       }\
+      #content #playlist .playlistInformation  .generationMessage{\n\
+        /* 「連続再生ボタンとリスト名は左右逆のほうが安定するんじゃね？ 名前の長さによってボタンの位置がコロコロ変わらなくなるし」という対応。*/ \n\
+        position: absolute; margin-left: 90px;\n\
+      }\n\n\
       #playlistContainerInner .thumbContainer, #playlistContainerInner .balloon{\n\
         cursor: move;\n\
       }\n\n\
@@ -1210,8 +1222,8 @@
       .resultPagination.w_touch li{\
         padding: 4px 16px;\
       }\
-      #searchResultOptions select.w_touch {\
-        font-size: 150%;\
+      select.w_touch {\
+        font-size: 200%;\
       }\
       ',
     ''].join('');
@@ -1323,7 +1335,8 @@
       {title: '動画投稿者の関連動画を開く',     varName: 'shortcutShowOtherVideo',     type: 'keyInput'},
       {title: '検索画面を開く',                 varName: 'shortcutOpenSearch',         type: 'keyInput'},
       {title: 'コメント表示ON/OFF',             varName: 'shortcutCommentVisibility',  type: 'keyInput'},
-      {title: 'プレイヤーの位置までスクロール', varName: 'shortcutScrollToNicoPlayer', type: 'keyInput'}
+      {title: 'プレイヤーの位置までスクロール', varName: 'shortcutScrollToNicoPlayer', type: 'keyInput'},
+      {title: 'ミュート',                       varName: 'shortcutMute',               type: 'keyInput'}
 
 
 
@@ -2958,7 +2971,6 @@
           watch.PlaylistInitializer.playlist.type,
           watch.PlaylistInitializer.playlist.option
         );
-
       },
       addDefMylist: function(description) {
         var watchId = watch.CommonModelInitializer.watchInfoModel.id;
@@ -2979,13 +2991,27 @@
       },
       commentVisibility: function(v) {
         if (v === 'toggle') {
-          this.commentVisibility(!this.commentVisibility());
+          return this.commentVisibility(!this.commentVisibility());
         } else
         if (typeof v === 'boolean') {
           watch.PlayerInitializer.nicoPlayerConnector.playerConfig.set({commentVisible: v});
+          return this;
         } else {
           var pc = watch.PlayerInitializer.nicoPlayerConnector.playerConfig.get();
           return pc.commentVisible;
+        }
+      },
+      mute: function(v) {
+        var exp = w.document.getElementById('external_nicoplayer');
+
+        if (v === 'toggle') {
+          return this.mute(!this.mute());
+        } else
+        if (typeof v === 'boolean') {
+          exp.ext_setMute(v);
+          return this;
+        } else {
+          return exp.ext_isMute();
         }
       },
       volume: function(v) {
@@ -3899,7 +3925,7 @@
       video_id = '', watch_id = '',
       iframe = Mylist.getPanel(''), tv_chan = $('.videoMenuToggle')[0],
       WatchApp = w.WatchApp, WatchJsApi = w.WatchJsApi,
-      isFixedHeader = !$('body').hasClass('nofix'),
+      isFixedHeader = !$('body').hasClass('nofix'), isTouchActive = false,
       watch = WatchApp.ns.init,
       tagv = watch.TagInitializer.tagViewController, pim = watch.PlayerInitializer.playerInitializeModel, npc = watch.PlayerInitializer.nicoPlayerConnector,
       pac  = watch.PlayerInitializer.playerAreaConnector, vs = watch.ComponentInitializer.videoSelection, isSearchOpen = false,
@@ -3914,7 +3940,7 @@
 
 
       function createDom() {
-        $popup = $('<div></div>').addClass('playlistMenuPopup');//.css({});
+        $popup = $('<div/>').addClass('playlistMenuPopup').toggleClass('w_touch', isTouchActive);
         var $ul = $('<ul/>');
         $popup.click(function() {
           self.hide();
@@ -5063,21 +5089,21 @@
           'z-index: 99;',
           'transition: right 0.3s ease-out, height 0.3s ease-out;  -webkit-transition: right 0.3s ease-out, height 0.3s ease-out;',
         '}',
-        'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_touch {',
-          'right: -32px !important;',
+        'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_touch:not(.w_active) {',
+          'right: -60px !important; margin-top: 36px;',
         '}',
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:not(.w_touch) {',
           'right: -16px !important;',
         '}',
-          'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover,',
+          'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover:not(.w_active),',
           'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_active {',
             'right: -',(commentPanelWidth), 'px !important; top: 0 !important; height: ', availableHeight, 'px !important; background: transparent; border: 0;',
           '}',
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter #playerCommentPanel {',
           'display: none;',
         '}',
-          'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover #playerCommentPanel,',
-          'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_active            #playerCommentPanel {',
+          'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover:not(.w_active) #playerCommentPanel,',
+          'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_active             #playerCommentPanel {',
             'height: ', (availableHeight - 20 /* padding+borderの10x2pxを引く */), 'px !important; ',
             'display: block; background: #dfdfdf; border: 2px outset;',
           '}',
@@ -5373,6 +5399,7 @@
         scrollToPlayer    = KeyMatch.create(conf.shortcutScrollToNicoPlayer),
         commentVisibility = KeyMatch.create(conf.shortcutCommentVisibility),
         showOtherVideo    = KeyMatch.create(conf.shortcutShowOtherVideo)
+        mute              = KeyMatch.create(conf.shortcutMute)
         ;
 
       ConfigPanel.addChangeEventListener(function(name, newValue, oldValue) {
@@ -5393,6 +5420,9 @@
         } else
         if (name === 'shortcutMylist') {
           mylist = KeyMatch.create(conf.shortcutMylist);
+        } else
+        if (name === 'shortcutMute') {
+          mute   = KeyMatch.create(conf.shortcutMute);
         } else
         if (name === 'shortcutShowOtherVideo') {
           showOtherVideo = KeyMatch.create(conf.shortcutShowOtherVideo);
@@ -5425,8 +5455,9 @@
         openSearch.test(e)        && (WatchController.openSearch() || WatchController.scrollToVideoPlayer(true));
         scrollToPlayer.test(e)    && WatchController.scrollToVideoPlayer(true);
         commentVisibility.test(e) && WatchController.commentVisibility('toggle');
-        mylist.test(e)    && $('#mylist_add_frame').find('.mylistAdd').click();
-        showOtherVideo.test(e)    && $('.showOtherVideos:visible:first').click();
+        mylist.test(e)            && $('#mylist_add_frame').find('.mylistAdd').click();
+        showOtherVideo.test(e)    && $('.showOtherVideos:first').click();
+        mute.test(e)              && WatchController.mute('toggle');
       });
     }
 
@@ -5490,7 +5521,8 @@
           }
           if (!touchInitialized) {
             $('#mylist_add_frame, #leftPanelTabContainer, #searchResultNavigation, #playerCommentPanelOuter').addClass('w_touch');
-            $('.userProfile, .resultPagination, #searchResultOptions select').addClass('w_touch');
+            $('.userProfile, .resultPagination, #searchResultContainer select, .playlistMenuPopup').addClass('w_touch');
+            isTouchActive = true;
             touchInitialized = true;
           }
         } else
