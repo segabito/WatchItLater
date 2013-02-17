@@ -15,13 +15,21 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130216b
+// @version        1.130217
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130217
+// - 画面モードまわりで、なんとなく不便だと思っていた仕様を変更
+// 　再生終了後に全画面をオフにする設定でも、連続再生中は解除しない
+// 　自動で検索画面にする設定でも、全画面にしていたら移行しない
+// 　全画面 ← →検索画面切り替え時の挙動など
+// 　(検索画面から設定を開くと画面がバグる問題は実害がないので放置しています)
+// - CSSを少し軽量化
 
 // * ver 1.130216
 // - 説明文の動画やマイリストリンクの下に、タイトルとサムネを表示
@@ -812,11 +820,11 @@
       #content .bottomAccessContainer {\n\
         position: absolute; bottom: 0;\n\
       }\n\n\
-      body.w_searchOpen .bottomAccessContainer, body.w_searchOpen #content .openConfButton{\
+      body.videoSelection .bottomAccessContainer, body.videoSelection #content .openConfButton{\
         display: none;\
       }\
       /* プレイリスト出したり隠したり */\
-      body.w_notFull #playlist:not(.w_show){\n\
+      body:not(.full_with_browser) #playlist:not(.w_show){\n\
         position: absolute; top: -9999px;\n\
       }\n\n\
       #content .playlistToggle:after {\
@@ -1002,30 +1010,30 @@
 \
 \
       /* 動画タグが1行以下の時 */\
-      body.w_notFull #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.oneLine {\
+      body:not(.full_with_browser) #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.oneLine {\
         height: 12px;\
       }\
-      body.w_notFull #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.oneLine .toggleText{\
+      body:not(.full_with_browser) #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.oneLine .toggleText{\
         display: none;\
       }\
       /* 動画タグが2行以下の時 */\
-      body.w_notFull #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.twoLines {\
+      body:not(.full_with_browser) #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.twoLines {\
         height: 36px;\
       }\
       /* タグ領域とプレイヤーの隙間をなくす */\
-      body.w_notFull #videoTagContainer, body.w_notFull #videoHeader .videoMenuToggle {\
+      body:not(.full_with_browser) #videoTagContainer, body:not(.full_with_browser) #videoHeader .videoMenuToggle {\
         margin-bottom: -10px;\
       }\
       #videoHeaderMenu .searchContainer .searchText {\
         margin-top: -8px;\
       }\
 \
-      body.w_small #playerContainerWrapper {\
+      body.size_small #playerContainerWrapper {\
         padding: 0;\
       }\
 \
       /* ニュース履歴 */\
-      body.w_searchOpen #textMarquee .openNewsHistory, body.w_searchOpen #textMarquee .newsHistory {\
+      body.videoSelection #textMarquee .openNewsHistory, body.videoSelection #textMarquee .newsHistory {\
         display: none;\
       }\
       #textMarquee .openNewsHistory {\
@@ -1077,26 +1085,16 @@
       body.full_with_browser #playerContainer {\
         margin-left: 0 !important;\
       }\
-      body.w_notFull #playerContainer/*.upside*/, body.w_notFull #content.narrowBorder #playerContainer{\
+      body:not(.full_with_browser) #playerContainer {\
         top: -8px;\
       }\
-      body.full_with_browser #playerContainer/*.upside*/, body.w_small #playerContainer/*.upside*/{\
+      body.full_with_browser #playerContainer, body.size_small #playerContainer {\
         top: auto;\
       }\
       body.full_with_browser.no_setting_panel #searchResultExplorerContentWrapper {\
         display:none;\
       }\
 \
-      #content.narrowBorder #playerCommentPanelOuter{\
-        /*right: -412px !important;*/\
-        /*margin-right: 10px !important;\*/\
-      }\
-      #content.narrowBorder #playerCommentPanelOuter #playerCommentPanel{\
-        border-radius: 0 4px 4px 0; padding: 4px 1px;\
-      }\n\
-      #content.narrowBorder #leftPanel{\
-        left: -256px; border-radius: 4px 0 0 4px ; \
-      }\n\
 \n\n\n\n\
       #searchResultExplorer.w_adjusted #resultContainer, #searchResultExplorer.w_adjusted #resultlist {\
         width: 592px; padding-left: 0; min-width: 592px; max-width: auto;\
@@ -1116,29 +1114,17 @@
       #searchResultExplorer.w_adjusted {\
         background: #333333;\
       }\n\
-      /*body.videoSelection .openOuter #searchResultExplorerContentWrapper {\
-        display: none;\
-      }\n\
-      body.videoSelection .openOuter #outline {\
-        display: block;\
-      }*/\n\
       body.videoSelection #footer.w_adjusted {\
         display: none;\
       }\n\
 \
     /* 1列表示の時、動画タイトルの横の空白部分にまでクリック判定があるのはVistaのエクスプローラみたいで嫌なので、文字部分だけにしたい */\
-      #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter .created_time {\
-        display: block;\
-      }\n\
       #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a{\
         display: inline;\
       }\n\
       #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a p {\
         display: inline;\
       }\n\
-      /*#searchResultExplorer.w_adjusted #resultlist .videoItem a:visited{\
-        color: #04618c;\
-      }*/\n\
 \
       #searchResultExplorer.w_adjusted #resultlist.column1 .commentBlank {\
         width: 96%;\
@@ -1147,7 +1133,7 @@
         width: 24%;\
       }\n\
 \
-      /* body.videoSelection */#resultlist.column4 .videoItem .balloon {\
+      #resultlist.column4 .videoItem .balloon {\
         bottom: auto; top: 10px;\
       }\n\
       #resultlist .videoItem .columnVertical     .balloon {\
@@ -1167,10 +1153,10 @@
         position: absolute; padding: 0; box-shadow: 1px 1px 2px black;\
         display: none;\
       }\
-      #searchResultExplorer #resultContainer #resultlist .videoItem .columnVertical     .thumbnailHoverMenu {\
+      #resultlist .videoItem .columnVertical     .thumbnailHoverMenu {\
         bottom:  4px; left: 4px;\
       }\
-      #searchResultExplorer #resultContainer #resultlist .videoItem .columnHorizontal   .thumbnailHoverMenu {\
+      #resultlist .videoItem .columnHorizontal   .thumbnailHoverMenu {\
         bottom: 75px; left: 5px;\
       }\
       #resultlist .videoItem .deleteFromMyMylist {\
@@ -1180,13 +1166,13 @@
       #resultlist .videoItem .showLargeThumbnail {\
         cursor: pointer; font-size: 70%; border: 1px solid #ccc;; \
       }\
-      #searchResultExplorer #resultContainer #resultlist .showLargeThumbnail {\
+      #resultlist .showLargeThumbnail {\
         padding: 0 4px;\
       }\
-      #searchResultExplorer #resultContainer #resultlist .videoItem:hover .thumbnailHoverMenu {\
+      #resultlist .videoItem:hover .thumbnailHoverMenu {\
         display: block;\
       }\n\
-      #searchResultExplorer #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
+      #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
         display: inline-block;\
       }\n\
       #searchResultExplorer.w_adjusted #resultContainer #searchResultContainer {\
@@ -1201,8 +1187,6 @@
       }\
       body.videoSelection.content-fix #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap {\
         display: none;\
-      }\
-      body.videoSelection.content-fix #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap:hover {\
       }\
 \
       #playlist .generationMessage {\
@@ -1272,7 +1256,7 @@
     var menus = [
       {title: '動画再生開始・終了時の設定'},
       {title: 'プレイヤーを自動で全画面化', varName: 'autoBrowserFull',
-        values: {'する': true, 'しない': false}},
+        values: {'する': true, 'しない': false}, addClass: true},
       {title: '自動全画面化オンでも、ユーザーニコ割のある動画は', varName: 'disableAutoBrowserFullIfNicowari',
         values: {'全画面化しない': true, '全画面化する': false}},
       {title: 'プレイヤーを自動で検索画面にする(自動全画面化オフ時)', varName: 'autoOpenSearch',
@@ -1280,7 +1264,8 @@
       {title: 'プレイヤー位置に自動スクロール(自動全画面化オフ時)', varName: 'autoScrollToPlayer',
         values: {'する': true, 'しない': false}},
       {title: '動画終了時に全画面化を解除(原宿と同じにする)', varName: 'autoNotFull',
-        values: {'する': true, 'しない': false}},
+        values: {'する': true, 'しない': false},
+        description: '連続再生中は解除しません'},
       {title: 'ウィンドウがアクティブの時だけ自動再生する', varName: 'autoPlayIfWindowActive',
         description: 'QWatch側の設定パネルの自動再生はオフにしてください。\n\n■こんな人におすすめ\n・自動再生ONにしたいけど別タブで開く時は自動再生したくない\n・複数タブ開いたままブラウザ再起動したら全部のタブで再生が始まって「うるせー！」という経験のある人',
         values: {'する': 'yes', 'しない': 'no'}},
@@ -1402,7 +1387,7 @@
       if (menu.description) { $menu.attr('title', menu.description); }
       var currentValue = conf.getValue(varName);
       $menu.addClass(menu.varName);
-      $panel.addClass(menu.varName + '_' + currentValue);
+      if (menu.addClass) { $panel.addClass(menu.varName + '_' + currentValue);}
       for (var k in values) {
         var v = values[k];
         var $label = w.jQuery('<label></label>');
@@ -1415,7 +1400,9 @@
         $chk.click(function() {
           var newValue = JSON.parse(this.value), oldValue = conf.getValue(varName);
           if (oldValue !== newValue) {
-            $panel.removeClass(menu.varName + '_' + oldValue).addClass(menu.varName + '_' + newValue);
+            if (menu.addClass) {
+              $panel.removeClass(menu.varName + '_' + oldValue).addClass(menu.varName + '_' + newValue);
+            }
             conf.setValue(menu.varName, newValue);
             if (typeof menu.onchange === 'function') {
               menu.onchange(newValue, oldValue);
@@ -1599,7 +1586,7 @@
           }
           this.style.display = 'none';
           e.preventDefault();
-        });
+        }, false);
         return popup;
       }
 
@@ -1649,7 +1636,7 @@
             appendTagHistory(a, text, dic);
           }
           return false;
-        });
+        }, false);
         li.appendChild(a);
 
         return li;
@@ -2070,11 +2057,11 @@
           } else {
             body.className = body.className.replace('deflistSelected', 'mylistSelected');
           }
-        });
+        }, false);
         if (w.jQuery) {
           w.jQuery(body).dblclick(ondblclick);
         } else {
-          body.addEventListener('dblclick', ondblclick);
+          body.addEventListener('dblclick', ondblclick, false);
         }
         function ondblclick() {
           sel.selectedIndex = 0;
@@ -2493,10 +2480,10 @@
 
     target.addEventListener('touchstart', function(e) {
       touchStartEvent = e;
-    });
+    }, false);
     target.addEventListener('touchcancel', function(e) {
       touchStartEvent = null;
-    });
+    }, false);
     target.addEventListener('touchend', function(e) {
       touchEndEvent = e;
       if (touchStartEvent !== null) {
@@ -2508,7 +2495,7 @@
           if (len > 150) {
             s = dy / len;
             var a = Math.abs(s), ss = Math.round(s);
-            if (a <= 0.2 || a >= 0.8) {
+            if (a <= 0.3 || a >= 0.7) {
               var d;
               if (ss < 0) { d = 'down'; } else if (ss > 0) { d = 'up'; }
               else if (dx < 0) { d = 'right';} else { d = 'left'; }
@@ -2523,7 +2510,7 @@
           }
       }
       touchStartEvent = touchEndEvent = null;
-    });
+    }, false);
 
     function onflick(callback) {
       events.onflick.push(callback);
@@ -2574,45 +2561,49 @@
     var videoReg = /(\?cc_video_id=|\?cc_id=|watch\/)([a-z0-9]+)/;
     var excludeReg = /(news|live|seiga)\..*?nicovideo\.jp/;
 
-    function each(e, watchId) {
-      e.mylist_add = "/mylist_add/video/" + watchId;
-      var over, out;
-      var mx = 0, my = 0;
+    function each(w, watchId) {
 
-      if (!w.jQuery) {
-        e.addEventListener('mousemove', function(ev) {
-          mx = ev.pageX;
-          my = ev.pageY;
-        });
-      }
-      e.addEventListener('mouseover', over = function(ev) {
-        e.mouse_in = true;
-        e.mouse_timer = setTimeout(function() {
-          if (!e.mouse_in) return;
+      this.w_eventInit = false;
+      this.addEventListener('mouseover', function() {
+        var mx = 0, my = 0, self = this, mouse_in = true, mouse_timer = null;
+
+        mouse_timer = setTimeout(function() {
+          mouse_timer = null;
+          if (!mouse_in) return;
           if (w.jQuery) {
-            var $e = w.jQuery(e);
+            var $e = w.jQuery(self);
             var t = $e.text();
             var o = t != "" ? $e.offset() : $e.find('*').offset();
             showPanel(watchId, o.left, o.top);
           } else
-          if (e.getBoundingClientRect) {
-            var o = (e.firstChild && e.firstChild.tagName == 'IMG') ? e.firstChild.getBoundingClientRect() : e.getBoundingClientRect();
+          if (self.getBoundingClientRect) {
+            var o = (self.firstChild && self.firstChild.tagName == 'IMG') ? self.firstChild.getBoundingClientRect() : self.getBoundingClientRect();
             var top = Math.max(w.document.documentElement.scrollTop, w.document.body.scrollTop),
                 left = Math.max(w.document.documentElement.scrollLeft, w.document.body.scrollLeft);
             showPanel(watchId, left + o.left, top + o.top);
           } else {
             showPanel(watchId, mx + 8, my + 8);
           }
-          addlink(mylistPanel, e, watchId);
+          addlink(mylistPanel, self, watchId);
         }, 400);
-      }, false);
-      e.addEventListener('mouseout', out = function() {
-        e.mouse_in = false;
-        if (e.mouse_timer) {
-          clearTimeout(e.mouse_timer);
+
+        if (!this.w_eventInit) {
+          this.addEventListener('mouseout', function() {
+            mouse_in = false;
+            if (mouse_timer) {
+              clearTimeout(mouse_timer);
+            }
+          }, false);
+          if (!w.jQuery) {
+            this.addEventListener('mousemove', function(ev) {
+              mx = ev.pageX;
+              my = ev.pageY;
+            }, false);
+          }
+          this.w_eventInit = true;
         }
       }, false);
-      e.added = 1;
+      this.added = 1;
     };
 
     function bind(force, target) {
@@ -2621,20 +2612,16 @@
       var a = Array.prototype.slice.apply(document.links), vreg = videoReg, ereg = excludeReg;
         for (var i = 0, len = a.length; i < len; i++) {
           var e = a[i];
-          try {
-            var m, href= e.href;
-            if (
-              href &&
-              !e.added &&
-              (m = vreg.exec(href)) != null &&
-              !ereg.test(href) &&
-              e.className != "itemEcoLink" &&
-              true
-            ) {
-              each(e, m[2]);
-            }
-          } catch (ex) {
-            conf.debugMode && console.log(ex);
+          var m, href= e.href;
+          if (
+            href &&
+            !e.added &&
+            (m = vreg.exec(href)) != null &&
+            !ereg.test(href) &&
+            e.className != "itemEcoLink" &&
+            true
+          ) {
+            each.apply(e, [w, m[2]]);
           }
         }
     }
@@ -2915,6 +2902,10 @@
       },
       closeSearch: function() {
         watch.ComponentInitializer.videoSelection.panelOPC.close();
+      },
+      openUpNushiVideo: function() {
+        $('.showOtherVideos:first').click(); // 手抜き
+        // TODO: 結果がマイリスト一個だけとかだったら自動で開きたい
       },
       getMyNick: function() {
         return watch.CommonModelInitializer.viewerInfoModel.nickname;
@@ -4138,10 +4129,11 @@
       }
       AnchorHoverPopup.hidePopup();
       resizeWatchTimer = setTimeout(function() {
-        var narrow = $(window).innerWidth() < 1350,r = - $('#playerCommentPanelOuter').outerWidth();
-        /*$('#content').toggleClass('narrowBorder', narrow);
-        if (narrow) { r += 10; }
-        $('#playerCommentPanelOuter').css({'right': r + 'px'});
+        /* // 解像度が一定以下の時は隙間を狭くする対応をやりたかった
+         var narrow = $(window).innerWidth() < 1350,r = - $('#playerCommentPanelOuter').outerWidth();
+         $('#content').toggleClass('narrowBorder', narrow);
+         if (narrow) { r += 10; }
+         $('#playerCommentPanelOuter').css({'right': r + 'px'});
         */
         resizeLeftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
         adjustSmallVideoSize();
@@ -4256,7 +4248,7 @@
           onWindowResize();
         }, 100);
       } else {
-        if (conf.autoOpenSearch && !$('body').hasClass('videoSelection')) {
+        if (conf.autoOpenSearch && !$('body').hasClass('videoSelection') && !$('body').hasClass('full_with_browser')) {
           $('#openSearchResultExplorer').click();
         }
         if (conf.autoScrollToPlayer) {
@@ -4517,6 +4509,7 @@
             .addClass('ch_profile').find('a').attr('target', '_blank')
         );
 
+      $leftInfoPanel.find('*').unbind();
       $leftInfoPanel.empty().scrollTop(0);
 
       $leftInfoPanel.append($template);
@@ -4890,7 +4883,7 @@
 
 
     var isMylistHacked = false;
-    function mylistHackInit() {
+    function mylistHackInit($) {
       if (isMylistHacked) { return; }
       var currentMylistId = 0;
 
@@ -5047,8 +5040,9 @@
 
     function onVideoEnded() {
       AnchorHoverPopup.hidePopup().updateNow();
-      // 原宿までと同じように、動画終了時にフルスクリーンを解除したい
-      if (conf.autoNotFull) {
+      // 原宿までと同じように、動画終了時にフルスクリーンを解除したい (ただし、連続再生中はやらない)
+      console.log(conf.autoNotFull, $('body').hasClass('full_with_browser'), !watch.PlaylistInitializer.playlist.isContinuousPlayback());
+      if (conf.autoNotFull && $('body').hasClass('full_with_browser') && !watch.PlaylistInitializer.playlist.isContinuousPlayback()) {
         WatchController.changeScreenMode('notFull');
       }
 
@@ -5073,6 +5067,10 @@
           watch.PlayerInitializer.nicoPlayerConnector.updatePlayerConfig({playerViewSize: ''})
         }, 100);
        }
+       // 通常画面でプレイリストを表示にしてるなら、開いた状態をデフォルトにする
+       if ($('#playlist').hasClass('w_show') === $('#playlist').find('.browserFullOption .browserFullPlaylistOpen').is(':visible')) {
+        $('#playlist').find('.browserFullOption a:visible').click();
+       }
 
       isSearchOpen = true;
       AnchorHoverPopup.hidePopup().updateNow();
@@ -5080,13 +5078,11 @@
 
     function onVideoSelectPanelOpening() {
       isSearchOpen = true;
-      $('body').addClass('w_searchOpen');
     }
 
     function onVideoSelectPanelClosed() {
       isSearchOpen = false;
       AnchorHoverPopup.hidePopup().updateNow();
-      $('body').removeClass('w_searchOpen');
     }
 
     /**
@@ -5137,7 +5133,7 @@
           'max-height: ', bottomHeight + 'px; overflow-y: auto; overflow-x: hidden; height: auto;',
         '}\n',
         'body.videoSelection #searchResultExplorer.w_adjusted #resultContainerWrapper             { margin-left: ', availableWidth,  'px !important; }\n',
-        'body.videoSelection #content.w_adjusted #playlist { padding-left: ', xdiff, 'px; }\n',
+        'body.videoSelection #content.w_adjusted #playlist { margin-left: ', xdiff, 'px; }\n',
         'body.videoSelection #searchResultExplorer.w_adjusted { min-height: ', (windowHeight + 200) ,'px !important; }\n',
 
         // かなり 無理矢理 左パネルを 召喚するよ 不安定に なっても 知らない
@@ -5192,16 +5188,15 @@
           'display: none !important;',
         '}',
       '</style>'].join('');
+
       // コメントパネルが白いままになるバグを対策
-      var $cp = $('#playerCommentPanelOuter');
-      $cp.unbind('mouseenter', refreshCommentPanelHeight);
-      $cp.bind(  'mouseenter', refreshCommentPanelHeight);
+      //var $cp = $('#playerCommentPanelOuter').unbind('mouseenter', refreshCommentPanelHeight).bind(  'mouseenter', refreshCommentPanelHeight);
 
       $smallVideoStyle = $(css);
       $('head').append($smallVideoStyle);
       if (!$('#searchResultNavigation').hasClass('w_touch')) {
         $('#searchResultNavigation').on('touchstart.watchItLater', function() {
-          $('#searchResultNavigation').addClass('w_touch').unbind('touchstart.watchItLater');
+          $(this).addClass('w_touch').unbind('touchstart.watchItLater');
         });
       }
     }
@@ -5227,13 +5222,11 @@
     }
 
     function onScreenModeChange(sc) {
-      $('body').toggleClass('w_notFull', sc.mode != 'browserFull');
-      $('body').toggleClass('w_small',   sc.mode == 'small');
+//      $('body').toggleClass('w_notFull', sc.mode != 'browserFull');
+//      $('body').toggleClass('w_small',   sc.mode == 'small');
       if (conf.hideNewsInFull) { $('body').addClass('hideNewsInFull'); }
       setTimeout(function() {
-        AnchorHoverPopup.hidePopup();
-//        $('#content').css({zIndex: 2});
-        $('body').toggleClass('w_setting',   $('#playerSettingPanel').is(':visible'));
+        //$('body').toggleClass('w_setting',   $('#playerSettingPanel').is(':visible'));
 
         // フル画面時プレイリストを閉じる
         if (conf.autoClosePlaylistInFull &&
@@ -5533,7 +5526,7 @@
         }
         defMylist.test(e)         && WatchController.addDefMylist();
         openDefMylist.test(e)     && (WatchController.showDefMylist() || WatchController.scrollToVideoPlayer(true));
-        openSearch.test(e)        && (WatchController.openSearch() || WatchController.scrollToVideoPlayer(true));
+        openSearch.test(e)        && (WatchController.openSearch() || (!$('body').hasClass('content-fix') && WatchController.scrollToVideoPlayer(true)));
         scrollToPlayer.test(e)    && WatchController.scrollToVideoPlayer(true);
         commentVisibility.test(e) && WatchController.commentVisibility('toggle');
         mylist.test(e)            && $('#mylist_add_frame').find('.mylistAdd').click();
@@ -5681,7 +5674,7 @@
 
       onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
 
-      mylistHackInit();
+      mylistHackInit($);
 
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
 
@@ -5759,7 +5752,7 @@
         AnchorHoverPopup.hidePopup();
         Popup.hide();
       }
-    });
+    }, false);
     w.document.body.addEventListener('click', function(e) {
       var tagName = e.target.tagName, className = e.target.className;
       //console.log(tagName, className);
@@ -5768,7 +5761,7 @@
       } else {
       }
 
-    });
+    }, false);
     var touchInitialized = false;
     TouchEventDispatcher.onflick(function(e) {
       if (e.direction === 'right') {
@@ -5777,7 +5770,7 @@
           touchInitialized = true;
         }
       }
-    });
+    }, false);
 //    w.document.body.addEventListener('dblclick', function(e) {var tagName = e.target.tagName, className = e.target.className;console.log(tagName, className);});
 
   })(w);
