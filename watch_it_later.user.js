@@ -15,13 +15,16 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130217
+// @version        1.130226
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130226
+// - 右ボタン＋ホイールで音量調整した時にメニューが出ないように修正
 
 // * ver 1.130217
 // - 画面モードまわりで、なんとなく不便だと思っていた仕様を変更
@@ -698,7 +701,7 @@
       }\
 \
       #leftPanelTabContainer {\
-        display:none; background: #666; position: absolute; right: 0; top: -27px; list-style-type: none; padding: 4px 6px 3px 60px; height: 20px; border-radius: 4px 4px 0px 4px;\
+        display:none; background: #666; position: absolute; right: 4px; top: -27px; list-style-type: none; padding: 4px 6px 3px 60px; height: 20px; border-radius: 4px 4px 0px 0px;\
       }\
       #leftPanelTabContainer.w_touch {\
         top: -40px; height: 33px;\
@@ -5041,7 +5044,6 @@
     function onVideoEnded() {
       AnchorHoverPopup.hidePopup().updateNow();
       // 原宿までと同じように、動画終了時にフルスクリーンを解除したい (ただし、連続再生中はやらない)
-      console.log(conf.autoNotFull, $('body').hasClass('full_with_browser'), !watch.PlaylistInitializer.playlist.isContinuousPlayback());
       if (conf.autoNotFull && $('body').hasClass('full_with_browser') && !watch.PlaylistInitializer.playlist.isContinuousPlayback()) {
         WatchController.changeScreenMode('notFull');
       }
@@ -5167,7 +5169,7 @@
           'transition: right 0.3s ease-out, height 0.3s ease-out;  -webkit-transition: right 0.3s ease-out, height 0.3s ease-out;',
         '}',
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_touch:not(.w_active) {',
-          'right: -60px !important; margin-top: 36px;',
+          'right: -60px !important; margin-top: 35px;',
         '}',
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:not(.w_touch) {',
           'right: -16px !important;',
@@ -5190,7 +5192,9 @@
       '</style>'].join('');
 
       // コメントパネルが白いままになるバグを対策
-      //var $cp = $('#playerCommentPanelOuter').unbind('mouseenter', refreshCommentPanelHeight).bind(  'mouseenter', refreshCommentPanelHeight);
+      $('#playerCommentPanelOuter')
+        .unbind('mouseenter.watchItLater', refreshCommentPanelHeight)
+        .bind('mouseenter.watchItLater', refreshCommentPanelHeight);
 
       $smallVideoStyle = $(css);
       $('head').append($smallVideoStyle);
@@ -5551,7 +5555,7 @@
       });
 
       function initWheelWatch() {
-        var leftDown = false, rightDown = false;
+        var leftDown = false, rightDown = false, isVolumeChanged = false;
         $('body').on('mousewheel.watchItLaterWheelWatch', function(e, delta) {
           // TODO: マジックナンバーを
           if (typeof e.buttons === 'number') { // firefox
@@ -5562,6 +5566,7 @@
           }
 
           var v = WatchController.volume();
+          isVolumeChanged = true;
           // 音量を下げる時は「うわ音でけぇ！」
           // 音量を上げる時は「ちょっと聞こえにくいな」…というパターンが多いので、変化の比率が異なる
           if (delta > 0) {
@@ -5578,6 +5583,11 @@
         }).on('mouseup.watchItLaterWheelWatch', function(e) {
           if (e.which == 1) leftDown  = false;
           if (e.which == 3) rightDown = false;
+        }).on('contextmenu.watchItLaterWheelWatch', function(e) {
+          if (isVolumeChanged) {
+            e.preventDefault();
+          }
+          isVolumeChanged = false;
         });
       }
       if (conf.mouseClickWheelVolume > 0) {
@@ -5804,4 +5814,3 @@
     monkey(true);
   }
 })();
-
