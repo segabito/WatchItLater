@@ -15,13 +15,18 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130226
+// @version        1.130227
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130227
+// - 動画説明文中のURLがリンクされるようにした
+// - マウスがリンクをかすっただけでメニューが出るのを修正
+// - 一部CSS修正
 
 // * ver 1.130226
 // - 右ボタン＋ホイールで音量調整した時にメニューが出ないように修正
@@ -662,6 +667,9 @@
       #leftPanel .leftVideoInfo .descriptionThumbnail.mylist img{\
         height: 40px; cursor: pointer;\
       }\
+      #leftPanel .leftVideoInfo a.otherSite {\n\
+        font-weight: bolder; text-decoration: underline; \n\
+      }\n\n\
       body.videoSelection #content.w_adjusted #leftIchibaPanel .ichiba_mainitem {\
         width: 180px; display:inline-block; vertical-align: top;\
         margin: 4px 3px; border 1px solid silver; border-radius: 8px\
@@ -2568,11 +2576,14 @@
 
       this.w_eventInit = false;
       this.addEventListener('mouseover', function() {
-        var mx = 0, my = 0, self = this, mouse_in = true, mouse_timer = null;
-
-        mouse_timer = setTimeout(function() {
-          mouse_timer = null;
-          if (!mouse_in) return;
+        var mx = 0, my = 0, self = this;
+        self.w_mouse_in = true;
+        self.w_mouse_timer = null;
+        self.w_mouse_timer = setTimeout(function() {
+          self.w_mouse_timer = null;
+          if (!self.w_mouse_in) {
+            return;
+          }
           if (w.jQuery) {
             var $e = w.jQuery(self);
             var t = $e.text();
@@ -2592,9 +2603,10 @@
 
         if (!this.w_eventInit) {
           this.addEventListener('mouseout', function() {
-            mouse_in = false;
-            if (mouse_timer) {
-              clearTimeout(mouse_timer);
+            self.w_mouse_in = false;
+            if (self.w_mouse_timer) {
+              clearTimeout(self.w_mouse_timer);
+              self.w_mouse_timer = null;
             }
           }, false);
           if (!w.jQuery) {
@@ -4087,7 +4099,7 @@
       var self, dataCache = {};
 
       function update() {
-        dataCache = {};
+        // dataCache = {};
         $('#nicommendPanelContent').find('.nicommendItemList>.item').each(function() {
           var $item = $(this);
           if ($item.hasClass('video')) {
@@ -4468,7 +4480,9 @@
 
 
       var $videoDescription = $template.find('.videoDescription');
-      $videoDescription.find('.videoDescriptionInner').append($('.videoDescription:first').clone(true));
+      var videoDescriptionHtml = $('.videoDescription:first').html();
+
+      $videoDescription.find('.videoDescriptionInner').append(create$videoDescription($('.videoDescription:first').html()));
       $videoDescription.find('.watch').unbind('click');
 
       NicommendReader.update();
@@ -4549,6 +4563,46 @@
       $leftPanel
         .toggleClass('ichibaEmpty',    $('#ichibaMain').find('.ichiba_mainitem').length < 1)
         .toggleClass('nicommendEmpty', $('#nicommendList').find('.content').length < 1);
+    }
+    function create$videoDescription(html) {
+      var linkmatch = /<a.*?<\/a>/, links = [], n;
+      if (html.match(/<br>/)) {
+        html = html.split('<br>').join(' <br> ');
+      } else {
+      }
+      while ((n = linkmatch.exec(html)) !== null) {
+        links.push(n);
+        html = html.replace(n, '<!---->');
+      }
+      html = html.replace(/(http:\/\/[\x21-\x7e]+)/gi, '<a href="$1" target="_blank" class="otherSite">$1</a>')
+      for (var i = 0, len = links.length; i < len; i++) {
+        html = html.replace('<!---->', links[i]);
+      }
+      html = html.split(' <br> ').join('<br>');
+      var $description = $('<span>' + html + '</span>');
+      window.$description = $description;
+      $description.find('a:not(.otherSite)').each(function(i, elm) {
+        if (elm.tagName === 'A') {
+          if (elm.className === 'otherSite') return;
+          var $elm = $(elm);
+          if (elm.textContent.indexOf('mylist/') === 0) {
+            $elm.addClass('mylist').attr('target', null).on('click.leftInfo', function(e) {
+              if (e.metaKey || e.shiftKey || e.altKey || e.ctrlKey || e.button != 0) return;
+              e.preventDefault();
+              WatchController.showMylist(this.text.split('/').reverse()[0]);
+            });
+          } else
+          if (elm.className === 'seekTime') {
+            $elm.attr('href', location.href + '?from=' + $elm.text().substr(1)).on('click.leftInfo', function(e) {
+              if (e.metaKey || e.shiftKey || e.altKey || e.ctrlKey || e.button != 0) return;
+              e.preventDefault();
+              var data = $(this).attr('data-seekTime').split(":");
+              WatchController.vpos((data[0] * 60 + parseInt(data[1], 10)) * 1000);
+            });
+          }
+        }
+      });
+      return $description;
     }
 
     var lastIchibaVideoId = 0;
@@ -5166,17 +5220,17 @@
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter {',
           '; top: 0px !important; height: 50px !important; background: #dfdfdf; border: 2px outset; border-radius: 4px;',
           'z-index: 99;',
-          'transition: right 0.3s ease-out, height 0.3s ease-out;  -webkit-transition: right 0.3s ease-out, height 0.3s ease-out;',
+          'transition: right 0.3s ease-out, height 0.3s ease-out;  -webkit-transition: right 0.3s ease-out, height 0.3s ease-out; margin-top: 114px;',
         '}',
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_touch:not(.w_active) {',
-          'right: -60px !important; margin-top: 35px;',
+          'right: -60px !important;',
         '}',
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:not(.w_touch) {',
           'right: -16px !important;',
         '}',
           'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover:not(.w_active),',
           'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_active {',
-            'right: -',(commentPanelWidth), 'px !important; top: 0 !important; height: ', availableHeight, 'px !important; background: transparent; border: 0;',
+            'right: -',(commentPanelWidth), 'px !important; top: 0 !important; height: ', availableHeight, 'px !important; background: transparent; border: 0;  margin-top: 0px;',
           '}',
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter #playerCommentPanel {',
           'display: none;',
@@ -5814,3 +5868,4 @@
     monkey(true);
   }
 })();
+
