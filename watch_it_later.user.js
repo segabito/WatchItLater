@@ -15,13 +15,18 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130227
+// @version        1.130302
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130302
+// - 次のバージョンのChromeでQwatchがぶっ壊れる問題の暫定対処
+//  - http://blog.nicovideo.jp/niconews/ni038155.html ここの変更点を、ほぼ解決
+//  - 問題点: 検索画面のスクロールがちょっとガクガクする。 コメントパネルが隠れる。 広告が消える
 
 // * ver 1.130227
 // - 動画説明文中のURLがリンクされるようにした
@@ -4572,11 +4577,11 @@
       }
       while ((n = linkmatch.exec(html)) !== null) {
         links.push(n);
-        html = html.replace(n, '<!---->');
+        html = html.replace(n, ' <!----> ');
       }
       html = html.replace(/(http:\/\/[\x21-\x7e]+)/gi, '<a href="$1" target="_blank" class="otherSite">$1</a>')
       for (var i = 0, len = links.length; i < len; i++) {
-        html = html.replace('<!---->', links[i]);
+        html = html.replace(' <!----> ', links[i]);
       }
       html = html.split(' <br> ').join('<br>');
       var $description = $('<span>' + html + '</span>');
@@ -5150,7 +5155,7 @@
       if (!conf.videoExplorerHack || !$('body').hasClass('videoSelection')) { return; }
 
       $('#leftVideoInfo').find('.videoDetails').attr('style', '');
-      $('#searchResultExplorer, #content').addClass('w_adjusted');
+      $('#searchResultExplorer, #content, #bottomContentTabContainer').addClass('w_adjusted');
       var
         rightAreaWidth = $('#resultContainer').outerWidth(),
         availableWidth = $(window).innerWidth() - rightAreaWidth,
@@ -5200,8 +5205,8 @@
         '}',
           'body.videoSelection #content.w_adjusted #leftPanel {',
           '}',
-        'body.videoSelection:not(.content-fix) #content.w_adjusted .videoDetails, ',
-        'body.videoSelection:not(.content-fix) #content.w_adjusted #searchResultNavigation {',
+        'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted .videoDetails, ',
+        'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted #searchResultNavigation {',
           // タグ領域三行分 スクロール位置をタグの場所にしてる時でも末端までスクロールできるようにするための細工
           // (四行以上あるときは表示しきれないが)
           'padding-bottom: 72px; ',
@@ -5243,6 +5248,35 @@
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter #playerCommentPanel .panelClickHandler{',
           'display: none !important;',
         '}',
+          ($('body').hasClass('chrome26') ?
+          [
+            'body.chrome26.videoSelection {',
+              'z-index: 1; background: #333;',
+            '}\n',
+            'body.chrome26.videoSelection.w_content-fix {',
+              'overflow: hidden;',
+            '}\n',
+            'body.chrome26.videoSelection               #content.w_adjusted {',
+              'z-index: 1; background: #f4f4f4; margin: 0;',
+            '}\n',
+            'body.chrome26.videoSelection.w_content-fix #content.w_adjusted {',
+              'background: none;',
+            '}\n',
+            'body.chrome26.videoSelection               #bottomContentTabContainer.w_adjusted {',
+              'overflow-y: visible; z-index: 100;',
+            '}\n',
+            'body.chrome26.videoSelection.w_content-fix #bottomContentTabContainer.w_adjusted {',
+              'overflow-y: auto; max-height: ', ($(window).innerHeight() - (WatchController.isFixedHeader() ? $('#siteHeader').outerHeight() : 0)) , 'px;',
+            '}\n',
+            'body.chrome26.videoSelection #searchResultExplorer {',
+              'overflow-x: hidden;',
+            '}\n',
+            'body.chrome26.videoSelection #content.w_adjusted #playlist, body.chrome26.videoSelection #bottomContentTabContainer.w_adjusted { margin-top: -', availableHeight ,'px !important;}\n',
+            'body.chrome26.videoSelection #content.w_adjusted #searchResultExplorerContentWrapper { margin-top: 0px !important; }\n',
+            'body.chrome26 #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap { display: none; }\n',
+            'body.chrome26.videoSelection.no_setting_panel #content.w_adjusted #playlist .browserFullOption { display: block !important; }\n',
+          ''].join('')
+          : ''),
       '</style>'].join('');
 
       // コメントパネルが白いままになるバグを対策
@@ -5522,6 +5556,110 @@
       WatchApp.$('#resultlist').toggleClass('squareThumbnail', isSquare);
     }
 
+
+    function initFxxkinChromeFix() {
+      // $('body').addClass('chrome26');
+      if (!$('body').hasClass('chrome26') || !conf.videoExplorerHack) {
+        //
+        return;
+      }
+      w.WatchApp.ns.util.env.EnvChrome.isFlashReloadingVersion = function() { return false; };
+      watch.BottomContentInitializer.videoSelectionModeViewController.fixed = function() { };
+      watch.BottomContentInitializer.videoSelectionModeViewController.unfixed = function() { };
+      var fixCss = '\
+        body.chrome26.videoSelection #content {\
+            float: none !important;\
+        }\
+        body.chrome26.videoSelection #playerContainerWrapper {\
+          margin-bottom: -164px;\
+          position: static !important;\
+        }\
+        body.chrome26.videoSelection #playlist {\
+          top: auto;\
+          left: 0;\
+          margin-left: 320px;\
+        }\
+        body.chrome26.videoSelection #searchResultExplorerContentWrapper {\
+          margin-top: 0px;\
+        }\
+        /*body.chrome26.full_with_browser *:not(#content, #playerContainerWrapper, #playerContainerWrapper, #playerContainerSlideArea, #playerContainer, #nicoplayerContainer, #nicoplayerContainerInner, #external_nicoplayer, #playerCommentPanelOuter, .mylistPopupPanel, .mylistPopupPanel *, #videoTagPopupContainer, #videoTagPopupContainer *) {\
+          display: none !important;\
+        }*/\
+        body.chrome26.full_with_browser #content, body.chrome26.full_with_browser #playerContainerWrapper, body.chrome26.full_with_browser #playerContainerSlideArea, body.chrome26.full_with_browser #playerContainer, body.chrome26.full_with_browser #nicoplayerContainer {\
+          position: static !important;\
+        }\
+        body.chrome26.full_with_browser #nicoplayerContainerInner {\
+          margin-bottom: 26px;\
+        }\
+        body.chrome26.full_with_browser.w_browserFullAll #nicoplayerContainerInner {\
+          margin-top: 32px;\
+        }\
+        body.chrome26.full_with_browser { overflow: hidden; }\
+        body.chrome26.full_with_browser:not(.w_browserFullAll) #videoTagContainer, body.chrome26.full_with_browser .bottomAccessContainer { display: none; }\
+        body.chrome26.full_with_browser.w_browserFullAll #content .videoHeaderOuter:hover {\
+          position: absolute; top: 0;\
+        }\
+        body.chrome26.full_with_browser.w_browserFullAll #content .videoHeaderOuter:hover {\
+          background: #fafafa; z-index: 300;\
+        }\
+        body.chrome26.full_with_browser #videoTagContainer {\
+          height: auto !important;\
+        }\
+        body.chrome26.full_with_browser #videoTagContainer .tagInner #videoHeaderTagList li .tagControlContainer {\
+          z-index: 0;\
+        }\
+        body.chrome26.full_with_browser #playlist {\
+          bottom: -8px; display: block; \
+        }\
+        ';
+
+        watch.PlayerInitializer.playerScreenMode.addEventListener('change', function(sc) {
+          setTimeout(function() {
+            if (sc.mode == 'browserFull') {
+              if (typeof localStorage.BROWSER_FULL_OPTIONS === 'string' && localStorage.BROWSER_FULL_OPTIONS.indexOf('"all"') >=0) {
+                $('body').scrollTop(0).removeClass('w_content-fix').addClass('w_browserFullAll');
+              } else {
+                $('body').removeClass('w_browserFullAll');
+              }
+            } else {
+              $('body').removeClass('w_browserFullAll');
+            }
+          }, 500);
+        });
+        var $body = $('body'), $con = $('#bottomContentTabContainer');
+        var header = (WatchController.isFixedHeader() ? $("#siteHeader").outerHeight() : 0);
+        $con.scroll(function() {
+          if (!$body.hasClass('videoSelection')) {
+            return;
+          }
+          if ($(this).scrollTop() == 0) {
+            $body.removeClass('w_content-fix');
+          }
+        });
+        $(window).scroll(function() {
+          if (!$body.hasClass('videoSelection')) {
+            return;
+          }
+          var threshold = $('#playerContainerWrapper').offset().top - header - 2;
+          if ($(this).scrollTop() >= threshold) {
+            $(this).scrollTop(threshold);
+            $body.toggleClass('w_content-fix', true);
+          } else {
+            $body.toggleClass('w_content-fix', false);
+            $con.scrollTop(0);
+          }
+        });
+
+        $('body').dblclick(function() {
+          $con.scrollTop(0);
+          $body.removeClass('w_content-fix');
+        });
+
+      addStyle(fixCss, 'chromeFixCss');
+    }
+
+
+
     function initShortcutKey() {
       var
         defMylist         = KeyMatch.create(conf.shortcutDefMylist),
@@ -5767,6 +5905,7 @@
     initPager();
     initSearchOption();
     initLeftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
+    initFxxkinChromeFix();
     initOther();
 
     onWindowResize();
@@ -5868,4 +6007,3 @@
     monkey(true);
   }
 })();
-
