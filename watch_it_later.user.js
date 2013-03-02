@@ -15,13 +15,17 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130302
+// @version        1.130303
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130303
+// - 検索画面の「閉じる」ボタンが消えるようになったのを修正
+// - お気に入り登録済みユーザーは名前の横に★を表示
 
 // * ver 1.130302
 // - 次のバージョンのChromeでQwatchがぶっ壊れる問題の暫定対処
@@ -699,8 +703,8 @@
         background: none;\
       }\
 \
-      #leftPanel.videoInfo  #leftVideoInfo{\
-        /*box-shadow: -2px 0 4px black;*/\
+      #leftPanel.videoInfo  #leftVideoInfo.isFavorite .userName:after{\
+        content: \'★\'; color: gold; text-shadow: 1px 1px 1px black; \
       }\
 \
       #leftPanel.videoInfo  #leftPanelContent {\
@@ -4450,7 +4454,7 @@
       initLeftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
 
       var watchInfoModel = watch.CommonModelInitializer.watchInfoModel;
-      var uploaderId = watchInfoModel.uploaderInfo.id;
+      var uploaderId = watchInfoModel.uploaderInfo.id, isFavorite = watchInfoModel.uploaderInfo.isFavorited;
       var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
       var h = $leftInfoPanel.innerHeight() - 100, $inner = $('<div/>');
 
@@ -4532,7 +4536,7 @@
         );
 
       $leftInfoPanel.find('*').unbind();
-      $leftInfoPanel.empty().scrollTop(0);
+      $leftInfoPanel.empty().scrollTop(0).toggleClass('isFavorite', isFavorite);
 
       $leftInfoPanel.append($template);
       // なんのためのアニメーション？ → 最初に投稿者アイコンをよく見せるため
@@ -5190,7 +5194,7 @@
           'width: ', availableWidth, 'px !important; height: ', availableHeight, 'px !important;padding: 0; margin: 0; ',
         '}\n',
         'body.videoSelection #content.w_adjusted #searchResultExplorerContentWrapper { ',
-          'margin-top: ',  availableHeight, 'px !important; left: ', xdiff, 'px; ',
+          'margin-top: ',  availableHeight, 'px !important; left: ', (xdiff - 2), 'px; ',
           'max-height: ', bottomHeight + 'px; overflow-y: auto; overflow-x: hidden; height: auto;',
         '}\n',
         'body.videoSelection #searchResultExplorer.w_adjusted #resultContainerWrapper             { margin-left: ', availableWidth,  'px !important; }\n',
@@ -5207,7 +5211,7 @@
           '}',
         'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted .videoDetails, ',
         'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted #searchResultNavigation {',
-          // タグ領域三行分 スクロール位置をタグの場所にしてる時でも末端までスクロールできるようにするための細工
+          // タグ領域三行分 bodyのスクロール位置をタグの場所にしてる時でもパネルは文章の末端までスクロールできるようにするための細工
           // (四行以上あるときは表示しきれないが)
           'padding-bottom: 72px; ',
         '}',
@@ -5248,19 +5252,25 @@
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter #playerCommentPanel .panelClickHandler{',
           'display: none !important;',
         '}',
+        'body.size_small.no_setting_panel.videoSelection #content #searchResultExplorerExpand {', // 「閉じる」ボタン
+          'position: static; top: auto; left: auto; margin-top: 0;',
+        '}\n',
           ($('body').hasClass('chrome26') ?
-          [
+          [ // Chrome v26のバグ対策　修正が長引くと困る
             'body.chrome26.videoSelection {',
-              'z-index: 1; background: #333;',
+              'z-index: 1;',
+            '}\n',
+            'body.chrome26.videoSelection.w_content-fix {',
+              'background: #333;',
             '}\n',
             'body.chrome26.videoSelection.w_content-fix {',
               'overflow: hidden;',
             '}\n',
-            'body.chrome26.videoSelection               #content.w_adjusted {',
-              'z-index: 1; background: #f4f4f4; margin: 0;',
+            'body.chrome26.videoSelection #content.w_adjusted {',
+              'z-index: 1; margin: 0;',
             '}\n',
-            'body.chrome26.videoSelection.w_content-fix #content.w_adjusted {',
-              'background: none;',
+            'body.chrome26.videoSelection #videoHeader {',
+//              'background: #f4f4f4;',
             '}\n',
             'body.chrome26.videoSelection               #bottomContentTabContainer.w_adjusted {',
               'overflow-y: visible; z-index: 100;',
@@ -5271,18 +5281,23 @@
             'body.chrome26.videoSelection #searchResultExplorer {',
               'overflow-x: hidden;',
             '}\n',
-            'body.chrome26.videoSelection #content.w_adjusted #playlist, body.chrome26.videoSelection #bottomContentTabContainer.w_adjusted { margin-top: -', availableHeight ,'px !important;}\n',
+            'body.chrome26.videoSelection #content.w_adjusted #playlist, body.chrome26.videoSelection #bottomContentTabContainer.w_adjusted { margin-top: -', (availableHeight + 2) ,'px !important;}\n',
             'body.chrome26.videoSelection #content.w_adjusted #searchResultExplorerContentWrapper { margin-top: 0px !important; }\n',
             'body.chrome26 #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap { display: none; }\n',
             'body.chrome26.videoSelection.no_setting_panel #content.w_adjusted #playlist .browserFullOption { display: block !important; }\n',
+            'body.chrome26.no_setting_panel.videoSelection #content.w_adjusted #searchResultExplorerExpand a#closeSearchResultExplorer { line-height: 26px;}\n',
           ''].join('')
           : ''),
       '</style>'].join('');
 
-      // コメントパネルが白いままになるバグを対策
-      $('#playerCommentPanelOuter')
-        .unbind('mouseenter.watchItLater', refreshCommentPanelHeight)
-        .bind('mouseenter.watchItLater', refreshCommentPanelHeight);
+
+      if (!$smallVideoStyle) {
+        // 「閉じる」の位置が変わって見えなくなってしまったのを復元
+        $('#searchResultExplorerErrorMessage').after($('#searchResultExplorerExpand'));
+        // コメントパネルが白いままになるバグを対策
+        $('#playerCommentPanelOuter')
+          .bind('mouseenter.watchItLater', refreshCommentPanelHeight);
+      }
 
       $smallVideoStyle = $(css);
       $('head').append($smallVideoStyle);
@@ -5557,7 +5572,7 @@
     }
 
 
-    function initFxxkinChromeFix() {
+    function initChrome26Fix() {
       // $('body').addClass('chrome26');
       if (!$('body').hasClass('chrome26') || !conf.videoExplorerHack) {
         //
@@ -5601,6 +5616,9 @@
         }\
         body.chrome26.full_with_browser.w_browserFullAll #content .videoHeaderOuter:hover {\
           background: #fafafa; z-index: 300;\
+        }\
+        body.chrome26.full_with_browser.w_browserFullAll #content #videoTagContainer {\
+          width: 100%;\
         }\
         body.chrome26.full_with_browser #videoTagContainer {\
           height: auto !important;\
@@ -5905,7 +5923,7 @@
     initPager();
     initSearchOption();
     initLeftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
-    initFxxkinChromeFix();
+    initChrome26Fix();
     initOther();
 
     onWindowResize();
@@ -6007,3 +6025,4 @@
     monkey(true);
   }
 })();
+
