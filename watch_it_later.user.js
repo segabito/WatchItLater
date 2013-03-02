@@ -15,13 +15,17 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130303
+// @version        1.130303b
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130303b
+// - 説明文中の静画リンクも展開表示するようにした
+// - タッチ操作の調整
 
 // * ver 1.130303
 // - 検索画面の「閉じる」ボタンが消えるようになったのを修正
@@ -328,7 +332,7 @@
       enableNewsHistory: false, // ニコニコニュースの履歴を保持する
       defaultSearchOption: '', // 検索時のデフォルトオプション
       autoPlayIfWindowActive: 'no', // 'yes' = ウィンドウがアクティブの時だけ自動再生する
-      enableYukkuriPlayButton: true, // スロー再生ボタンを表示する
+      enableYukkuriPlayButton: false, // スロー再生ボタンを表示する
       noNicoru: false, // ニコるボタンをなくす
       enoubleTouchPanel: false, // タッチパネルへの対応を有効にする
       mouseClickWheelVolume: 0, // マウスボタン+ホイールで音量調整を有効にする 1 = 左ボタン 2 = 右ボタン
@@ -668,13 +672,16 @@
       }\n\n\
       #leftPanel .leftVideoInfo .descriptionThumbnail {\
         text-align: left; font-size: 90%; padding: 4px; border-radius: 4px; background: #ccc;/*box-shadow: 2px 2px 2px #666;*/\
-        min-height: 50px; margin-bottom: 4px; font-weight: normal; color: black;\
+        min-height: 60px; margin-bottom: 4px; font-weight: normal; color: black;\
       }\
       #leftPanel .leftVideoInfo .descriptionThumbnail.video img{\
         height: 50px; cursor: pointer; float: left;\
       }\
       #leftPanel .leftVideoInfo .descriptionThumbnail.mylist img{\
         height: 40px; cursor: pointer;\
+      }\
+      #leftPanel .leftVideoInfo .descriptionThumbnail.illust img{\
+        height: 60px; cursor: pointer; float: left;\
       }\
       #leftPanel .leftVideoInfo a.otherSite {\n\
         font-weight: bolder; text-decoration: underline; \n\
@@ -2554,14 +2561,19 @@
     document.body.appendChild(mylistPanel);
 
     function showPanel(watchId, baseX, baseY, w_touch) {
-      VideoTags.hidePopup();
 
       var cn = mylistPanel.className.toString();
       if (w_touch === true) {
         cn = cn.replace(' w_touch', '') + ' w_touch';
       } else {
+        if (cn.indexOf('w_touch') >= 0 && mylistPanel.style.display !== 'none') {
+          // フリック操作で表示したパネルが出ている間はそちらを優先し、なにもしない
+          return;
+        }
         cn = cn.replace(' w_touch', '');
+
       }
+      VideoTags.hidePopup();
       if (mylistPanel.className !== cn) mylistPanel.className = cn;
 
       mylistPanel.style.display = '';
@@ -4133,6 +4145,15 @@
             img[2] && (dataCache[url].thumbnail[2] = img[2].src);
 
           }
+          if ($item.hasClass('illust')) {
+            var url = $item.find('.itemThumb>a').attr('href').split('?')[0], img = $item.find('.itemThumb img');
+            dataCache[url] = {
+              type: 'illust',
+              title: $.trim($item.find('.itemName a').text()),
+              thumbnail: [$item.find('.itemThumb img').attr('src')]
+            };
+
+          }
         });
       }
 
@@ -4356,7 +4377,7 @@
           Math.min(
             266,
             $leftPanel.width(),
-            $(window).innerWidth() - $('#playerCommentPanelOuter').width() - $('#nicoplayerContainer').width() - 20
+            $(window).innerWidth() - $('#playerCommentPanelOuter').width() - $('#nicoplayerContainer').width() - 22
           ),
           196
         );
@@ -4517,6 +4538,15 @@
             info.thumbnail[2] && (dom.push('<img src="' + info.thumbnail[2] + '">'));
             dom.push('</div>');
             $this.after(dom.join(''));
+        } else
+        if (info.type === 'illust') {
+            text = $this.text();
+            $this.after([
+                '<div class="descriptionThumbnail illust" style="">',
+                '<img src="', info.thumbnail[0], '">',
+                '<p>', info.title, '</p>',
+                '</div>',
+            ''].join(''));
         }
       });
       $videoDescription.find('.descriptionThumbnail img').on('click', function() { showLargeThumbnail(this.src);});
@@ -4707,7 +4737,7 @@
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
           $toggle.addClass('opening');
-          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 2000 )}, 1000, function() {
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 2000 )}, (isVisible ? 500 : 1000 ), function() {
             $toggle.toggleClass('open', !isVisible);
             $toggle.removeClass('opening');
           });
@@ -4777,7 +4807,7 @@
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
           $toggle.addClass('opening');
-          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 1000 )}, 500, function() {
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 2000 )}, (isVisible ? 500 : 1000 ), function() {
             $toggle.toggleClass('open', !isVisible);
             $toggle.removeClass('opening');
           });
@@ -4823,7 +4853,7 @@
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
           $toggle.addClass('opening');
-          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 2000 )}, 1000, function() {
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 2000 )}, (isVisible ? 500 : 1000 ), function() {
             $toggle.toggleClass('open', !isVisible);
             $toggle.removeClass('opening');
           });
@@ -4906,7 +4936,7 @@
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
           $toggle.addClass('opening');
-          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 2000 )}, 1000, function() {
+          $popup.toggleClass('open', !isVisible).animate({maxHeight: (isVisible ? 0 : 2000 )}, (isVisible ? 500 : 1000 ), function() {
             $toggle.toggleClass('open', !isVisible);
             $toggle.removeClass('opening');
           });
@@ -5089,12 +5119,20 @@
     }
 
     function showLargeThumbnail(baseUrl) {
+      var largeUrl = baseUrl;
+      if (baseUrl.indexOf('smilevideo.jp') >= 0) {
+        largeUrl = baseUrl + '.L';
+        size = 'width: 360px; height: 270px;';
+      } else {
+        largeUrl = baseUrl.replace(/z$/, 'l');
+        size = 'width: 360px; height: 202.5px;';
+      }
       var
         baseUrl,
         html = [
           '<div onmousedown="if (event.button == 0) { $(\'#popupMarquee\').hide(); event.preventDefault(); }" style="background:#000;">',
-          '<img src="', baseUrl, '.L" style="width: 360px; height: 270px; position: absolute; display: none; z-index: 3;" onload="this.style.display = \'\';">',
-          '<img src="', baseUrl, '"   style="width: 360px; height: 270px; z-index: 2;">',
+          '<img src="', largeUrl, '" style="', size, ' z-index: 3; position: absolute; display: none;" onload="this.style.display = \'\';">',
+          '<img src="', baseUrl, '"  style="', size, ' z-index: 2;">',
           '</div>',
         ''].join('');
       Popup.show(html);
@@ -5319,7 +5357,7 @@
       refreshCommentPanelTimer =
         setTimeout(function() {
           watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
-        }, 500);
+        }, 1000);
     }
 
 
@@ -6025,4 +6063,3 @@
     monkey(true);
   }
 })();
-
