@@ -8,9 +8,10 @@ WatchItLater.js
 ニコニコ動画の視聴ページを開く前にマイリストに登録するGreasemonkeyスクリプトです。
 FirefoxとChromeに対応しています。
 
-開発版のデモ動画
+配布ページ
+http://userscripts.org/scripts/show/151269 
+開発版のデモ動画(ちょっと古い)
 http://www.nicovideo.jp/watch/sm18845030 (基本機能紹介)
-http://www.nicovideo.jp/watch/sm19684491 (最新情報)
 
 ランキングや検索結果を見て「これは面白そうだなあ」「あとで見よう」という動画があった時、
 とりあえずマイリストにどんどん登録しておいて、あとからZeroWatchやVitaやiPadで
