@@ -15,13 +15,17 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130303b
+// @version        1.130305
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130305
+// - 「再生開始時にコメント表示をOFF」または「前回の状態」にする設定を追加
+// - Chrome v26対策
 
 // * ver 1.130303b
 // - 説明文中の静画リンクも展開表示するようにした
@@ -61,7 +65,7 @@
 // * ver 1.130215
 // - タッチパネルへの対応テスト。(Chromeでしかうまく動かない)
 //   マウスがなくても、動画リンクを右フリックでマイリストメニューが出るように。
-//   画面を右クリックすると一部のボタンやリンクが大きくなるモード
+//   画面を右フリックすると一部のボタンやリンクが大きくなるモード
 // - ショートカットキーの追加「動画投稿者の関連動画を表示」「右下で選択中のマイリストに登録」
 // - CSSを少し軽量化
 // - 細かい修正
@@ -338,6 +342,8 @@
       mouseClickWheelVolume: 0, // マウスボタン+ホイールで音量調整を有効にする 1 = 左ボタン 2 = 右ボタン
       enableAutoPlaybackContinue: false, // 一定時間操作しなかくても自動再生を続行
       enableQTouch: false, // タッチパネルモード有効
+      commentVisibility: 'visible', // 'visible', 'hidden', 'lastState'
+      lastCommentVisibility: 'visible',
 
       enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
 
@@ -614,7 +620,7 @@
         background: #ccc; text-align: center; color: #000; margin: 0; cursor: pointer;\n\
       }\n\n\
         body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoThumbnailContainer{\n\
-          position: absolute; width: 130px; top: 0; \
+          position: absolute; max-width: 130px; top: 0; \
         }\n\n\
       #leftPanel .leftVideoInfo .videoTitle{\n\
         \
@@ -647,7 +653,7 @@
         padding: 0 4px;\
       }\n\n\
       #leftPanel .leftVideoInfo .videoDetails{\n\
-        background: #bbb;\
+        background: #bbb; min-width: 130px;\
       }\n\n\
         body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoDetails{\n\
           border-left: 130px solid #ccc; padding-left: 4px; min-height: 250px;\
@@ -665,7 +671,7 @@
         background: #ccc; width: 100%; text-align: center; border-radius: 0 0 4px 4px; float: none;\n\
       }\n\n\
         body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .userIconContainer, body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .ch_profile{\n\
-          background: #ccc; width: 130px; float: none;\n\
+          background: #ccc; max-width: 130px; float: none;\n\
         }\n\n\
       #leftPanel .leftVideoInfo .userIconContainer .usericon, #leftPanel .leftVideoInfo .ch_profile img{\n\
         max-width: 130px; width: auto; height: auto; border: 0;\n\
@@ -1299,6 +1305,8 @@
       {title: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
         description: '全画面状態だと再生数がわからなくて不便、という時に',
         values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
+      {title: 'コメント表示', varName: 'commentVisibility',
+        values: {'オン': 'visible', 'オフ': 'hidden', '前回の状態': 'lastState'}},
 
       {title: '動画プレイヤーの設定'},
       {title: 'コメントパネルのワイド化', varName: 'wideCommentPanel',
@@ -1623,7 +1631,7 @@
         if (uniq === null) {
           uniq = {};
           $history = $('<div class="tagSearchHistory"><h3 class="title">タグ検索履歴</h3></div>');
-          $history.css({width: $('#searchResultNavigation').width() - 12, maxHeight: '300px', overflowY: 'auto'});
+          $history.css({width: $('#searchResultNavigation').width() - 8, maxHeight: '300px', overflowY: 'auto'});
           $('#searchResultNavigation').append($history);
         }
         if (!uniq[text]) {
@@ -2099,7 +2107,7 @@
 
       function createSubmitButton(sel) {
         var btn = document.createElement('button');
-        btn.appendChild(document.createTextNode('マ'));
+        btn.appendChild(document.createTextNode('my'));
         btn.className = 'mylistAdd';
         btn.title = 'マイリストに追加';
         btn.addEventListener('click', function(e) {
@@ -2117,7 +2125,7 @@
             self.addDefListItem(_watchId, function(status, result, replaced) {
               self.reloadDefList();
               if (status != "ok") {
-                Popup.alert('とりあえずマイリストの登録に失敗: ' + result.error.description);
+                Popup.alert('とりあえずマイリストへの登録に失敗: ' + result.error.description);
               } else {
                 var torimai = '<a href="/my/mylist">とりあえずマイリスト</a>';
                 Popup.show(
@@ -2132,7 +2140,7 @@
               if (status == 'ok') {
                 Popup.show( '<a href="/my/mylist/#/' + groupId + '">' + name + '</a>に登録しました');
               } else {
-                Popup.alert(name + 'の登録に失敗: ' + result.error.description);
+                Popup.alert(name + 'への登録に失敗: ' + result.error.description);
               }
             }, description);
           }
@@ -4314,6 +4322,16 @@
           // ウィンドウがアクティブの時だけ自動再生する。 複数タブ開いてるときは便利
           setTimeout(function() { WatchController.play();}, 2000);
         }
+
+        if (isFirst && conf.commentVisibility !== 'visible') {
+          if (conf.commentVisibility === 'hidden') {
+            conf.debugMode && console.log('comment off');
+            WatchController.commentVisibility(false);
+          } else {
+            conf.debugMode && console.log('last state', conf.lastCommentVisibility);
+            WatchController.commentVisibility(conf.lastCommentVisibility === 'visible');
+          }
+        }
       }
       isFirst = false;
     }
@@ -5299,20 +5317,20 @@
               'z-index: 1;',
             '}\n',
             'body.chrome26.videoSelection.w_content-fix {',
-              'background: #333;',
+              '/*background: #333;*/ overflow: hidden;',
             '}\n',
-            'body.chrome26.videoSelection.w_content-fix {',
-              'overflow: hidden;',
-            '}\n',
-            'body.chrome26.videoSelection #content.w_adjusted {',
+            'body.chrome26.videoSelection               #content.w_adjusted {',
               'z-index: 1; margin: 0;',
             '}\n',
-            'body.chrome26.videoSelection #videoHeader {',
-//              'background: #f4f4f4;',
+            'body.chrome26.videoSelection.w_content-fix #playlist {',
+              'margin-right: 19px;',
             '}\n',
             'body.chrome26.videoSelection               #bottomContentTabContainer.w_adjusted {',
               'overflow-y: visible; z-index: 100;',
             '}\n',
+//            'body.chrome26.videoSelection.w_content-fix #videoTagContainer {',
+//              'visibility: hidden;',
+//            '}\n',
             'body.chrome26.videoSelection.w_content-fix #bottomContentTabContainer.w_adjusted {',
               'overflow-y: auto; max-height: ', ($(window).innerHeight() - (WatchController.isFixedHeader() ? $('#siteHeader').outerHeight() : 0)) , 'px;',
             '}\n',
@@ -5504,6 +5522,9 @@
         WatchController.clearMylistCache(info.groupId);
       });
 
+      $(window).on('beforeunload.watchItLater', function(e) {
+        conf.setValue('lastCommentVisibility', WatchController.commentVisibility() ? 'visible' : 'hidden');
+      });
     }
 
     function initAdditionalButtons() {
@@ -5611,14 +5632,94 @@
 
 
     function initChrome26Fix() {
-      // $('body').addClass('chrome26');
+      //$('body').addClass('chrome26');
       if (!$('body').hasClass('chrome26') || !conf.videoExplorerHack) {
         //
         return;
       }
+      var $body = $('body'), $con = $('#bottomContentTabContainer');
+      var header = (WatchController.isFixedHeader() ? $("#siteHeader").outerHeight() : 0);
+
       w.WatchApp.ns.util.env.EnvChrome.isFlashReloadingVersion = function() { return false; };
-      watch.BottomContentInitializer.videoSelectionModeViewController.fixed = function() { };
-      watch.BottomContentInitializer.videoSelectionModeViewController.unfixed = function() { };
+      watch.BottomContentInitializer.videoSelectionModeViewController.fixed = watch.BottomContentInitializer.videoSelectionModeViewController.unfixed = function() { };
+
+      w.WatchApp.ns.util.WindowUtil.scroll_org = w.WatchApp.ns.util.WindowUtil.scroll;
+      w.WatchApp.ns.util.WindowUtil.scroll = $.proxy(function(top, dur, callback) {
+        var threshold = $('#playerContainerWrapper').offset().top - header;
+        if (top >= threshold) {
+          updateContentFix(true);
+        } else {
+          updateContentFix(false);
+        }
+        return this.scroll_org(top, dur, callback);
+      }, w.WatchApp.ns.util.WindowUtil);
+
+      watch.ComponentInitializer.videoSelection.scrollUp = function(dur) {
+        var target = '#playlist';
+        dur = dur || 200;
+        $con.animate({scrollTop: 0}, dur);
+        var threshold = $('#playerContainerWrapper').offset().top - header;
+        $body.scrollTop(threshold);
+      };
+
+      function updateContentFix(v) {
+        if (v === $body.hasClass('w_content-fix')) { return; }
+        if (v) {
+          $body.toggleClass('w_content-fix', true);
+          var threshold = Math.round($('#playerContainerWrapper').offset().top - header), st = $body.scrollTop();
+         // $con.scrollTop(Math.max(st - threshold, $con.scrollTop(), 3)).focus();
+          $body.scrollTop(threshold);
+        } else {
+          $con.scrollTop(2);
+          $body.toggleClass('w_content-fix', false);
+        }
+      }
+
+      watch.PlayerInitializer.playerScreenMode.addEventListener('change', function(sc) {
+        setTimeout(function() {
+          if (sc.mode == 'browserFull') {
+            if (typeof localStorage.BROWSER_FULL_OPTIONS === 'string' && localStorage.BROWSER_FULL_OPTIONS.indexOf('"all"') >=0) {
+              $body.scrollTop(0).removeClass('w_content-fix').addClass('w_browserFullAll');
+            } else {
+              $body.removeClass('w_browserFullAll');
+            }
+          } else
+          if (sc.mode === 'small' && $body.hasClass('videoSelection')) {
+            updateContentFix(false);
+          } else {
+            $body.removeClass('w_browserFullAll');
+          }
+        }, 500);
+      });
+
+      $con.scroll(function() {
+        if (!$body.hasClass('videoSelection')) {
+          return;
+        }
+        if ($con.scrollTop() <= 2) {
+          updateContentFix(false);
+        }
+      });
+
+      $(window).scroll(function() {
+        if (!$body.hasClass('videoSelection')) {
+          return;
+        }
+        // 拡大縮小してると小数になったりする
+        var threshold = Math.round($('#playerContainerWrapper').offset().top - header), st = $body.scrollTop();
+        if (st >= threshold - 2 && !$body.hasClass('w_content-fix')) {
+          updateContentFix(true);
+        } else
+        if (st <  threshold - 2 && $body.hasClass('w_content-fix')) {
+          updateContentFix(false);
+        }
+      });
+
+      $body.dblclick(function() {
+        updateContentFix(false);
+      });
+
+
       var fixCss = '\
         body.chrome26.videoSelection #content {\
             float: none !important;\
@@ -5668,48 +5769,6 @@
           bottom: -8px; display: block; \
         }\
         ';
-
-        watch.PlayerInitializer.playerScreenMode.addEventListener('change', function(sc) {
-          setTimeout(function() {
-            if (sc.mode == 'browserFull') {
-              if (typeof localStorage.BROWSER_FULL_OPTIONS === 'string' && localStorage.BROWSER_FULL_OPTIONS.indexOf('"all"') >=0) {
-                $('body').scrollTop(0).removeClass('w_content-fix').addClass('w_browserFullAll');
-              } else {
-                $('body').removeClass('w_browserFullAll');
-              }
-            } else {
-              $('body').removeClass('w_browserFullAll');
-            }
-          }, 500);
-        });
-        var $body = $('body'), $con = $('#bottomContentTabContainer');
-        var header = (WatchController.isFixedHeader() ? $("#siteHeader").outerHeight() : 0);
-        $con.scroll(function() {
-          if (!$body.hasClass('videoSelection')) {
-            return;
-          }
-          if ($(this).scrollTop() == 0) {
-            $body.removeClass('w_content-fix');
-          }
-        });
-        $(window).scroll(function() {
-          if (!$body.hasClass('videoSelection')) {
-            return;
-          }
-          var threshold = $('#playerContainerWrapper').offset().top - header - 2;
-          if ($(this).scrollTop() >= threshold) {
-            $(this).scrollTop(threshold);
-            $body.toggleClass('w_content-fix', true);
-          } else {
-            $body.toggleClass('w_content-fix', false);
-            $con.scrollTop(0);
-          }
-        });
-
-        $('body').dblclick(function() {
-          $con.scrollTop(0);
-          $body.removeClass('w_content-fix');
-        });
 
       addStyle(fixCss, 'chromeFixCss');
     }
@@ -5935,13 +5994,6 @@
       mylistHackInit($);
 
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
-
-      // AdBlockがあってもとりあえず動くように(初回はAdBlockのほうが速いので無理)
-      if (!w.Ads) {
-        conf.debugMode && console.log('adblocked?');
-        Popup.show('Adblockを使っていると一部誤動作します');
-      }
-
     }
 
 
@@ -6051,6 +6103,7 @@
       inject.id = "monkey";
       inject.setAttribute("type", "text/javascript");
       inject.appendChild(document.createTextNode("(" + monkey + ")(false)"));
+//      inject.appendChild(document.createTextNode("try {(" + monkey + ")(false) } catch(e) { console.log(e); }"));
 
       document.body.appendChild(inject);
     } else {
@@ -6063,3 +6116,4 @@
     monkey(true);
   }
 })();
+
