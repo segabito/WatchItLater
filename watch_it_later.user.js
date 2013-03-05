@@ -15,13 +15,18 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130305
+// @version        1.130306
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130306
+// - 横が狭い時の検索画面の表示を修正
+// - プレイヤーサイズの計算を微妙に間違っていたのを修正
+
 
 // * ver 1.130305
 // - 「再生開始時にコメント表示をOFF」または「前回の状態」にする設定を追加
@@ -612,16 +617,12 @@
       #leftPanel .leftVideoInfo .videoTitleContainer{\n\
         background: #ccc; text-align: center;  color: #000; border-radius: 4px 4px 0 0;margin: 6px 0 0;\n\
       }\n\n\
-        body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoTitleContainer{\n\
-          margin-left: 134px; border-radius: 0 4px 0 0 ; background: #999; \
-          \
-        }\n\n\
       #leftPanel .leftVideoInfo .videoThumbnailContainer{\n\
-        background: #ccc; text-align: center; color: #000; margin: 0; cursor: pointer;\n\
+        background: #ccc; text-align: center; color: #000; margin: 0;\n\
       }\n\n\
-        body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoThumbnailContainer{\n\
-          position: absolute; max-width: 130px; top: 0; \
-        }\n\n\
+      #leftPanel .leftVideoInfo .videoThumbnailContainer img {\n\
+        cursor: pointer;\n\
+      }\n\n\
       #leftPanel .leftVideoInfo .videoTitle{\n\
         \
       }\n\n\
@@ -643,9 +644,6 @@
       #leftPanel .leftVideoInfo .videoInfo{\n\
         background: #ccc; text-align: center; \
       }\n\n\
-        body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoInfo{\n\
-          background: #999; border-radius: 0 0 4px 0;\
-        }\n\n\
       #leftPanel .leftVideoInfo .videoDescription{\n\
         overflow-x: hidden; text-align: left;\
       }\n\n\
@@ -655,24 +653,15 @@
       #leftPanel .leftVideoInfo .videoDetails{\n\
         background: #bbb; min-width: 130px;\
       }\n\n\
-        body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoDetails{\n\
-          border-left: 130px solid #ccc; padding-left: 4px; min-height: 250px;\
-        }\n\n\
       #leftPanel .leftVideoInfo .videoDetails a{\n\
         margin: auto 4px;\
       }\n\n\
-        body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoOwnerInfoContainer{\n\
-          position: absolute; width: 130px; top: 120px;\
-        }\n\n\
       #leftPanel .leftVideoInfo .userIconContainer a, #leftPanel .leftVideoInfo .ch_profile a{\n\
         display: block;\
       }\n\n\
       #leftPanel .leftVideoInfo .userIconContainer, #leftPanel .leftVideoInfo .ch_profile{\n\
         background: #ccc; width: 100%; text-align: center; border-radius: 0 0 4px 4px; float: none;\n\
       }\n\n\
-        body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .userIconContainer, body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .ch_profile{\n\
-          background: #ccc; max-width: 130px; float: none;\n\
-        }\n\n\
       #leftPanel .leftVideoInfo .userIconContainer .usericon, #leftPanel .leftVideoInfo .ch_profile img{\n\
         max-width: 130px; width: auto; height: auto; border: 0;\n\
       }\n\n\
@@ -4316,6 +4305,8 @@
       leftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
       resetHidariue();
       onTagReset();
+      adjustSmallVideoSize();
+
       if (!isFirst) {
       } else {
         if (conf.autoPlayIfWindowActive === 'yes' && w.document.hasFocus()) {
@@ -4507,9 +4498,8 @@
       $videoTitleContainer.append($('#videoTitle').clone().attr('id', null));
 
       var $videoThumbnailContainer = $template.find('.videoThumbnailContainer');//.css({maxHeight: 0});
-      $videoThumbnailContainer.append($('#videoThumbnailImage').clone(true).attr('id', null)).click(function() {
-        var src = $(this).find('img:last').attr('src');
-        showLargeThumbnail(src);
+      $videoThumbnailContainer.append($('#videoThumbnailImage').clone(true).attr('id', null)).find('img:last').click(function() {
+        showLargeThumbnail($(this).attr('src'));
       });
 
       var $videoDetails = $template.find('.videoDetails');
@@ -5219,15 +5209,16 @@
       var
         rightAreaWidth = $('#resultContainer').outerWidth(),
         availableWidth = $(window).innerWidth() - rightAreaWidth,
-        commentInputHeight = $('#playerContainer').hasClass('oldTypeCommentInput') ? 46 : 0, controlPanelHeight = $('#playerContainer').hasClass('controll_panel') ? 46 : 0;
+        commentInputHeight = $('#playerContainer').hasClass('oldTypeCommentInput') ? 66 : 0, controlPanelHeight = $('#playerContainer').hasClass('controll_panel') ? 46 : 0;
       if (availableWidth <= 0) { return; }
       //var flashVars = watch.PlayerInitializer.playerInitializeModel.flashVars, isWide = flashVars.isWide === "1"; // 4:3対応しても額縁になるだけだった
       var
-        defPlayerWidth = 300,
-        defPlayerHeight = defPlayerWidth/16*9/*isWide ? defPlayerWidth/16*9 : defPlayerWidth/4*3 /* 144 */,
+        defPlayerWidth = 300, otherPluginsHeight = $('body.chrome26 #songrium_inline').outerHeight() /* + $('#graphContentOuter').outerHeight() */,
+        defPlayerHeight = (defPlayerWidth - 32) * 9 / 16 + 10,
+//        defPlayerHeight = defPlayerWidth/16*9/*isWide ? defPlayerWidth/16*9 : defPlayerWidth/4*3 /* 144 */,
         ratio = availableWidth / defPlayerWidth , availableHeight = defPlayerHeight * ratio + commentInputHeight + controlPanelHeight,
         xdiff = (availableWidth - defPlayerWidth - 20), windowHeight = $(window).innerHeight(),
-        bottomHeight = windowHeight - availableHeight - (WatchController.isFixedHeader() ? $('#siteHeader').outerHeight() : 0);
+        bottomHeight = windowHeight - availableHeight - (WatchController.isFixedHeader() ? $('#siteHeader').outerHeight() : 0) - otherPluginsHeight;
       if (ratio < 1) { return; }
 
       if (availableWidth <= 0 || bottomHeight <= 0 || (lastAvailableWidth === availableWidth && lastBottomHeight === bottomHeight)) { return; }
@@ -5260,23 +5251,64 @@
         // かなり 無理矢理 左パネルを 召喚するよ 不安定に なっても 知らない
         // 破滅！
         'body.videoSelection #content.w_adjusted #leftPanel {',
-          ' display: block; top: ', availableHeight, 'px !important; max-height: ', bottomHeight, 'px !important; width: ', (xdiff - 4), 'px !important; left: 0;',
+          ' display: block; top: ', (availableHeight + otherPluginsHeight), 'px !important; max-height: ', bottomHeight, 'px !important; width: ', (xdiff - 4), 'px !important; left: 0;',
           ' height:', (Math.min(bottomHeight, 600) - 2) , 'px !important;',
         '}',
           'body.videoSelection #content.w_adjusted #leftPanel {',
           '}',
-        'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted .videoDetails, ',
-        'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted #searchResultNavigation {',
-          // タグ領域三行分 bodyのスクロール位置をタグの場所にしてる時でもパネルは文章の末端までスクロールできるようにするための細工
-          // (四行以上あるときは表示しきれないが)
-          'padding-bottom: 72px; ',
+        'body.videoSelection #content.w_adjusted #leftPanel .panelClickHandler{',
+          'display: none !important;',
         '}',
         'body.videoSelection #content.w_adjusted .leftVideoInfo, body.size_small.no_setting_panel.videoSelection #content.w_adjusted .leftIchibaPanel {',
-          'width: ', (xdiff - 4), 'px !important;',
+          'width: ', Math.max((xdiff -  4), 130), 'px !important;',
         '}',
         'body.videoSelection #content.w_adjusted .nicommendContentsOuter {',
-          'width: ', (xdiff - 18), 'px !important;',
+          'width: ', Math.max((xdiff - 18), 130), 'px !important;',
         '}',
+        ((xdiff >= 400) ?
+          [
+            'body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoTitleContainer{',
+              'margin-left: 134px; border-radius: 0 4px 0 0 ; background: #999;',
+            '}',
+            'body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoThumbnailContainer{',
+              'position: absolute; max-width: 130px; top: 0; ',
+            '}',
+            'body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoInfo{',
+              'background: #999; border-radius: 0 0 4px 0;',
+            '}',
+            'body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoDetails{',
+              'border-left: 130px solid #ccc; padding-left: 4px; min-height: 250px;',
+            '}',
+            'body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .videoOwnerInfoContainer{',
+              'position: absolute; width: 130px; top: 120px;',
+            '}',
+            'body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .userIconContainer, body.videoSelection #content.w_adjusted #leftPanel .leftVideoInfo .ch_profile{',
+              'background: #ccc; max-width: 130px; float: none;',
+            '}',
+            'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted .videoDetails, ',
+            'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted #searchResultNavigation {',
+              // タグ領域三行分 bodyのスクロール位置をタグの場所にしてる時でもパネルは文章の末端までスクロールできるようにするための細工
+              // (四行以上あるときは表示しきれないが)
+              'padding-bottom: 72px; ',
+            '}'
+          ].join('') :
+          (
+            (xdiff >= 134) ?
+            [
+              'body.videoSelection #content.w_adjusted #leftPanel #leftPanelTabContainer { padding: 4px 2px 3px 2px; }',
+              'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted #searchResultNavigation, ',
+              'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted .videoOwnerInfoContainer {padding-bottom: 72px; }'
+            ].join('') :
+            [
+              'body.videoSelection #content.w_adjusted #leftPanel { min-width: 130px; padding: 0; margin: 0; left: ', (xdiff - 134), 'px !important ;}',
+              'body.videoSelection #content.w_adjusted #leftPanel img, body.videoSelection #content.w_adjusted #leftPanel .descriptionThumbnail { display: none; }',
+              'body.videoSelection #content.w_adjusted #leftPanel #leftPanelTabContainer { display: none; }',
+              'body.videoSelection #content.w_adjusted #leftPanel *   { padding: 0; margin: 0; }',
+              'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted #searchResultNavigation, ',
+              'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted .videoOwnerInfoContainer {padding-bottom: 72px; }',
+            ].join('')
+          )
+        ),
         // かなり 無理矢理 コメントパネルを 召喚するよ 不安定に なっても 知らない
         // 破滅！
         'body.videoSelection #content.w_adjusted #nicoplayerContainer {',
@@ -5337,7 +5369,7 @@
             'body.chrome26.videoSelection #searchResultExplorer {',
               'overflow-x: hidden;',
             '}\n',
-            'body.chrome26.videoSelection #content.w_adjusted #playlist, body.chrome26.videoSelection #bottomContentTabContainer.w_adjusted { margin-top: -', (availableHeight + 2) ,'px !important;}\n',
+            'body.chrome26.videoSelection #content.w_adjusted #playlist, body.chrome26.videoSelection #bottomContentTabContainer.w_adjusted { margin-top: -', (availableHeight + otherPluginsHeight + 2) ,'px !important;}\n',
             'body.chrome26.videoSelection #content.w_adjusted #searchResultExplorerContentWrapper { margin-top: 0px !important; }\n',
             'body.chrome26 #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap { display: none; }\n',
             'body.chrome26.videoSelection.no_setting_panel #content.w_adjusted #playlist .browserFullOption { display: block !important; }\n',
@@ -5720,6 +5752,12 @@
       });
 
 
+      setTimeout(function() {
+        if ($('#alertWindow').find('.alertLabel').text() === 'お使いのブラウザでは、現在一部機能の動作が変更されています。') {
+          $('#alertWindow').find('.alertClose').click();
+        }
+      }, 3000);
+
       var fixCss = '\
         body.chrome26.videoSelection #content {\
             float: none !important;\
@@ -5768,6 +5806,9 @@
         body.chrome26.full_with_browser #playlist {\
           bottom: -8px; display: block; \
         }\
+        body.chrome26.videoSelection    #songrium_inline       { right: 22px; }\
+        body.chrome26.full_with_browser #songrium_inline       { position:fixed; bottom: -48px; }\
+        body.chrome26.full_with_browser #songrium_inline:hover { bottom: 26px; }\
         ';
 
       addStyle(fixCss, 'chromeFixCss');
