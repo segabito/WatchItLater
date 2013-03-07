@@ -15,13 +15,20 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130307
+// @version        1.130308
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130308
+// - コメント入力欄が常識的な太さになったのに対応
+// - タグの高さ自動調整が効かなくなったのを修正
+// - タグ検索結果にニコニ広告が出るようになったのに対応
+// - プレイリストに件数表示
+// - その他3/7の本家側更新に対応
 
 // * ver 1.130307
 // - https://～がリンクできてなかったのを修正
@@ -1038,7 +1045,7 @@
 \
       /* 動画タグが1行以下の時 */\
       body:not(.full_with_browser) #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.oneLine {\
-        height: 12px;\
+        height: 12px; padding: 6px 4px 2px;\
       }\
       body:not(.full_with_browser) #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.oneLine .toggleText{\
         display: none;\
@@ -1143,6 +1150,9 @@
       }\n\
       body.videoSelection #footer.w_adjusted {\
         display: none;\
+      }\n\
+      #searchResultExplorer.w_adjusted #searchResultUadTagRelatedContainer .itemList>li {\
+        width: 124px;\
       }\n\
 \
     /* 1列表示の時、動画タイトルの横の空白部分にまでクリック判定があるのはVistaのエクスプローラみたいで嫌なので、文字部分だけにしたい */\
@@ -1540,7 +1550,9 @@
   /**
    * 通信用
    */
-  w.WatchItLater = {};
+  w.WatchItLater = {
+    event: EventDispatcher
+  };
 
 
   var EventDispatcher = (function(conf, w) {
@@ -5181,7 +5193,7 @@
       var
         rightAreaWidth = $('#resultContainer').outerWidth(),
         availableWidth = $(window).innerWidth() - rightAreaWidth,
-        commentInputHeight = $('#playerContainer').hasClass('oldTypeCommentInput') ? 66 : 0, controlPanelHeight = $('#playerContainer').hasClass('controll_panel') ? 46 : 0;
+        commentInputHeight = $('#playerContainer').hasClass('oldTypeCommentInput') ? 36 : 0, controlPanelHeight = $('#playerContainer').hasClass('controll_panel') ? 46 : 0;
       if (availableWidth <= 0) { return; }
       //var flashVars = watch.PlayerInitializer.playerInitializeModel.flashVars, isWide = flashVars.isWide === "1"; // 4:3対応しても額縁になるだけだった
       var
@@ -5483,6 +5495,7 @@
     }
 
     function initPlaylist() {
+      var playlist = watch.PlaylistInitializer.playlist; //.getItems().length;
       EventDispatcher.addEventListener('onScreenModeChange', function(sc) {
         if ($('body').hasClass('full_with_browser')) {
           // フル画面時プレイリストを閉じる
@@ -5498,36 +5511,57 @@
           $('#playlist').find('.browserFullOption a:visible').click();
         }
       });
+
+      function updatePos() {
+        var pos = Math.max((playlist.getPlayingIndex() + 1), 1) + '/' + Math.max(playlist.getItems().length, 1);
+        $('.generationMessage').text(pos + " - \n" + $('.generationMessage').text().replace(/^.*\n/, ''));
+      }
+      playlist.addEventListener('reset', function() {
+        updatePos();
+        EventDispatcher.dispatch('onPlaylistReset');
+      });
+      playlist.addEventListener('update', function() {
+        updatePos();
+        EventDispatcher.dispatch('onPlaylistUpdate');
+      });
+      EventDispatcher.addEventListener('onWatchInfoReset', updatePos);
+
     }
 
     function initTags() {
-      var $videoHeaderTagEditLinkArea = null, $toggleTagEditText = null, baseTagHeight = 72;
+      var $videoHeaderTagEditLinkArea = null, $toggleTagEditText = null, baseTagHeight = 72, currentHeight = 72;
+      var tagListView = watch.TagInitializer.tagViewController.tagListView;
+
+      tagListView.getCurrentDefaultHeight_org = tagListView.getCurrentDefaultHeight;
+      tagListView.getCurrentDefaultHeight = function() {
+        if ($('body').hasClass('full_with_browser')) {
+          return tagListView.getCurrentDefaultHeight_org();
+        }
+        return currentHeight;
+      };
+      $videoHeaderTagEditLinkArea = $('.toggleTagEditInner .videoHeaderTagEditLinkArea');
+      $('.toggleTagEdit').append($videoHeaderTagEditLinkArea);
+      $toggleTagEditText = $('<span class="toggleText">' + $('.toggleTagEditInner').text() + '</span>');
+      $('.toggleTagEditInner').empty().append($toggleTagEditText).append($videoHeaderTagEditLinkArea);
+
       function onTagReset() {
         try {
           // タグが2行以下だったら自動的に狭くする処理
           if (!conf.enableAutoTagContainerHeight) { return; }
-          // if (baseTagHeight === 0) { baseTagHeight = 72; /*watch.TagInitializer.tagViewController.defaultHeightInNormal;}
-          var h = Math.min(baseTagHeight, $('#videoTagContainer').find('.tagInner').innerHeight());
+          currentHeight = Math.min(baseTagHeight, $('#videoTagContainer').find('.tagInner').innerHeight());
 
-          if (watch.TagInitializer.tagViewController.defaultHeightInNormal != h) {
+          if (watch.TagInitializer.tagViewController.defaultHeightInNormal != currentHeight) {
             var $toggle = $('#videoTagContainer').find('.toggleTagEdit');
-            watch.TagInitializer.tagViewController.defaultHeightInNormal = h;
             $toggle.removeClass('oneLine').removeClass('twoLines');
 
-            if (h < 36) { // 1行以下の時
-              if (!$videoHeaderTagEditLinkArea) {
-                $videoHeaderTagEditLinkArea = $('.toggleTagEditInner .videoHeaderTagEditLinkArea');
-                $('.toggleTagEdit').append($videoHeaderTagEditLinkArea);
-                $toggleTagEditText = $('<span class="toggleText">' + $('.toggleTagEditInner').text() + '</span>');
-                $('.toggleTagEditInner').empty().append($toggleTagEditText).append($videoHeaderTagEditLinkArea);
-              }
+            if (currentHeight < 36) { // 1行以下の時
               $toggle.addClass('oneLine');
             } else {
-              if (h <= 60) { // 2行以下の時
+              if (currentHeight <= 60) { // 2行以下の時
                 $toggle.addClass('twoLines');
               }
             }
-            watch.TagInitializer.tagViewController.fitTagAreaAndVideoHeader();
+            watch.TagInitializer.tagViewController.tagListView.fit();
           }
         } catch (e) {
           console.log(e);
@@ -6056,7 +6090,7 @@
           initSquareThumbnail();
         } else
         if (name === 'enableAutoTagContainerHeight') {
-          if (newValue) { watch.TagInitializer.tagViewController.setIsPinned(true); }
+          if (newValue) { watch.TagInitializer.tagViewController.tagViewPinStatus.changeStatus(true); }
         } else
         if (name === 'enableMylistDeleteButton') {
           $('#resultContainer').toggleClass('enableMylistDeleteButton', newValue);
