@@ -15,13 +15,16 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130309
+// @version        1.130311
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130311
+// - 真全画面モード調整。フルHDモニターで上端10ピクセルの枠が残っていたのを修正
 
 // * ver 1.130309
 // - 【地味に便利】全画面モード時に自動で操作パネルとコメント入力欄を隠す設定
@@ -1280,15 +1283,16 @@
       }\
       /* 真・browserFullモード */\
       body.full_with_browser.hideCommentInput #nicoplayerContainerInner {\
-        margin-bottom: -36px;\
+        /* コメント入力欄は動画上表示にするのではなく、画面外に押し出す事によって見えなくする */\
+        margin-top: -10px; margin-bottom: -26px; \
       }\
-      body.full_with_browser.trueBrowserFull:not(.squareRatio) #nicoplayerContainerInner {\
+      body.full_with_browser.trueBrowserFull #nicoplayerContainerInner {\
         margin-left: -2.5%; width: 105% !important;\
       }\
-      body.full_with_browser.trueBrowserFull:not(.squareRatio) #playerContainerWrapper {\
+      body.full_with_browser.trueBrowserFull #playerContainerWrapper {\
         margin: 0 !important;\
       }\
-      body.full_with_browser.trueBrowserFull:not(.squareRatio) #playlist {\
+      body.full_with_browser.trueBrowserFull #playlist {\
         display: none;\
       }\
       body.full_with_browser.trueBrowserFull .mylistPopupPanel,body.full_with_browser.trueBrowserFull .yukkuriButton { display:none; }\
@@ -4061,6 +4065,12 @@
     var PlaylistMenu = (function($, conf, w){
       var $popup = null, $generationMessage = $('#playlist').find('.generationMessage'), self;
 
+      function enableContinuous() {
+        if (watch.PlaylistInitializer.playlist.getPlaybackMode() === 'normal') {
+          watch.PlaylistInitializer.playlist.setPlaybackMode('continuous');
+        }
+      }
+
       function createDom() {
         $popup = $('<div/>').addClass('playlistMenuPopup').toggleClass('w_touch', isTouchActive);
         var $ul = $('<ul/>');
@@ -4069,21 +4079,25 @@
         });
         var $shuffle = $('<li>リストをシャッフル</li>').click(function() {
           WatchController.shufflePlaylist();
+          enableContinuous();
         });
         $ul.append($shuffle);
 
         var $next = $('<li>検索結果を追加：次に再生</li>').click(function() {
           WatchController.appendSearchResultToPlaylist('next');
+          enableContinuous();
         });
         $ul.append($next);
 
         var $insert = $('<li>検索結果を追加：末尾</li>').click(function() {
           WatchController.appendSearchResultToPlaylist();
+          enableContinuous();
         });
         $ul.append($insert);
 
         var $clear = $('<li>リストを消去</li>').click(function() {
           WatchController.clearPlaylist();
+          watch.PlaylistInitializer.playlist.setPlaybackMode('normal');
         });
         $ul.append($clear);
 
@@ -5539,6 +5553,10 @@
             if ($('body').hasClass('up_marquee') && conf.disableAutoBrowserFullIfNicowari) {
               // ユーザーニコ割があるときは自動全画面にしない
               return;
+            }
+            if ($('body').hasClass('videoSelection')) {
+              var settingSize = (localStorage["PLAYER_SETTINGS.LAST_PLAYER_SIZE"] === '"normal"') ? 'normal' : 'medium';
+              WatchController.changeScreenMode(settingSize);
             }
             WatchController.changeScreenMode('browserFull');
             onWindowResize();
