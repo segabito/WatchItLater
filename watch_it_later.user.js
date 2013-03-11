@@ -15,13 +15,16 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130311
+// @version        1.130312
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130312
+// - 真全画面モードのダブルクリック切り替えに問題があったので一旦保留
 
 // * ver 1.130311
 // - 真全画面モード調整。フルHDモニターで上端10ピクセルの枠が残っていたのを修正
@@ -1296,7 +1299,30 @@
         display: none;\
       }\
       body.full_with_browser.trueBrowserFull .mylistPopupPanel,body.full_with_browser.trueBrowserFull .yukkuriButton { display:none; }\
-      #trueBrowserFullShield { position:absolute; top: 0; left: 0; bottom: 80px; right: 0px; z-index: 10000; display: block; }\
+      #trueBrowserFullShield {\
+        -webkit-transition: opacity 0.2s ease-out;\
+        position:absolute; \
+        display: none;\
+      }\
+      body.full_with_browser #trueBrowserFullShield {\
+        background: black;\
+        display: block;\
+        bottom: 100px; \
+        right:  100px;\
+        z-index: 10000; \
+        min-width: 400px;\
+        cursor: pointer;\
+        opacity: 0;\
+        color: white;\
+        box-shadow: 2px 2px 2px silver;\
+        border-radius: 4px;\
+      }\
+      body.full_with_browser #trueBrowserFullShield .title {\
+        color: #ffc; font-size: 120%;\
+      }\
+      body.full_with_browser #trueBrowserFullShield:hover, body.full_with_browser #trueBrowserFullShield.active { \
+        opacity: 1;\
+      }\
       body:not(.full_with_browser) #trueBrowserFullShield { display: none; }\
       ',
     ''].join('');
@@ -1369,7 +1395,7 @@
       {title: '全画面時に操作パネルとコメント入力欄を隠す', varName: 'controllerVisibilityInFull',
         values: {'隠す': 'hidden', '隠さない': ''}},
       {title: '真のブラウザ全画面モード (黒枠がなくなる)', varName: 'enableTrueBrowserFull',
-        description: '※操作パネルが若干はみ出します。\nChromeは画面ダブルクリックでいつでも切り替えできます。',
+        description: '※操作パネルが若干はみ出します。',
         values: {'有効': true, '無効': false}},
 
 
@@ -4358,6 +4384,11 @@
             '<br/><span style="margin-left:10px; font-size: 90%;">'+ h + '</span>'
           );
         }
+        $('#trueBrowserFullShield').html([
+          '<div class="title">', watchInfoModel.title, '</div>',
+          '<p class="count">',h, '</p>',
+        ''].join(''));
+
         if (conf.headerViewCounter) {
           var vc = $('#videoCounter');
           if (vc.length < 1) {
@@ -5614,23 +5645,18 @@
 
         function initShield() {
           var shield = $('<div id="trueBrowserFullShield" />');
-          shield.dblclick(function(e) {
+          shield.click(function(e) {
             e.stopPropagation();
             toggleTrueBrowserFull();
-          });
-          shield.mousedown(function(e) {
-            if (WatchController.vpos() < 1) {
-              WatchController.togglePlay();
-            }
-          });
+          }).attr('title', 'クリックで全画面モード切替');
           $('#external_nicoplayer').after(shield);
           shield = null;
         }
+        initShield();
 
         EventDispatcher.addEventListener('onScreenModeChange', function(sc) {
           var mode = sc.mode;
           if (mode === 'browserFull' && lastScreenMode !== mode) {
-            initShield();
             lastPlayerConfig = watch.PlayerInitializer.nicoPlayerConnector.playerConfig.get();
             hideIfNeed();
             toggleTrueBrowserFull(conf.enableTrueBrowserFull);
@@ -6405,4 +6431,5 @@
     monkey(true);
   }
 })();
+
 
