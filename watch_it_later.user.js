@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130312
+// @version        1.130312b
 // ==/UserScript==
 
 // TODO:
@@ -25,6 +25,8 @@
 
 // * ver 1.130312
 // - 真全画面モードのダブルクリック切り替えに問題があったので一旦保留
+// - ブラウザ全画面再生中でも、右下にカーソルを持っていくとタイトルと再生数を確認できるようにした (Chrome限定)
+// - コメントパネル上にNG共有レベル設定を追加できるようにした
 
 // * ver 1.130311
 // - 真全画面モード調整。フルHDモニターで上端10ピクセルの枠が残っていたのを修正
@@ -374,6 +376,7 @@
       lastCommentVisibility: 'visible',
       controllerVisibilityInFull: '', // 全画面時に操作パネルとコメント入力欄を出す設定
       enableTrueBrowserFull: false, // フチなし全画面モードにする (Chromeは画面ダブルクリックで切り替え可能)
+      enableSharedNgSetting: false, //
 
       enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
 
@@ -1287,7 +1290,7 @@
       /* 真・browserFullモード */\
       body.full_with_browser.hideCommentInput #nicoplayerContainerInner {\
         /* コメント入力欄は動画上表示にするのではなく、画面外に押し出す事によって見えなくする */\
-        margin-top: -10px; margin-bottom: -26px; \
+        margin-top: -10px; margin-bottom: -36px; \
       }\
       body.full_with_browser.trueBrowserFull #nicoplayerContainerInner {\
         margin-left: -2.5%; width: 105% !important;\
@@ -1311,7 +1314,7 @@
         right:  100px;\
         z-index: 10000; \
         min-width: 400px;\
-        cursor: pointer;\
+        cursor: nw-resize;\
         opacity: 0;\
         color: white;\
         box-shadow: 2px 2px 2px silver;\
@@ -1320,10 +1323,20 @@
       body.full_with_browser #trueBrowserFullShield .title {\
         color: #ffc; font-size: 120%;\
       }\
+      body.full_with_browser #trueBrowserFullShield .ownerIcon {\
+        float: left; height: 55px; padding: 8px;\
+      }\
       body.full_with_browser #trueBrowserFullShield:hover, body.full_with_browser #trueBrowserFullShield.active { \
         opacity: 1;\
       }\
       body:not(.full_with_browser) #trueBrowserFullShield { display: none; }\
+      \
+      #sharedNgSettingContainer {\
+        display: inline-block; font-size: 80%; position: absolute; top: 0; left: 85px;\
+      }\
+      #sharedNgSetting {\
+        background: #ddd; border: 1px solid silver;\
+      }\
       ',
     ''].join('');
     addStyle(style, 'watchItLater');
@@ -1348,6 +1361,7 @@
     return conf[varName];
   };
   conf.setValue = function(k, v) {
+    EventDispatcher.dispatch('on.config.' + k, v, conf[k]);
     conf[k] = v;
     window.localStorage.setItem('watchItLater_' + k, JSON.stringify(v));
   };
@@ -1381,22 +1395,19 @@
       {title: '動画プレイヤーの設定'},
       {title: 'コメントパネルのワイド化', varName: 'wideCommentPanel',
         values: {'する': true, 'しない': false}},
+      {title: 'コメントパネルにNG共有設定を表示', varName: 'enableSharedNgSetting',
+        values: {'する': true, 'しない': false}},
       {title: '左のパネルに動画情報・市場を表示', varName: 'leftPanelJack',
         values: {'する': true, 'しない': false}},
       {title: 'ページのヘッダに再生数表示', varName: 'headerViewCounter',
         values: {'する': true, 'しない': false}},
-      {title: 'てれびちゃんメニュー内に、原宿以前の左上ロゴを復活', varName: 'hidariue',
-        values: {'する': true, 'しない': false}},
-      {title: 'タグが2行以内なら自動で領域を細くする(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
+      {title: 'てれびちゃんメニュー内にニコニコ動画のロゴを復活', varName: 'hidariue',
+        values: {'させる': true, 'させない': false}},
+      {title: 'タグが2行以内なら自動で縦幅を縮める(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
         description: '無駄な空白がなくなって画面の節約になります',
         values: {'する': true, 'しない': false}},
       {title: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory',
         values: {'する': true, 'しない': false}},
-      {title: '全画面時に操作パネルとコメント入力欄を隠す', varName: 'controllerVisibilityInFull',
-        values: {'隠す': 'hidden', '隠さない': ''}},
-      {title: '真のブラウザ全画面モード (黒枠がなくなる)', varName: 'enableTrueBrowserFull',
-        description: '※操作パネルが若干はみ出します。',
-        values: {'有効': true, '無効': false}},
 
 
       {title: '動画検索画面の設定'},
@@ -1406,6 +1417,7 @@
       {title: 'お気に入りタグを表示', varName: 'enableFavTags',
         values: {'する': true, 'しない': false}},
       {title: 'お気に入りマイリストを表示', varName: 'enableFavMylists',
+        description: '更新のあったリストが上に来るので、新着動画のチェックに便利です。',
         values: {'する': true, 'しない': false}},
       {title: 'サムネを4:3にする', varName: 'squareThumbnail',
         description: '上下がカットされなくなり、サムネの全体が見えるようになります。',
@@ -1413,6 +1425,14 @@
       {title: '「マイリストから外す」ボタンを表示', varName: 'enableMylistDeleteButton',
         description: 'マイリストの整理に便利。\n ※ 消す時に確認ダイアログは出ないので注意',
         values: {'する': true, 'しない': false}},
+
+      {title: '全画面モードの設定'},
+      {title: '全画面時に操作パネルとコメント入力欄を隠す', varName: 'controllerVisibilityInFull',
+        description: '全画面の時は少しでも動画を大きくしたい場合に便利',
+        values: {'隠す': 'hidden', '隠さない': ''}},
+      {title: '真のブラウザ全画面モード (黒枠がなくなる)', varName: 'enableTrueBrowserFull',
+        description: 'F11でブラウザを最大化した状態だと、モニター全画面表示より大きくなります。 \nただし、操作パネルが若干はみ出します。',
+        values: {'有効': true, '無効': false}},
 
       {title: 'その他の設定'},
       {title: 'マウスを重ねるとマイリストメニューを表示', varName: 'enableHoverPopup',
@@ -1423,15 +1443,19 @@
       {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
        description: '常に指定したいパラメータ指定するのに便利です\n例: 「-グロ -例のアレ」とすると、その言葉が含まれる動画が除外されます'},
       {title: '「@ジャンプ」を無効化', varName: 'ignoreJumpCommand',
+        description: '勝手に他の動画に飛ばされる機能を無効化します。',
         values: {'する': true, 'しない': false}},
       {title: '「ニコる」ボタンをなくす', varName: 'noNicoru',
+        description: '画面上から見えなくなります。',
         values: {'なくす': true, 'なくさない': false}},
       {title: 'タッチパネル向けモード(画面を右フリックで開始)', varName: 'enableQTouch',
+        description: '指で操作しやすいように、一部のボタンやメニューが大きくなります',
         values: {'使う': true, '使わない': false}},
 
 
       {title: 'マウスとキーボードの設定', description: '※Chromeはコメント入力中も反応してしまいます'},
       {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
+        description: 'なにもない場所をダブルクリックすると、動画の位置にスクロールします。\n 市場を見てからプレイヤーに戻りたい時などに便利',
         values: {'する': true, 'しない': false}},
       {title: 'マウスのボタン＋ホイールで音量調整機能', varName: 'mouseClickWheelVolume',
         description: 'とっさに音量を変えたい時に便利',
@@ -4365,10 +4389,11 @@
         setVideoCounter(watchInfoModel);
       });
       function setVideoCounter(watchInfoModel) {
+        var addComma = WatchApp.ns.util.StringUtil.addComma;
         var h = [
-          '再生: ', watchInfoModel.viewCount,
-          ' | コメント: ', watchInfoModel.commentCount,
-          ' | マイリスト: ', watchInfoModel.mylistCount
+          '再生: ',          addComma(watchInfoModel.viewCount),
+          ' | コメント: ',   addComma(watchInfoModel.commentCount),
+          ' | マイリスト: ', addComma(watchInfoModel.mylistCount)
         ].join('');
         if ((conf.popupViewCounter === 'always') ||
             (conf.popupViewCounter === 'full' && $('body').hasClass('full_with_browser'))
@@ -4385,9 +4410,13 @@
           );
         }
         $('#trueBrowserFullShield').html([
+          '<img class="ownerIcon" src="', ($('.usericon:first').attr('src') || $('#ch_prof img').attr('src')), '">',
           '<div class="title">', watchInfoModel.title, '</div>',
+          '<p class="postedAt">',$('.videoPostedAt:last').text(), '</p>',
           '<p class="count">',h, '</p>',
-        ''].join(''));
+        ''].join(''))
+//          .find('.title').attr('title', $(WatchApp.ns.init.CommonModelInitializer.watchInfoModel.description.replace(/<br \/>/g, '\n')).text()).end()
+          .find('img').attr('title', watchInfoModel.uploaderInfo.nickname ? watchInfoModel.uploaderInfo.nickname : watchInfoModel.channelInfo.name);
 
         if (conf.headerViewCounter) {
           var vc = $('#videoCounter');
@@ -5648,7 +5677,7 @@
           shield.click(function(e) {
             e.stopPropagation();
             toggleTrueBrowserFull();
-          }).attr('title', 'クリックで全画面モード切替');
+          });
           $('#external_nicoplayer').after(shield);
           shield = null;
         }
@@ -5750,7 +5779,7 @@
       watch.TagInitializer.tagList.addEventListener('reset', onTagReset);
     }
 
-    function initSidePanel() {
+    function initCommentPanel() {
       if (conf.wideCommentPanel) {
 //      完全に横スクロール不要にしたい場合はこっち
 //        var tarinaiWidth = $('#commentDefault .commentTableContainer').innerWidth() - $('#commentDefault .commentTableContainerInner').outerWidth();
@@ -5758,6 +5787,32 @@
         WatchController.changeCommentPanelWidth(420);
         $rightPanel.css('right', 2000);
       }
+      EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
+        var $div = $([
+            '<div id="sharedNgSettingContainer" style="display: none;">NG共有レベル: ',
+              '<select id="sharedNgSetting">',
+                '<option value="HIGH">高</option>',
+                '<option value="MIDDLE">中</option>',
+                '<option value="LOW">低</option>',
+                '<option value="NONE">無</option>',
+              '</select>',
+            '</div>',
+          ''].join('')), $ngs = $div.find('select');
+        $ngs.val(watch.PlayerInitializer.nicoPlayerConnector.playerConfig.get().ngScoringFilteringLevel);
+        $ngs.on('change', function() {
+          var val = this.value;
+          watch.PlayerInitializer.nicoPlayerConnector.playerConfig.set({ngScoringFilteringLevel: this.value});
+        });
+        $('#commentDefaultHeader').append($div);
+        EventDispatcher.addEventListener('on.config.enableSharedNgSetting', function(newValue, oldValue) {
+          if (newValue) {
+            $div.show();
+          } else {
+            $div.hide();
+          }
+        });
+        if (conf.enableSharedNgSetting) { $div.show(); }
+      });
     }
 
     function initPager() {
@@ -6328,7 +6383,7 @@
     }
 
     initIframe();
-    initSidePanel();
+    initCommentPanel();
     initShortcutKey();
     initMouse();
     initTouch();
@@ -6431,5 +6486,4 @@
     monkey(true);
   }
 })();
-
 
