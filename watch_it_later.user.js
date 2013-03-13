@@ -1345,19 +1345,19 @@
       #content.noNews #textMarquee {\
         display: none !important;\
       }\
-      body:not(.videoSelection):not(.setting_panel):not(.videoSelection) #content.noNews #playerCommentPanelOuter {\
+      body:not(.videoSelection):not(.setting_panel):not(.full_with_browser) #content.noNews #playerCommentPanelOuter {\
         height: auto !important; position: absolute; bottom: 20px;\
       }\
-      body:not(.videoSelection):not(.setting_panel):not(.videoSelection) #content.noNews #leftPanel {\
+      body:not(.videoSelection):not(.setting_panel):not(.full_with_browser) #content.noNews #leftPanel {\
         height: auto !important; position: absolute; bottom: 0px;\
       }\
-      body:not(.videoSelection):not(.setting_panel):not(.videoSelection) #content.noNews #playerCommentPanel {\
+      body:not(.videoSelection):not(.setting_panel):not(.full_with_browser) #content.noNews #playerCommentPanel {\
         height: 100% !important;\
       }\
-      body:not(.videoSelection):not(.setting_panel):not(.videoSelection) #content.noNews #appliPanel {\
+      body:not(.videoSelection):not(.setting_panel):not(.full_with_browser) #content.noNews #appliPanel {\
         bottom: -54px !important;\
       }\
-      body:not(.videoSelection):not(.setting_panel):not(.videoSelection) #content.noNews #playerContainer {\
+      body:not(.videoSelection):not(.setting_panel):not(.full_with_browser) #content.noNews #playerContainer {\
         height: auto;\
       }\
       ',
