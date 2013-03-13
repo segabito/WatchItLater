@@ -15,13 +15,16 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130312b
+// @version        1.130314
 // ==/UserScript==
 
 // TODO:
 // マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // 軽量化
+
+// * ver 1.130314
+// - ニコニコニュースを消す設定を追加
 
 // * ver 1.130312
 // - 真全画面モードのダブルクリック切り替えに問題があったので一旦保留
@@ -315,7 +318,7 @@
   var monkey =
   (function(isNativeGM){
     var w;
-    try { w = unsafeWindow || window; } catch (e) { var w = window;}
+    try { w = unsafeWindow || window; } catch (e) { w = window;}
     var document = w.document;
 
     function addlink(e, video_id) {
@@ -377,6 +380,7 @@
       controllerVisibilityInFull: '', // 全画面時に操作パネルとコメント入力欄を出す設定
       enableTrueBrowserFull: false, // フチなし全画面モードにする (Chromeは画面ダブルクリックで切り替え可能)
       enableSharedNgSetting: false, //
+      hideNicoNews: false, // ニコニコニュースを消す
 
       enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
 
@@ -611,7 +615,7 @@
       }\n\
       /* 全画面時にニュースを隠す時 */\
       body.full_with_browser.hideNewsInFull #playerContainerSlideArea{\
-        \margin-bottom: -45px;\
+        margin-bottom: -37px;\
       }\n\
       /* 少しでも縦スクロールを減らすため、動画情報を近づける。人によっては窮屈に感じるかも */\
       #outline {\n\
@@ -1337,6 +1341,25 @@
       #sharedNgSetting {\
         background: #ddd; border: 1px solid silver;\
       }\
+      /* ニュース消す */\
+      #content.noNews #textMarquee {\
+        display: none !important;\
+      }\
+      body:not(.videoSelection):not(.setting_panel):not(.videoSelection) #content.noNews #playerCommentPanelOuter {\
+        height: auto !important; position: absolute; bottom: 20px;\
+      }\
+      body:not(.videoSelection):not(.setting_panel):not(.videoSelection) #content.noNews #leftPanel {\
+        height: auto !important; position: absolute; bottom: 0px;\
+      }\
+      body:not(.videoSelection):not(.setting_panel):not(.videoSelection) #content.noNews #playerCommentPanel {\
+        height: 100% !important;\
+      }\
+      body:not(.videoSelection):not(.setting_panel):not(.videoSelection) #content.noNews #appliPanel {\
+        bottom: -54px !important;\
+      }\
+      body:not(.videoSelection):not(.setting_panel):not(.videoSelection) #content.noNews #playerContainer {\
+        height: auto;\
+      }\
       ',
     ''].join('');
     addStyle(style, 'watchItLater');
@@ -1408,6 +1431,9 @@
         values: {'する': true, 'しない': false}},
       {title: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory',
         values: {'する': true, 'しない': false}},
+      {title: '画面からニコニコニュースを消す', varName: 'hideNicoNews',
+        values: {'消す': true, '消さない': false}},
+
 
 
       {title: '動画検索画面の設定'},
@@ -2114,7 +2140,7 @@
         }
         var
           item_id = item.item_id,
-          url = 'http://' + host + '/api/mylist/delete';
+          url = 'http://' + host + '/api/mylist/delete',
           data = [
             'id_list[0][]=', item_id,
             '&group_id=',    groupId,
@@ -2731,14 +2757,15 @@
           if (!self.w_mouse_in) {
             return;
           }
+           var o;
           if (w.jQuery) {
             var $e = w.jQuery(self);
             var t = $e.text();
-            var o = t != "" ? $e.offset() : $e.find('*').offset();
+            o = t != "" ? $e.offset() : $e.find('*').offset();
             showPanel(watchId, o.left, o.top);
           } else
           if (self.getBoundingClientRect) {
-            var o = (self.firstChild && self.firstChild.tagName == 'IMG') ? self.firstChild.getBoundingClientRect() : self.getBoundingClientRect();
+            o = (self.firstChild && self.firstChild.tagName == 'IMG') ? self.firstChild.getBoundingClientRect() : self.getBoundingClientRect();
             var top = Math.max(w.document.documentElement.scrollTop, w.document.body.scrollTop),
                 left = Math.max(w.document.documentElement.scrollLeft, w.document.body.scrollLeft);
             showPanel(watchId, left + o.left, top + o.top);
@@ -2802,13 +2829,14 @@
             true
           ) {
             watchId = m[2];
+             var o;
             if (w.jQuery) {
               var $a = w.jQuery(a);
               var t = $a.text();
-              var o = t != "" ? $a.offset() : $a.find('*').offset();
+              o = t != "" ? $a.offset() : $a.find('*').offset();
               showPanel(watchId, o.left, o.top, true);
             } else {
-              var o = (a.firstChild && a.firstChild.tagName == 'IMG') ? a.firstChild.getBoundingClientRect() : a.getBoundingClientRect();
+              o = (a.firstChild && a.firstChild.tagName == 'IMG') ? a.firstChild.getBoundingClientRect() : a.getBoundingClientRect();
               var top  = Math.max(w.document.documentElement.scrollTop,  w.document.body.scrollTop),
                   left = Math.max(w.document.documentElement.scrollLeft, w.document.body.scrollLeft);
               showPanel(watchId, left + o.left, top + o.top, true);
@@ -3001,8 +3029,8 @@
       scrollToVideoPlayer: function(force) {
         // 縦解像度がタグ+プレイヤーより大きいならタグの開始位置、そうでないならプレイヤーの位置にスクロール
         // ただし、該当部分が画面内に納まっている場合は、勝手にスクロールするとかえってうざいのでなにもしない
-        var isContentFix = $('body').hasClass('content-fix');
-        $('body').removeClass('content-fix');
+        var $body = $('body'), isContentFix = $body.hasClass('content-fix');
+        $body.removeClass('content-fix');
         var h = $('#playerContainer').outerHeight() + $('#videoTagContainer').outerHeight();
         var top = $(window).height() >= h ? '#videoTagContainer, #playerContainer' : '#playerContainer';
 
@@ -3015,10 +3043,11 @@
           WatchApp.ns.util.WindowUtil.scrollFitMinimum(top, 600);
         }
         $(window).scrollLeft(0);
-        $('body').toggleClass('content-fix', isContentFix);
+        $body.toggleClass('content-fix', isContentFix);
       },
       changeCommentPanelWidth: function(target) {
-        var px = target - $('#playerCommentPanelOuter').outerWidth();
+        var $playerCommentPanelOuter = $('#playerCommentPanelOuter');
+        var px = target - $playerCommentPanelOuter.outerWidth();
         var elms = [
           '#playerCommentPanelOuter',
           '#playerCommentPanel',
@@ -3030,7 +3059,7 @@
           var $e = $(elms[v]);
           $e.width($e.width() + px);
         }
-        $('#playerCommentPanelOuter').css({'right': - $('#playerCommentPanelOuter').outerWidth() + 'px'});
+        $playerCommentPanelOuter.css({'right': - $playerCommentPanelOuter.outerWidth() + 'px'});
       },
       play: function() {
         watch.PlayerInitializer.nicoPlayerConnector.playVideo();
@@ -3067,7 +3096,6 @@
       },
       openUpNushiVideo: function() {
         $('.showOtherVideos:first').click(); // 手抜き
-        // TODO: 結果がマイリスト一個だけとかだったら自動で開きたい
       },
       openUserVideo: function(userId, userNick) {
         watch.ComponentInitializer.videoSelection.showOtherUserVideos(userId, userNick);
@@ -3114,7 +3142,7 @@
         var
           items = watch.PlaylistInitializer.playlist.items, lr = watch.ComponentInitializer.videoSelection.lastLoadResponse,
           searchItems = lr.sortedRawData ? lr.sortedRawData : lr.rawData.list,
-          uniq = {}, i, f = WatchApp.ns.model.playlist.PlaylistItem, playingIndex = 0;
+          uniq = {}, i, f = WatchApp.ns.model.playlist.PlaylistItem, playingIndex = 0, c;
         if (!searchItems || searchItems.length < 1) {
           return;
         }
@@ -3124,13 +3152,13 @@
         }
         if (mode === 'next') {
           var tmp = [];
-          for (var i = searchItems.length - 1; i >= 0; i--) {
-            var c = searchItems[i];
+          for (i = searchItems.length - 1; i >= 0; i--) {
+            c = searchItems[i];
             ("undefined" == typeof c.type || "video" == c.type) && uniq[c.id] === undefined && items.splice(playingIndex + 1, 0, new f(c));
           }
         } else {
           for (i = 0, len = searchItems.length; i < len; i++) {
-            var c = searchItems[i];
+            c = searchItems[i];
             ("undefined" == typeof c.type || "video" == c.type) && uniq[c.id] === undefined && items.push(new f(c));
           }
         }
@@ -3237,7 +3265,7 @@
 
   var NicoNews = (function() {
     var WatchApp = null, watch = null, $ = null, WatchJsApi = null, initialized = false;
-    var $button = null, $history = null, $ul = null, deteru = {}, $textMarqueeInner;
+    var $button = null, $history = null, $ul = null, deteru = {}, $textMarquee, $textMarqueeInner;
     var isHover = false;
 
     function onNewsUpdate(news) {
@@ -3273,7 +3301,8 @@
         watch = WatchApp.ns.init;
         $ = w.$;
         WatchJsApi = w.WatchJsApi;
-        $textMarqueeInner = $('#textMarquee').find('.textMarqueeInner');
+        $textMarquee = $('#textMarquee');
+        $textMarqueeInner = $textMarquee.find('.textMarqueeInner');
 
         watch.TextMarqueeInitializer.textMarqueeViewController.scheduler.addEventListener(
           'schedule',
@@ -3288,7 +3317,7 @@
         $ul = $history.find('ul');
         $button.click(function() { self.toggle(); });
 
-        $('#textMarquee').append($button).append($history);
+        $textMarquee.append($button).append($history);
         initialized = true;
       },
       open: function() {
@@ -3460,8 +3489,8 @@
       GM_xmlhttpRequest({
         url: url,
         onload: function(resp) {
-          var text = resp.responseText, lines = text.split(/[\r\n]/), found = false, data;
-          for (var i = 0, len = lines.length; i < len; i++) {
+          var text = resp.responseText, lines = text.split(/[\r\n]/), found = false, data, i, len;
+          for (i = 0, len = lines.length; i < len; i++) {
             var line = lines[i];
             if (line.indexOf('var Nico_RecommendationsParams') >= 0 &&
                 lines[i + 5] && lines[i + 5].indexOf('first_data') >= 0) {
@@ -3477,7 +3506,7 @@
           }
 
           var getType = function() { return 'video'; };
-          for (var i = 0, len = data.videos.length; i < len; i++) {
+          for (i = 0, len = data.videos.length; i < len; i++) {
             var video = data.videos[i];
             if (histories[video.id]) {
               delete histories[video.id];
@@ -4197,7 +4226,7 @@
 
       function createDom() {
         $content = $('<div id="yukkuriPanel" />');
-        $button = $('<button>Yu</button>').addClass('yukkuriButton').attr({title: 'ゆっくり(スロー再生)'});
+        $button = $('<button>yu</button>').addClass('yukkuriButton').attr({title: 'ゆっくり(スロー再生)'});
         $button.click(function() {
           toggleActive();
         });
@@ -4269,9 +4298,9 @@
       function update() {
         // dataCache = {};
         $('#nicommendPanelContent').find('.nicommendItemList>.item').each(function() {
-          var $item = $(this);
+          var $item = $(this), url, img;
           if ($item.hasClass('video')) {
-            var url = $item.find('.itemThumb>a').attr('href').split('?')[0];
+            url = $item.find('.itemThumb>a').attr('href').split('?')[0];
             dataCache[url] = {
               type: 'video',
               title: $.trim($item.find('.itemName a').text()),
@@ -4279,7 +4308,8 @@
             };
           } else
           if ($item.hasClass('mylist')) {
-            var url = $item.find('.itemThumb>a').attr('href').split('?')[0], img = $item.find('.itemThumb img');
+            url = $item.find('.itemThumb>a').attr('href').split('?')[0];
+            img = $item.find('.itemThumb img');
 
             dataCache[url] = {
               type: 'mylist',
@@ -4293,7 +4323,8 @@
 
           }
           if ($item.hasClass('illust')) {
-            var url = $item.find('.itemThumb>a').attr('href').split('?')[0], img = $item.find('.itemThumb img');
+            url = $item.find('.itemThumb>a').attr('href').split('?')[0];
+            img = $item.find('.itemThumb img');
             dataCache[url] = {
               type: 'illust',
               title: $.trim($item.find('.itemName a').text()),
@@ -5114,7 +5145,7 @@
         currentMylistId = 0;
         $('#resultContainer').removeClass('dummyMylist').removeClass('mylist').removeClass('isMine');
         watch.ComponentInitializer.videoSelection._show_org(a, b);
-      }
+      };
 
       watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader.load_org =
         watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader.load;
@@ -5186,7 +5217,7 @@
           }
 //          if (item._info.recommend_tag) {}
           return $item;
-      }
+      };
 
       var menu =
         '<div class="thumbnailHoverMenu">' +
@@ -5249,7 +5280,6 @@
         size = 'width: 360px; height: 202.5px;';
       }
       var
-        baseUrl,
         html = [
           '<div onmousedown="if (event.button == 0) { $(\'#popupMarquee\').hide(); event.preventDefault(); }" style="background:#000;">',
           '<img src="', largeUrl, '" style="', size, ' z-index: 3; position: absolute; display: none;" onload="this.style.display = \'\';">',
@@ -5412,7 +5442,7 @@
               'body.videoSelection #content.w_adjusted #leftPanel #leftPanelTabContainer { display: none; }',
               'body.videoSelection #content.w_adjusted #leftPanel *   { padding: 0; margin: 0; }',
               'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted #searchResultNavigation, ',
-              'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted .videoOwnerInfoContainer {padding-bottom: 72px; }',
+              'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted .videoOwnerInfoContainer {padding-bottom: 72px; }'
             ].join('')
           )
         ),
@@ -5815,6 +5845,16 @@
       });
     }
 
+    function initNews() {
+      if (conf.hideNicoNews) {
+        $('#content').addClass('noNews');
+      }
+      EventDispatcher.addEventListener('on.config.hideNicoNews', function(value) {
+        $('#content').toggleClass('noNews', value);
+      });
+      if (conf.enableNewsHistory) { NicoNews.initialize(w); }
+    }
+
     function initPager() {
     }
 
@@ -5889,7 +5929,7 @@
       var $div = $('<div></div>');
 
       $div.addClass('bottomAccessContainer');
-      var $playlistToggle = $('<button alt="プレイリスト表示/非表示">playlist</button>');
+      var $playlistToggle = $('<button title="プレイリスト表示/非表示">playlist</button>');
       $playlistToggle.addClass('playlistToggle');
 
       $('#playlist').toggleClass('w_show', !conf.hidePlaylist);
@@ -5908,7 +5948,7 @@
         if (e.which == 38 || e.which == 40) { toggleSearchType(':first'); }
       });
 
-      var $conf = $('<button alt="WatchItLaterの設定">config</button>');
+      var $conf = $('<button title="WatchItLaterの設定">config</button>');
       $conf.addClass('openConfButton');
       $conf.click(function() {
         AnchorHoverPopup.hidePopup();
@@ -6105,7 +6145,7 @@
           position: static !important;\
         }\
         body.chrome26.full_with_browser #nicoplayerContainerInner {\
-          margin-bottom: 26px;\
+          /*margin-bottom: 0;*/\
         }\
         body.chrome26.full_with_browser.w_browserFullAll #nicoplayerContainerInner {\
           margin-top: 32px;\
@@ -6128,7 +6168,7 @@
           z-index: 0;\
         }\
         body.chrome26.full_with_browser #playlist {\
-          bottom: -8px; display: block; \
+          bottom: -8px; display: block; display: none;\
         }\
         body.chrome26.videoSelection    #songrium_inline       { right: 22px; }\
         body.chrome26.full_with_browser #songrium_inline       { position:fixed; bottom: -55px; }\
@@ -6201,15 +6241,16 @@
           return;
         }
         // 全画面時はFlashにフォーカスがなくてもショートカットキーが効くようにする
+
         if ($('body').hasClass('full_with_browser') && e.target.tagName === 'BODY') {
           if (e.keyCode === 32) { // space
-            WatchController.togglePlay();
+        //    WatchController.togglePlay();
           } else
           if (e.keyCode === 38) {
-            WatchController.volume(WatchController.volume() + 10);
+        //    WatchController.volume(WatchController.volume() + 10);
           } else
           if (e.keyCode === 40) {
-            WatchController.volume(WatchController.volume() - 10);
+        //    WatchController.volume(WatchController.volume() - 10);
           } else
           if (e.keyCode === 37) {
             WatchController.prevVideo();
@@ -6327,8 +6368,6 @@
         WatchController.closeSearch();
       });
 
-      if (conf.enableNewsHistory) {NicoNews.initialize(w);}
-
       var vs = watch.ComponentInitializer.videoSelection;
       vs._searchVideo_org = vs._searchVideo;
       vs._searchVideo = function(word, type, callback) {
@@ -6341,7 +6380,7 @@
         }
         EventDispatcher.dispatch('onSearchStart', originalWord, type);
         vs._searchVideo_org(word, type, callback);
-      }
+      };
 
       ConfigPanel.addChangeEventListener(function(name, newValue, oldValue) {
         if (name === 'squareThumbnail') {
@@ -6384,6 +6423,7 @@
 
     initIframe();
     initCommentPanel();
+    initNews();
     initShortcutKey();
     initMouse();
     initTouch();
