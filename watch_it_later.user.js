@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130318
+// @version        1.130319
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130319
+// - 「プレイリストが消えないモード」追加(sessionStorage版)
 
 // * ver 1.130318
 // - プレイリストが消えないモード追加(実験用)
@@ -388,7 +391,8 @@
       enableTrueBrowserFull: false, // フチなし全画面モードにする (Chromeは画面ダブルクリックで切り替え可能)
       enableSharedNgSetting: false, //
       hideNicoNews: false, // ニコニコニュースを消す
-      savePlaylistMode: 0, //
+      hashPlaylistMode: 0,    // location.hashにプレイリストを保持 0 =無効 1=連続再生時 2=常時
+      storagePlaylistMode: '', // localStorageにプレイリストを保持
 
       enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
 
@@ -510,7 +514,7 @@
         border: 1px solid;\
       }\
       #playlistSaveDialog.show .formWindow .formWindowInner a{\
-        font-weight: bolder; font-size: 120%;\
+        font-weight: bolder;\
       }\
       #playlistSaveDialog.show .formWindow .formWindowInner a:hover{\
         text-decoration: underline; background: white;\
@@ -1273,11 +1277,15 @@
       #resultlist .videoItem .columnVertical     .balloon {\
         top: -20px; /* 「再生リストに追加しました」が上の動画に被るのを防ぐ */\
       }\
-      #resultlist .videoItem .columnVertical     .itemMylistComment {\
+      #resultlist                 .videoItem .columnVertical .itemMylistComment {\
         font-size: 85%; color: #666; border: 1px solid silver; border-radius: 8px; padding: 4px; margin: 0 2px; display: none;\
       }\
-      #resultlist .videoItem .columnVertical     .nicorepoOwnerIconContainer {\
-        position: absolute; right: 10px;\
+      #resultlist                 .videoItem .columnVertical .nicorepoOwnerIconContainer {\
+        display: none;\
+      }\
+      #resultlist .nicorepoResult .videoItem .columnVertical .nicorepoOwnerIconContainer {\
+        position: absolute; top: 24px; right: 10px; display: block;\
+        padding: 3px; border: 1px solid silver;\
       }\
       #resultlist .videoItem .columnVertical     .nicorepoOwnerIconContainer img {\
         height: 48px;\
@@ -1315,8 +1323,8 @@
       #resultlist .log-user-video-upload {\
         background: #ffe; border-radius: 4px;\
       }\
-      #resultlist .nicorepoResult .itemVideoDescription{\
-        margin-right: 64px;\
+      #resultlist .nicorepoResult .itemVideoDescription, #resultlist .nicorepoResult .videoTitle{\
+        padding-right: 66px;\
       }\
       #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
         display: inline-block;\
@@ -1512,6 +1520,15 @@
         values: {'する': true, 'しない': false}},
       {title: '画面からニコニコニュースを消す', varName: 'hideNicoNews',
         values: {'消す': true, '消さない': false}},
+      {title: 'プレイリストを保持(実験中)', varName: 'storagePlaylistMode',
+        description: '有効にすると、リロードしてもプレイリストが消えなくなります。',
+        values:
+          conf.debugMode ?
+            {'ウィンドウを閉じるまで': 'sessionStorage', 'ずっと保持': 'localStorage', 'しない': ''} :
+            {'ウィンドウを閉じるまで': 'sessionStorage', 'しない': ''}
+       },
+
+
 
       {title: '動画検索画面の設定'},
       {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack',
@@ -1575,7 +1592,7 @@
 
 
       {title: '実験中の設定', debugOnly: true},
-      {title: 'プレイリスト消えないモード(※実験中)', varName: 'savePlaylistMode', debugOnly: true,
+      {title: 'プレイリスト消えないモード(※実験中)', varName: 'hashPlaylistMode', debugOnly: true,
         values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}}
 
 
@@ -5575,25 +5592,29 @@
               // (四行以上あるときは表示しきれないが)
               'padding-bottom: 72px; ',
             '}',
-            'body.videoSelection.content-fix #content.w_adjusted #leftPanel  .leftVideoInfo .videoOwnerInfoContainer {',
-              'position: fixed; top: auto !important; bottom: 2px;',
-//              'margin-top: ', Math.min($('#videoTagContainer').outerHeight() -20, 72)  ,'px; ',
-            '}'
+            ( bottomHeight >= 250 ?
+              [
+                'body.videoSelection.content-fix #content.w_adjusted #leftPanel  .leftVideoInfo .videoOwnerInfoContainer {',
+                  'position: fixed; top: auto !important; bottom: 2px;',
+                '}'
+              ].join('') :
+              ''
+            )
           ].join('') :
           (
             (xdiff >= 134) ?
             [
               'body.videoSelection #content.w_adjusted #leftPanel #leftPanelTabContainer { padding: 4px 2px 3px 2px; }',
-              'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted #searchResultNavigation, ',
-              'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted .videoOwnerInfoContainer {padding-bottom: 72px; }'
+              'body.videoSelection:not(.content-fix) #content.w_adjusted #searchResultNavigation, ',
+              'body.videoSelection:not(.content-fix) #content.w_adjusted .videoOwnerInfoContainer {padding-bottom: 72px; }'
             ].join('') :
             [
               'body.videoSelection #content.w_adjusted #leftPanel { min-width: 130px; padding: 0; margin: 0; left: ', (xdiff - 134), 'px !important ;}',
               'body.videoSelection #content.w_adjusted #leftPanel img, body.videoSelection #content.w_adjusted #leftPanel .descriptionThumbnail { display: none; }',
               'body.videoSelection #content.w_adjusted #leftPanel #leftPanelTabContainer { display: none; }',
               'body.videoSelection #content.w_adjusted #leftPanel *   { padding: 0; margin: 0; }',
-              'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted #searchResultNavigation, ',
-              'body.videoSelection:not(.content-fix):not(.w_content-fix) #content.w_adjusted .videoOwnerInfoContainer {padding-bottom: 72px; }'
+              'body.videoSelection:not(.content-fix) #content.w_adjusted #searchResultNavigation, ',
+              'body.videoSelection:not(.content-fix) #content.w_adjusted .videoOwnerInfoContainer {padding-bottom: 72px; }'
             ].join('')
           )
         ),
@@ -5857,14 +5878,20 @@
     function initPlaylist($, conf, w) {
       var playlist = watch.PlaylistInitializer.playlist; //.getItems().length;
       var blankVideoId = 'sm20353707', blankVideoUrl = 'http://www.nicovideo.jp/watch/' + blankVideoId;
+      var storage = w.localStorage;
 
       var items = {};
 
       function updatePos() {
         if (
-          conf.savePlaylistMode === 2 || (conf.savePlaylistMode === 1 && WatchController.isPlaylistActive())) {
+          conf.hashPlaylistMode === 2 || (conf.hashPlaylistMode === 1 && WatchController.isPlaylistActive())) {
           LocationHashParser.setValue('playlist', exportPlaylist());
           LocationHashParser.updateHash();
+        }
+        if (conf.storagePlaylistMode == 'sessionStorage' || conf.storagePlaylistMode == 'localStorage') {
+          setTimeout(function() {
+            w[conf.storagePlaylistMode].setItem('watchItLater_playlist', JSON.stringify(exportPlaylist()));
+          }, 0);
         }
 
         var pos = Math.max((playlist.getPlayingIndex() + 1), 1) + '/' + Math.max(playlist.getItems().length, 1);
@@ -5875,7 +5902,7 @@
         watch.PlaylistInitializer.playlistView.resetView();
       }
 
-      function exportPlaylist() {
+      function exportPlaylist(option, type) {
         var items = playlist.items, list = [];
         for (var i = 0, len = Math.min(300, items.length); i < len; i++) {
           var item = items[i];
@@ -5891,8 +5918,8 @@
         return {
           a: WatchController.isPlaylistContinuous(),
           r: WatchController.isPlaylistRandom(),
-          o: playlist.option,
-          t: playlist.type,
+          o: option || playlist.option,
+          t: type || playlist.type,
           i: list
         };
       }
@@ -5931,7 +5958,7 @@
           } else {
             var item = new PlaylistItem({
               id:             id,
-              title:          title,
+              title:          title.replace('<', '&lt;').replace('>', '&gt;'), // ないはずだけど一応
               mylist_counter: parseInt(c[1], 36),
               view_counter:   parseInt(c[2], 36),
               num_res:        parseInt(c[3], 36),
@@ -5958,37 +5985,45 @@
         }
       }
 
-      var $dialog = null, $savelink = null, $titleEdit;
+      var $dialog = null, $savelink = null;
       function openSaveDialog() {
+        function resetLink() {
+          $savelink
+            .attr('href', blankVideoUrl + LocationHashParser.getHash())
+            .unbind();
+        }
+
         if (!$dialog) {
           $dialog = $('<div id="playlistSaveDialog" />');
           $dialog.append($([
             '<div class="shadow"></div>',
             '<div class="formWindow"><div  class="formWindowInner">',
               '<h3>プレイリスト保存用リンク(実験中)</h3>',
-              '<p class="link"><a target="_blank" class="playlistSaveLink">保存用リンク</a></p>',
+              '<p class="link"><a target="_blank" class="playlistSaveLink">保存用リンク</a><button class="editButton">編集</button></p>',
               '<p class="desc">リンクを右クリックしてコピーやブックマークする事で、現在のプレイリストを保存する事ができます。</p>',
-              'タイトル編集: <input type="text" class="titleEdit">',
-              '<button>閉じる</button>',
+              '<button class="closeButton">閉じる</button>',
             '</div></div>',
           ''].join('')));
           $savelink = $dialog.find('a').attr('added', 1);
           function closeDialog() { $dialog.removeClass('show'); }
           $dialog.find('.shadow').on('click', closeDialog);
-          $dialog.find('button').on('click', closeDialog);
-          $titleEdit = $dialog.find('.titleEdit').on('keyup', function() {
-            $savelink.text(this.value);
+          $dialog.find('.editButton').on('click', function() {
+            var newTitle = prompt('タイトルを編集', $savelink.text());
+            if (newTitle) {
+              LocationHashParser.setValue('playlist', exportPlaylist({name: newTitle}, 'mylist'));
+              resetLink();
+              $savelink.text(newTitle);
+            }
           });
+          $dialog.find('.closeButton').on('click', closeDialog);
 
           $('body').append($dialog);
         }
-
         LocationHashParser.setValue('playlist', exportPlaylist());
-        $savelink
-          .attr('href', blankVideoUrl + LocationHashParser.getHash())
-          .text($('#playlist .generationMessage').text().replace(/^.*?\n/, ''))
-          .unbind();
-        $titleEdit.val($savelink.text());
+        $savelink.text(
+          $('#playlist .generationMessage').text().replace(/^.*?\n/, '') +
+          ' - ' + WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M', new Date()))
+        resetLink();
         $dialog.addClass('show');
       }
 
@@ -6089,14 +6124,24 @@
       var hashlist = LocationHashParser.getValue('playlist');
       if (hashlist && hashlist.i && hashlist.i.length > 0) {
         try {
-          console.debug && console.log('restore playlist!!');
+          conf.debugMode && console.log('restore playlist!!');
           importPlaylist(hashlist);
-          if (conf.savePlaylistMode < 1) {
+          if (conf.hashPlaylistMode < 1) {
             LocationHashParser.removeHash();
           }
         } catch (e) {
           console.log(e);
           console.trace();
+        }
+      } else
+      if ((conf.storagePlaylistMode == 'sessionStorage' || conf.storagePlaylistMode == 'localStorage') && w[conf.storagePlaylistMode]) {
+        try {
+          conf.debugMode && console.log('restore playlist:' + conf.storagePlaylistMode);
+          var list = JSON.parse(w[conf.storagePlaylistMode].getItem('watchItLater_playlist'));
+          importPlaylist(list);
+          resetView();
+        } catch (e) {
+          console.log('プレイリストの復元に失敗！', e);
         }
       } else {
         updatePos();
@@ -6115,7 +6160,7 @@
           $('#playlist').find('.browserFullOption a:visible').click();
         }
       });
-      EventDispatcher.addEventListener('on.config.savePlaylistMode', function(v) {
+      EventDispatcher.addEventListener('on.config.hashPlaylistMode', function(v) {
         if (v === 0) {
           LocationHashParser.deleteValue('playlist');
           LocationHashParser.removeHash();
@@ -6136,7 +6181,7 @@
             LocationHashParser.setValue('playlist', exportPlaylist());
             LocationHashParser.updateHash();
           } else {
-            conf.setValue('savePlaylistMode', 0);
+            conf.setValue('hashPlaylistMode', 0);
             ConfigPanel.refresh();
           }
         }
@@ -6145,8 +6190,8 @@
       $('#playlist .browserFullOption').on('click.bugfix', resetView);
 
       playlist.addEventListener('changePlaybackMode', function(mode) {
-        conf.debugMode && console.log('changePlaybackMode', mode, conf.savePlaylistMode);
-        if (mode === 'normal' && conf.savePlaylistMode < 2) {
+        conf.debugMode && console.log('changePlaybackMode', mode, conf.hashPlaylistMode);
+        if (mode === 'normal' && conf.hashPlaylistMode < 2) {
           LocationHashParser.removeHash();
         } else {
           updatePos();
