@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130324
+// @version        1.130325
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,10 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130325
+// - 左パネルを非表示にする設定
+// - プレイヤー下の項目(市場・ニコメンド・レビュー)の表示設定
 
 // * ver 1.130324
 // - 細かい不具合修正
@@ -365,6 +369,7 @@
       autoScrollToPlayer: true, // プレイヤー位置に自動スクロール(自動全画面化オフ時)
       hideNewsInFull: true, // 全画面時にニュースを閉じる
       wideCommentPanel: true, // コメントパネルをワイドにする
+      removeLeftPanel: false, // 左パネルを消滅させる
       leftPanelJack: true, // 左パネルに動画情報を表示
       headerViewCounter: false, // ヘッダに再生数コメント数を表示
       popupViewCounter: 'full', // 動画切り替わり時にポップアップで再生数を表示
@@ -398,7 +403,9 @@
       hashPlaylistMode: 0,    // location.hashにプレイリストを保持 0 =無効 1=連続再生時 2=常時
       storagePlaylistMode: '', // localStorageにプレイリストを保持
 
-      enableSlideEffect: false, // 動画切り替え時にスライドするエフェクト(ただのお遊び)
+      nicommendVisibility: 'visible', // ニコメンドの表示 'visible', 'underIchiba', 'hidden'
+      ichibaVisibility:    'visible', // 市場の表示 '',   'visible', 'hidden'
+      reviewVisibility:    'visible', // レビューの表示   'visible', 'hidden'
 
       shortcutDefMylist:          {char: 'M', shift: true,  ctrl: false, alt: false, enable: false}, // とりマイ登録のショートカット
       shortcutMylist:             {char: 'M', shift: false, ctrl: true , alt: false, enable: false}, // マイリスト登録のショートカット
@@ -779,6 +786,12 @@
       #leftPanel .leftVideoInfo a.otherSite {\n\
         font-weight: bolder; text-decoration: underline; \n\
       }\n\n\
+      body:not(.videoSelection) #leftPanel.removed {\
+        display: none; left: 0px;\
+      }\
+      body:not(.videoSelection) #leftPanel.removed .leftVideoInfo{\
+        display: none; width: 0px !important; border: none; margin: 0; padding: 0; right: auto;\
+      }\
       body.videoSelection #content.w_adjusted #leftIchibaPanel .ichiba_mainitem {\
         width: 180px; display:inline-block; vertical-align: top;\
         margin: 4px 3px; border 1px solid silver; border-radius: 8px\
@@ -1009,7 +1022,9 @@
       #watchItLaterConfigPanel.autoBrowserFull_false .disableAutoBrowserFullIfNicowari {\
         color: #ccc;\
       }\
-      #watchItLaterConfigPanel.autoBrowserFull_true .autoScrollToPlayer, #watchItLaterConfigPanel.autoBrowserFull_true .autoOpenSearch {\
+      #watchItLaterConfigPanel.autoBrowserFull_true .autoScrollToPlayer,\
+      #watchItLaterConfigPanel.autoBrowserFull_true .autoOpenSearch,\
+      #watchItLaterConfigPanel.removeLeftPanel_true .leftPanelJack  {\
         color: #ccc;\
       }\
       #content .openConfButton {\n\
@@ -1447,6 +1462,9 @@
       body:not(.videoSelection):not(.setting_panel):not(.full_with_browser) #content.noNews #playerContainer {\
         height: auto;\
       }\
+      #outline.noNicommend #nicommendContainer, #outline.noIchiba  #nicoIchiba, #outline.noReview  #videoReview{\
+        display: none;\
+      }\
       ',
     ''].join('');
     addStyle(style, 'watchItLater');
@@ -1509,7 +1527,9 @@
       {title: 'コメントパネルのワイド化', varName: 'wideCommentPanel',
         values: {'する': true, 'しない': false}},
       {title: 'コメントパネルにNG共有設定を表示', varName: 'enableSharedNgSetting',
-        values: {'する': true, 'しない': false}},
+        values: {'する': true, 'しない': false}, addClass: true},
+      {title: '左のパネルを消滅させる', varName: 'removeLeftPanel',
+        values: {'する': true, 'しない': false}, addClass: true},
       {title: '左のパネルに動画情報・市場を表示', varName: 'leftPanelJack',
         values: {'する': true, 'しない': false}},
       {title: 'ページのヘッダに再生数表示', varName: 'headerViewCounter',
@@ -1523,14 +1543,21 @@
         values: {'する': true, 'しない': false}},
       {title: '画面からニコニコニュースを消す', varName: 'hideNicoNews',
         values: {'消す': true, '消さない': false}},
-      {title: 'プレイリストを保持(実験中)', varName: 'storagePlaylistMode',
+      {title: 'プレイリスト消えないモード(実験中)', varName: 'storagePlaylistMode',
         description: '有効にすると、リロードしてもプレイリストが消えなくなります。',
         values:
-          conf.debugMode ?
+          (conf.debugMode ?
             {'ウィンドウを閉じるまで': 'sessionStorage', 'ずっと保持': 'localStorage', 'しない': ''} :
-            {'ウィンドウを閉じるまで': 'sessionStorage', 'しない': ''}
-       },
+            {'有効(ウィンドウを閉じるまで)': 'sessionStorage', '無効': ''})
+      },
 
+      {title: '動画プレイヤー下の設定'},
+      {title: 'ニコメンドの表示', varName: 'nicommendVisibility',
+        values: {'非表示': 'hidden', '市場の下': 'underIchiba', '市場の上(標準)': 'visible'}},
+      {title: '市場の位置', varName: 'ichibaVisibility',
+        values: {'非表示': 'hidden', '表示': 'visible'}},
+      {title: 'レビューの位置', varName: 'reviewVisibility',
+        values: {'非表示': 'hidden', '表示': 'visible'}},
 
 
       {title: '動画検索画面の設定'},
@@ -4777,6 +4804,15 @@
       EventDispatcher.addEventListener('onVideoInitialized', function() {
         leftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
       });
+
+      function updateLeftPanelVisibility(v) {
+        $leftPanel.toggleClass('removed',v);
+        setTimeout(function() {
+          watch.SidePanelInitializer.panelSlideViewController.slide();
+        }, 100);
+      }
+      EventDispatcher.addEventListener('on.config.removeLeftPanel', updateLeftPanelVisibility);
+      updateLeftPanelVisibility(conf.removeLeftPanel);
     }
 
     function leftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel) {
@@ -6482,6 +6518,35 @@
       WatchApp.$('#resultlist').toggleClass('squareThumbnail', isSquare);
     }
 
+    function initPlayerBottom($, conf, w) {
+      function updateNicommendVisibility(v) {
+        var $nicommend = $('#nicommendContainer');
+        if (v === 'visible') {
+          $('#nicoIchiba').before($nicommend);
+          $('#outline').removeClass('noNicommend');
+        } else
+        if (v === 'underIchiba') {
+          $('#nicoIchiba').after($nicommend);
+          $('#outline').removeClass('noNicommend');
+        } else
+        if (v === 'hidden') {
+          $('#outline').addClass('noNicommend');
+        }
+      }
+      function updateIchibaVisibility(v) {
+        $('#outline').toggleClass('noIchiba', v === 'hidden');
+      }
+      function updateReviewVisibility(v) {
+        $('#outline').toggleClass('noReview', v === 'hidden');
+      }
+      EventDispatcher.addEventListener('on.config.nicommendVisibility', updateNicommendVisibility);
+      EventDispatcher.addEventListener('on.config.ichibaVisibility',    updateIchibaVisibility);
+      EventDispatcher.addEventListener('on.config.reviewVisibility',    updateReviewVisibility);
+      if (conf.nicommendVisibility !== 'visible') { updateNicommendVisibility(conf.nicommendVisibility); }
+      if (conf.ichibaVisibility    !== 'visible') { updateIchibaVisibility(conf.ichibaVisibility); }
+      if (conf.reviewVisibility    !== 'visible') { updateReviewVisibility(conf.reviewVisibility); }
+    }
+
 
     function initShortcutKey() {
       var
@@ -6743,6 +6808,7 @@
     initVideoCounter();
     initScreenMode();
     initPlaylist($, conf, w);
+    initPlayerBottom($, conf, w);
     initTags();
     initMylist($);
     initOther();
@@ -6833,4 +6899,3 @@
     monkey(true);
   }
 })();
-
