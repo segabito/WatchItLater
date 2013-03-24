@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130319
+// @version        1.130324
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,10 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130324
+// - 細かい不具合修正
+// - 本家側の更新でゆっくり再生ボタンが効かなくなったのを修正
 
 // * ver 1.130319
 // - 「プレイリストが消えないモード」追加(sessionStorage版)
@@ -1284,7 +1288,7 @@
         display: none;\
       }\
       #resultlist .nicorepoResult .videoItem .columnVertical .nicorepoOwnerIconContainer {\
-        position: absolute; top: 24px; right: 10px; display: block;\
+        float: right; display: block;\
         padding: 3px; border: 1px solid silver;\
       }\
       #resultlist .videoItem .columnVertical     .nicorepoOwnerIconContainer img {\
@@ -1324,7 +1328,6 @@
         background: #ffe; border-radius: 4px;\
       }\
       #resultlist .nicorepoResult .itemVideoDescription, #resultlist .nicorepoResult .videoTitle{\
-        padding-right: 66px;\
       }\
       #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
         display: inline-block;\
@@ -3243,7 +3246,7 @@
         nicoPlayer.playVideo();
       },
       pause: function() {
-        nicoPlayer.pauseVideo();
+        nicoPlayer.stopVideo();
       },
       togglePlay: function() {
         var status = $("#external_nicoplayer")[0].ext_getStatus();
@@ -5387,9 +5390,8 @@
       $template.find('.videoItem .columnVertical   .thumbContainer').append(menu);
       $template.find('.videoItem .columnHorizontal .balloon').before(menu);
       $template.find('.columnVertical')
-        .find('.itemVideoDescription')
-          .before('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>')
-          .after('<p class="itemMylistComment"/>');
+        .find('.itemVideoDescription').after('<p class="itemMylistComment"/>')
+        .end().find('.created_time').after('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>');
 
       function onDeleteFromMyMylistClick(elm) {
         var
@@ -5438,7 +5440,7 @@
         size = 'width: 360px; height: 270px;';
       } else {
         largeUrl = baseUrl.replace(/z$/, 'l');
-        size = 'width: 360px; height: 202.5px;';
+        size = 'width: 360px;';
       }
       var
         html = [
@@ -5878,7 +5880,6 @@
     function initPlaylist($, conf, w) {
       var playlist = watch.PlaylistInitializer.playlist; //.getItems().length;
       var blankVideoId = 'sm20353707', blankVideoUrl = 'http://www.nicovideo.jp/watch/' + blankVideoId;
-      var storage = w.localStorage;
 
       var items = {};
 
@@ -6021,7 +6022,7 @@
         }
         LocationHashParser.setValue('playlist', exportPlaylist());
         $savelink.text(
-          $('#playlist .generationMessage').text().replace(/^.*?\n/, '') +
+          $('#playlist .generationMessage').text().replace(/^.*?\n/, '').replace(/^.*「/, '').replace(/」.*?$/, '') +
           ' - ' + WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M', new Date()))
         resetLink();
         $dialog.addClass('show');
@@ -6066,7 +6067,7 @@
           });
           $ul.append($clear);
 
-          var $saver = $('<li class="savelist">プレイリスト保存用リンク(実験中)</li>').click(function() {
+          var $saver = $('<li>プレイリスト保存用リンク(実験中)</li>').click(function() {
             openSaveDialog();
           });
           $ul.append($saver);
@@ -6129,6 +6130,7 @@
           if (conf.hashPlaylistMode < 1) {
             LocationHashParser.removeHash();
           }
+          setTimeout(function() {resetView()} , 3000);
         } catch (e) {
           console.log(e);
           console.trace();
@@ -6139,7 +6141,7 @@
           conf.debugMode && console.log('restore playlist:' + conf.storagePlaylistMode);
           var list = JSON.parse(w[conf.storagePlaylistMode].getItem('watchItLater_playlist'));
           importPlaylist(list);
-          resetView();
+          setTimeout(function() {resetView()} , 3000);
         } catch (e) {
           console.log('プレイリストの復元に失敗！', e);
         }
@@ -6831,3 +6833,4 @@
     monkey(true);
   }
 })();
+
