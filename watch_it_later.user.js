@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130328
+// @version        1.130330
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,11 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130330
+// - その他 ＞ グラデーションや角の丸みをなくす設定
+// - プレイリスト保存リンクの調整
+// - 細かい調整
 
 // * ver 1.130328
 // - 本家側の更新でプレイヤーの位置計算が変わったのに対応
@@ -411,6 +416,8 @@
       ichibaVisibility:    'visible', // 市場の表示 '',   'visible', 'hidden'
       reviewVisibility:    'visible', // レビューの表示   'visible', 'hidden'
 
+      flatDesignMode: '',  // 'on' グラデーションや角丸をなくす
+
       shortcutDefMylist:          {char: 'M', shift: true,  ctrl: false, alt: false, enable: false}, // とりマイ登録のショートカット
       shortcutMylist:             {char: 'M', shift: false, ctrl: true , alt: false, enable: false}, // マイリスト登録のショートカット
       shortcutOpenSearch:         {char: 'S', shift: true,  ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
@@ -476,24 +483,24 @@
   (function() {
     var style = [
     '\
-    /* 動画タグとプレイリストのポップアップ */\n\
-      #videoTagPopupContainer {\n\
-      }\n\
-      #videoTagPopupContainer.w_touch {\n\
-        line-height: 200%; font-size: 130%;\n\
-      }\n\
-      #videoTagPopupContainer.w_touch .nicodic{\n\
-        margin: 4px 14px;\n\
-      }\n\
-      .tagItemsPopup {\n\
-        background: #eef; \n\
-      }\n\
-      .playlistMenuPopup {\n\
-        background: #666; color: white; padding: 4px 8px;\n\
-      }\n\
-      .playlistMenuPopup.w_touch {\n\
-        line-height: 250%;\n\
-      }\n\
+    /* 動画タグとプレイリストのポップアップ */\
+      #videoTagPopupContainer {\
+      }\
+      #videoTagPopupContainer.w_touch {\
+        line-height: 200%; font-size: 130%;\
+      }\
+      #videoTagPopupContainer.w_touch .nicodic{\
+        margin: 4px 14px;\
+      }\
+      .tagItemsPopup {\
+        background: #eef; \
+      }\
+      .playlistMenuPopup {\
+        background: #666; color: white; padding: 4px 8px;\
+      }\
+      .playlistMenuPopup.w_touch {\
+        line-height: 250%;\
+      }\
       #playlistSaveDialog {\
         display: none;\
       }\
@@ -534,8 +541,11 @@
       #playlistSaveDialog.show .formWindow .formWindowInner a:hover{\
         text-decoration: underline; background: white;\
       }\
+      #playlistSaveDialog.show .formWindow .formWindowInner label{\
+        margin: 8px;\
+      }\
       #playlistSaveDialog.show .formWindow .formWindowInner input{\
-        width: 380px;\
+        \
       }\
       #playlistSaveDialog.show .formWindow .formWindowInner .desc{\
         font-size: 80%;\
@@ -547,87 +557,87 @@
         z-index: 2000000; \
         box-shadow: 2px 2px 2px #888;\
       }\
-      .tagItemsPopup ul,.tagItemsPopup ul li, .playlistMenuPopup ul, .playlistMenuPopup ul li  {\n\
-        position: relative; \n\
-        list-style-type: none; \n\
-        margin: 0; padding: 0; \n\
-      }\n\n\
+      .tagItemsPopup ul,.tagItemsPopup ul li, .playlistMenuPopup ul, .playlistMenuPopup ul li  {\
+        position: relative; \
+        list-style-type: none; \
+        margin: 0; padding: 0; \
+      }\
       .playlistMenuPopup ul li {\
         cursor: pointer;\
-      }\n\n\
+      }\
       .playlistMenuPopup ul li.savelist {\
         color: #aaa;\
-      }\n\n\
+      }\
       .playlistMenuPopup ul li:hover {\
         text-decoration: underline; background: #888;\
-      }\n\n\
-      .tagItemsPopup li a{\n\
-      }\n\n\
-      .tagItemsPopup .nicodic {\n\
-        margin-right: 4px; \n\
-      }\n\
-      .tagItemsPopup .icon{\n\
-        width: 17px; \n\
-        height: 15px; \n\
-        \n\
-      }\n\n\
+      }\
+      .tagItemsPopup li a{\
+      }\
+      .tagItemsPopup .nicodic {\
+        margin-right: 4px; \
+      }\
+      .tagItemsPopup .icon{\
+        width: 17px; \
+        height: 15px; \
+        \
+      }\
     /* マイリスト登録パネル */\
-      .mylistPopupPanel {\n\
-        height: 24px; \n\
-        z-index: 10000; \n\
-        /*border: 1px solid silver;\n\
-        border-radius: 3px; */\n\
-        padding: 0;\n\
-        margin: 0;\n\
-        overflow: hidden; \n\
-        display: inline-block; \n\
-        background: #eee; \n\
-      }\n\n\
-      .mylistPopupPanel.w_touch {\n\
+      .mylistPopupPanel {\
+        height: 24px; \
+        z-index: 10000; \
+        /*border: 1px solid silver;\
+        border-radius: 3px; */\
+        padding: 0;\
+        margin: 0;\
+        overflow: hidden; \
+        display: inline-block; \
+        background: #eee; \
+      }\
+      .mylistPopupPanel.w_touch {\
         height: 40px;\
       }\
     /* マウスホバーで出るほうのマイリスト登録パネル */\
-      .mylistPopupPanel.popup {\n\
-        position: absolute; \n\
-        z-index: 1000000;\n\
-        box-shadow: 2px 2px 2px #888;\n\
-      }\n\
+      .mylistPopupPanel.popup {\
+        position: absolute; \
+        z-index: 1000000;\
+        box-shadow: 2px 2px 2px #888;\
+      }\
     /* マイリスト登録パネルの中の各要素 */\
-      .mylistPopupPanel .mylistSelect {\n\
-        width: 64px; \n\
-        margin: 0;\n\
-        padding: 0;\n\
-        font-size: 80%; \n\
-        white-space: nowrap; \n\
-        background: #eee; \n\
-        border: 1px solid silver;\n\
-      }\n\
+      .mylistPopupPanel .mylistSelect {\
+        width: 64px; \
+        margin: 0;\
+        padding: 0;\
+        font-size: 80%; \
+        white-space: nowrap; \
+        background: #eee; \
+        border: 1px solid silver;\
+      }\
     /* 誤操作を減らすため、とりマイの時だけスタイルを変える用 */\
-      .mylistPopupPanel.w_touch button {\n\
+      .mylistPopupPanel.w_touch button {\
         padding: 8px 18px;\
-      }\n\n\
-      .mylistPopupPanel.w_touch .mylistSelect {\n\
+      }\
+      .mylistPopupPanel.w_touch .mylistSelect {\
         font-size: 170%; width: 130px;\
-      }\n\n\
-      .mylistPopupPanel.deflistSelected button {\n\
-      }\n\n\
-      .mylistPopupPanel.mylistSelected  button {\n\
-        color: #ccf; \n\
-      }\n\n\
-      .mylistPopupPanel button {\n\
-        margin: 0; \n\
-        font-weight: bolder; \n\
-        cursor: pointer;  \n\
-      }\n\n\
-      .mylistPopupPanel button:active, #content .playlistToggle:active, #content .quickIchiba:active, #content .openConfButton:active {\n\
-        border:1px inset !important\n\
-      }\n\n\
-      .mylistPopupPanel button:hover, #content .playlistToggle:hover, #content .quickIchiba:hover, #content .openConfButton:hover, #yukkuriPanel .yukkuriButton:hover {\n\
-        border:1px outset\n\
-      }\n\n\
-      #yukkuriPanel .yukkuriButton.active {\n\
-        border:1px inset\n\
-      }\n\n\
+      }\
+      .mylistPopupPanel.deflistSelected button {\
+      }\
+      .mylistPopupPanel.mylistSelected  button {\
+        color: #ccf; \
+      }\
+      .mylistPopupPanel button {\
+        margin: 0; \
+        font-weight: bolder; \
+        cursor: pointer;  \
+      }\
+      .mylistPopupPanel button:active, #content .playlistToggle:active, #content .quickIchiba:active, #content .openConfButton:active {\
+        border:1px inset !important\
+      }\
+      .mylistPopupPanel button:hover, #content .playlistToggle:hover, #content .quickIchiba:hover, #content .openConfButton:hover, #yukkuriPanel .yukkuriButton:hover {\
+        border:1px outset\
+      }\
+      #yukkuriPanel .yukkuriButton.active {\
+        border:1px inset\
+      }\
 \
       .mylistPopupPanel .mylistAdd, .mylistPopupPanel .tagGet, #content .playlistToggle, #content .quickIchiba, #content .openConfButton, #yukkuriPanel .yukkuriButton {\
         border:1px solid #777; cursor: pointer; font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #eee; background-color: #888;\
@@ -637,10 +647,10 @@
         background-image: -ms-linear-gradient(top, #d3d3d3, #707070);\
         background-image: -o-linear-gradient(top, #d3d3d3, #707070);\
         background-image: linear-gradient(top, #d3d3d3, #707070);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#d3d3d3, endColorstr=#707070);*/\
-        }\n\
+        }\
         .mylistPopupPanel.deflistSelected {\
           color: #ff9;\
-        }\n\
+        }\
         .mylistPopupPanel .deflistRemove, #yukkuriPanel .yukkuriButton.active{\
           border:1px solid #ebb7b7; font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f7e3e3;\
            /*background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #f7e3e3), color-stop(100%, #ffd7d7));\
@@ -649,134 +659,146 @@
            background-image: -ms-linear-gradient(top, #f7e3e3, #ffd7d7);\
            background-image: -o-linear-gradient(top, #f7e3e3, #ffd7d7);\
            background-image: linear-gradient(top, #f7e3e3, #ffd7d7);filter:progid:DXImageTransform.Microsoft.gradient(GradientType=0,startColorstr=#f7e3e3, endColorstr=#ffd7d7);*/\
-        }\n\
+        }\
         .mylistPopupPanel.mylistSelected .deflistRemove {\
           display: none; \
-        }\n\
+        }\
         .mylistPopupPanel .closeButton{\
           color: #339; \
           padding: 0;\
           margin: 0;\
           font-size: 80%;\
           text-decoration: none;\
-        }\n\
+        }\
         .mylistPopupPanel .newTabLink{\
           padding: 0 2px; text-decoration: underline; text-shadow: -1px -1px 0px #442B2B;\
-        }\n\
+        }\
         .mylistPopupPanel.fixed .newTabLink, .mylistPopupPanel.fixed .closeButton {\
           display: none;\
-        }\n\
+        }\
 \
 \
 \
 \
       /* 全画面時にタグとプレイリストを表示しない時*/\
-      body.full_and_mini.full_with_browser #playerContainerSlideArea{\n\
-        margin-bottom: 0 !important;\n\
-      }\n\n\
-      body.full_and_mini.full_with_browser #playlist{\n\
-        z-index: auto;\n\
-      }\n\n\
-      body.full_and_mini.full_with_browser .generationMessage{\n\
-        display: inline-block;\n\
-      }\n\
+      body.full_and_mini.full_with_browser #playerContainerSlideArea{\
+        margin-bottom: 0 !important;\
+      }\
+      body.full_and_mini.full_with_browser #playlist{\
+        z-index: auto;\
+      }\
+      body.full_and_mini.full_with_browser .generationMessage{\
+        display: inline-block;\
+      }\
       /* 全画面時にタグとプレイリストを表示する時 */\
-      body.full_with_browser #playlist{\n\
-        z-index: 100;\n\
-      }\n\n\
-      body.full_with_browser .generationMessage{\n\
-        display: none;\n\
-      }\n\n\
-      body.full_with_browser .browserFullOption{\n\
-        padding-right: 200px;\n\
-      }\n\
+      body.full_with_browser #playlist{\
+        z-index: 100;\
+      }\
+      body.full_with_browser .generationMessage{\
+        display: none;\
+      }\
+      body.full_with_browser .browserFullOption{\
+        padding-right: 200px;\
+      }\
       /* 全画面時にニュースを隠す時 */\
       body.full_with_browser.hideNewsInFull #playerContainerSlideArea{\
         margin-bottom: -37px;\
-      }\n\
+      }\
       /* 少しでも縦スクロールを減らすため、動画情報を近づける。人によっては窮屈に感じるかも */\
-      #outline {\n\
-        margin-top: -20px;\n\
-      }\n\n\
-      #outline #feedbackLink{\n\
-        \n\
-      }\n\n\
-      #outline .videoEditMenuExpand{\n\
-        position: absolute;right: 0;top: 26px; z-index: 1;\n\
-      }\n\n\
-      /* ヘッダに表示する再生数 */\
-      #videoCounter {\n\
-        color: #ff9; font-size: 70%;\n\
-      }\n\n\
-      /* 左に表示する動画情報 */\
-      #leftPanel .leftVideoInfo, #leftPanel .leftIchibaPanel {\n\
-        padding: 0px 0px 0 0px; width: 196px; height: 100%;\n\
-        position:absolute; top:0; right:0;\
-        border-radius: 4px; display:none; \
-      }\n\n\
-      #leftPanel .leftVideoInfo {\n\
-        background: #bbb; text-Align: left; overflow-x: hidden; overflow-Y: auto; box-shadow: none; font-size: 90%;\n\
-      }\n\n\
-      #leftPanel .leftIchibaPanel {\n\
-        background: #eee; text-Align: center; overflow-x: hidden; overflow-Y: auto; box-shadow: none; font-size: 90%;\n\
-      }\n\n\
-      #leftPanel .leftVideoInfo .leftVideoInfoInner {\n\
-        padding: 0 4px; position: relative;\n\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoTitleContainer{\n\
-        background: #ccc; text-align: center;  color: #000; border-radius: 4px 4px 0 0;margin: 6px 0 0;\n\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoThumbnailContainer{\n\
-        background: #ccc; text-align: center; color: #000; margin: 0;\n\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoThumbnailContainer img {\n\
-        cursor: pointer;\n\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoTitle{\n\
+      #outline {\
+        margin-top: -20px;\
+      }\
+      #outline #feedbackLink{\
         \
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoPostedAt{\n\
+      }\
+      #outline .videoEditMenuExpand{\
+        position: absolute;right: 0;top: 26px; z-index: 1;\
+      }\
+      /* ヘッダに表示する再生数 */\
+      #videoCounter {\
+        color: #ff9; font-size: 70%;\
+      }\
+      /* 左に表示する動画情報 */\
+      #leftPanel .leftVideoInfo, #leftPanel .leftIchibaPanel {\
+        padding: 0px 0px 0 0px; width: 196px; height: 100%;\
+        position:absolute; top:0; right:0;\
+        display:none; \
+      }\
+      #content:not(.w_flat) #leftPanel .leftVideoInfo, #content:not(.w_flat) #leftPanel .leftIchibaPanel {\
+        border-radius: 4px;\
+      }\
+      #leftPanel .leftVideoInfo {\
+        background: #bbb; text-Align: left; overflow-x: hidden; overflow-Y: auto; box-shadow: none; font-size: 90%;\
+      }\
+      #leftPanel .leftIchibaPanel {\
+        background: #eee; text-Align: center; overflow-x: hidden; overflow-Y: auto; box-shadow: none; font-size: 90%;\
+      }\
+      #leftPanel .leftVideoInfo .leftVideoInfoInner {\
+        padding: 0 4px; position: relative;\
+      }\
+      #leftPanel .leftVideoInfo .videoTitleContainer{\
+        background: #ccc; text-align: center;  color: #000; margin: 6px 0 0;\
+      }\
+      #content:not(.w_flat) #leftPanel .leftVideoInfo .videoTitleContainer{\
+        border-radius: 4px 4px 0 0;\
+      }\
+      #leftPanel .leftVideoInfo .videoThumbnailContainer{\
+        background: #ccc; text-align: center; color: #000; margin: 0;\
+      }\
+      #leftPanel .leftVideoInfo .videoThumbnailContainer img {\
+        cursor: pointer;\
+      }\
+      #leftPanel .leftVideoInfo .videoTitle{\
+        \
+      }\
+      #leftPanel .leftVideoInfo .videoPostedAt{\
         color: #333;\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoStats{\n\
+      }\
+      #leftPanel .leftVideoInfo .videoStats{\
         font-size:90%;\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoStats li{\n\
+      }\
+      #leftPanel .leftVideoInfo .videoStats li{\
         display: inline-block; margin: 0 2px;\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoStats li span{\n\
+      }\
+      #leftPanel .leftVideoInfo .videoStats li span{\
         font-weight: bolder;\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoStats .ranking{\n\
+      }\
+      #leftPanel .leftVideoInfo .videoStats .ranking{\
         display: none !important;\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoInfo{\n\
+      }\
+      #leftPanel .leftVideoInfo .videoInfo{\
         background: #ccc; text-align: center; \
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoDescription{\n\
+      }\
+      #leftPanel .leftVideoInfo .videoDescription{\
         overflow-x: hidden; text-align: left;\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoDescriptionInner{\n\
-        padding: 0 4px;\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoDetails{\n\
-        background: #bbb; min-width: 130px;\
-      }\n\n\
-      #leftPanel .leftVideoInfo .videoDetails a{\n\
+      }\
+      #leftPanel .leftVideoInfo .videoDescriptionInner{\
+        margin: 0 4px;\
+      }\
+      #leftPanel .leftVideoInfo .videoDetails{\
+        min-width: 130px;\
+      }\
+      #leftPanel .leftVideoInfo .videoDetails a{\
         margin: auto 4px;\
-      }\n\n\
-      #leftPanel .leftVideoInfo .userIconContainer .userName, #leftPanel .leftVideoInfo .ch_profile a{\n\
+      }\
+      #leftPanel .leftVideoInfo .userIconContainer .userName, #leftPanel .leftVideoInfo .ch_profile a{\
         display: block;\
-      }\n\n\
-      #leftPanel .leftVideoInfo .userIconContainer, #leftPanel .leftVideoInfo .ch_profile{\n\
-        background: #ccc; width: 100%; text-align: center; border-radius: 0 0 4px 4px; float: none;\n\
-      }\n\n\
-      #leftPanel .leftVideoInfo .userIconContainer .usericon, #leftPanel .leftVideoInfo .ch_profile img{\n\
-        max-width: 130px; width: auto; height: auto; border: 0;\n\
-      }\n\n\
+      }\
+      #leftPanel .leftVideoInfo .userIconContainer, #leftPanel .leftVideoInfo .ch_profile{\
+        background: #ccc; width: 100%; text-align: center; float: none;\
+      }\
+      #content:not(.w_flat) #leftPanel .leftVideoInfo .userIconContainer, #content:not(.w_flat) #leftPanel .leftVideoInfo .ch_profile{\
+        border-radius: 0 0 4px 4px;\
+      }\
+      #leftPanel .leftVideoInfo .userIconContainer .usericon, #leftPanel .leftVideoInfo .ch_profile img{\
+        max-width: 130px; width: auto; height: auto; border: 0;\
+      }\
       #leftPanel .leftVideoInfo .descriptionThumbnail {\
-        text-align: left; font-size: 90%; padding: 4px; border-radius: 4px; background: #ccc;/*box-shadow: 2px 2px 2px #666;*/\
+        text-align: left; font-size: 90%; padding: 4px; background: #ccc;/*box-shadow: 2px 2px 2px #666;*/\
         min-height: 60px; margin-bottom: 4px; font-weight: normal; color: black;\
+      }\
+      #content:not(.w_flat) #leftPanel .leftVideoInfo .descriptionThumbnail {\
+        border-radius: 4px;\
       }\
       #leftPanel .leftVideoInfo .descriptionThumbnail.video img{\
         height: 50px; cursor: pointer; float: left;\
@@ -787,9 +809,9 @@
       #leftPanel .leftVideoInfo .descriptionThumbnail.illust img{\
         height: 60px; cursor: pointer; float: left;\
       }\
-      #leftPanel .leftVideoInfo a.otherSite {\n\
-        font-weight: bolder; text-decoration: underline; \n\
-      }\n\n\
+      #leftPanel .leftVideoInfo a.otherSite {\
+        font-weight: bolder; text-decoration: underline; \
+      }\
       body:not(.videoSelection) #leftPanel.removed {\
         display: none; left: 0px;\
       }\
@@ -798,23 +820,26 @@
       }\
       body.videoSelection #content.w_adjusted #leftIchibaPanel .ichiba_mainitem {\
         width: 180px; display:inline-block; vertical-align: top;\
-        margin: 4px 3px; border 1px solid silver; border-radius: 8px\
-      }\n\
+        margin: 4px 3px; border 1px solid silver;\
+      }\
+      body.videoSelection #content.w_adjusted:not(.w_flat) #leftIchibaPanel .ichiba_mainitem {\
+        border-radius: 8px\
+      }\
       body.videoSelection #content.w_adjusted #leftIchibaPanel .ichiba_mainitem .thumbnail span {\
         font-size: 60px;\
-      }\n\
+      }\
       body.videoSelection #content.w_adjusted #leftIchibaPanel .ichiba_mainitem>div>dt {\
         height: 50px;position: relative;\
-      }\n\
+      }\
       body.videoSelection #content.w_adjusted #leftIchibaPanel .ichiba_mainitem .balloonUe {\
         position: absolute;width: 100%;\
-      }\n\
+      }\
       body.videoSelection #content.w_adjusted #leftIchibaPanel .ichiba_mainitem .balloonUe {\
         position: absolute;\
-      }\n\
+      }\
       body.videoSelection #content.w_adjusted #leftIchibaPanel .ichiba_mainitem .balloonShita {\
         position: absolute;\
-      }\n\
+      }\
 \
       #leftPanel.videoInfo, #leftPanel.ichiba{\
         background: none;\
@@ -835,7 +860,10 @@
       }\
 \
       #leftPanelTabContainer {\
-        display:none; background: #666; position: absolute; right: 4px; top: -27px; list-style-type: none; padding: 4px 6px 3px 60px; height: 20px; border-radius: 4px 4px 0px 0px;\
+        display:none; background: #666; position: absolute; right: 4px; top: -27px; list-style-type: none; padding: 4px 6px 3px 60px; height: 20px;\
+      }\
+      #content:not(.w_flat) #leftPanelTabContainer {\
+        border-radius: 4px 4px 0px 0px;\
       }\
       #leftPanelTabContainer.w_touch {\
         top: -40px; height: 33px;\
@@ -844,10 +872,13 @@
         display:block;\
       }\
       #leftPanelTabContainer .tab {\
-        display: inline-block; cursor: pointer; background: #999; padding: 2px 4px 0px; border-radius: 4px 4px 0px 0px; border-width: 1px 1px 0px; \
+        display: inline-block; cursor: pointer; background: #999; padding: 2px 4px 0px; border-width: 1px 1px 0px; \
       }\
         #leftPanelTabContainer.w_touch .tab {\
           padding: 8px 12px 8px;\
+        }\
+        #content:not(.w_flat) #leftPanelTabContainer .tab {\
+          border-radius: 4px 4px 0px 0px;\
         }\
       #leftPanel.nicommend .tab.nicommend{\
         background: #dfdfdf; border-style: outset;\
@@ -861,7 +892,7 @@
       #leftPanel.ichibaEmpty #leftPanelTabContainer .ichiba, #leftPanel.nicommendEmpty #leftPanelTabContainer .nicommend {\
         color: #ccc;\
       }\
-\n\
+\
       #leftIchibaPanel .ichibaPanelInner {\
         margin:0; color: #666;\
       }\
@@ -873,34 +904,34 @@
       }\
       #leftIchibaPanel .ichiba_mainitem {\
         margin: 0 0 8px 0; background: white; border-bottom : 1px dotted #ccc;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem a:hover{\
         background: #eef;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem>div {\
         max-width: 266px; margin: auto; text-align: center;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .blomagaArticleNP {\
         background: url("http://ichiba.dev.nicovideo.jp/embed/zero/img/bgMainBlomagaArticleNP.png") no-repeat scroll 0 0 transparent;\
         height: 170px;\
         margin: 0 auto;\
         width: 180px;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .blomagaLogo {\
         color: #FFFFFF;font-size: 9px;font-weight: bold;padding-left: 10px;padding-top: 8px;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .blomagaLogo span{\
         background: none repeat scroll 0 0 #AAAAAA;padding: 0 3px;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .blomagaText {\
         color: #666666;font-family: \'HGS明朝E\',\'ＭＳ 明朝\';font-size: 16px;height: 100px;padding: 7px 25px 0 15px;text-align: center;white-space: normal;word-break: break-all;word-wrap: break-word;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .blomagaAuthor {\
         color: #666666; font-size: 11px;padding: 0 20px 0 10px;text-align: right;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .balloonUe{\
         bottom: 12px; display: block; max-width: 266px; \
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .balloonUe a{\
         background: url("/img/watch_zero/ichiba/imgMainBalloonUe.png") no-repeat scroll center top transparent;\
         color: #666666 !important;\
@@ -912,117 +943,117 @@
         text-align: center;\
         text-decoration: none;\
         word-wrap: break-word;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .balloonShita{\
         height: 12px; bottom: 0; left: 0;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .balloonShita img{\
         vertical-align: top !important; \
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .ichibaMarquee {\
         display: none;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .thumbnail span {\
         font-size: 22px; color: #0066CC;\
         font-family: \'ヒラギノ明朝 Pro W3\',\'Hiragino Mincho Pro\',\'ＭＳ Ｐ明朝\',\'MS PMincho\',serif;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .action {\
         font-size: 85%;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .action .buy {\
         font-weight: bolder; color: #f60;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .itemname {\
         font-weight: bolder;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .maker {\
         font-size: 77%; margin-bottom: 2px;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .price {\
         \
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .action .click {\
         font-weight: bolder;\
-      }\n\
+      }\
       #leftIchibaPanel .ichiba_mainitem .goIchiba {\
         font-size: 77%; margin: 5px 0;\
-      }\n\
+      }\
       #leftIchibaPanel .addIchiba, #leftIchibaPanel .reloadIchiba {\
         cursor: pointer;\
-      }\n\
+      }\
       #leftIchibaPanel .noitem {\
         cursor: pointer;\
-      }\n\
-\n\
-      #content .bottomAccessContainer {\n\
-        position: absolute; bottom: 0;\n\
-      }\n\n\
+      }\
+\
+      #content .bottomAccessContainer {\
+        position: absolute; bottom: 0;\
+      }\
       body.videoSelection .bottomAccessContainer, body.videoSelection #content .openConfButton{\
         display: none;\
       }\
       /* プレイリスト出したり隠したり */\
-      body:not(.full_with_browser) #playlist:not(.w_show){\n\
-        position: absolute; top: -9999px;\n\
-      }\n\n\
+      body:not(.full_with_browser) #playlist:not(.w_show){\
+        position: absolute; top: -9999px;\
+      }\
       #content .playlistToggle:after {\
         content: "▼";\
       }\
       #content .playlistToggle.w_show:after {\
         content: "▲";\
       }\
-      #content #playlist .playlistInformation  .generationMessage{\n\
-        /* 「連続再生ボタンとリスト名は左右逆のほうが安定するんじゃね？ 名前の長さによってボタンの位置がコロコロ変わらなくなるし」という対応。*/ \n\
-        position: absolute; margin-left: 90px;\n\
-      }\n\n\
-      #playlistContainerInner .thumbContainer, #playlistContainerInner .balloon{\n\
-        cursor: move;\n\
-      }\n\n\
+      #content #playlist .playlistInformation  .generationMessage{\
+        /* 「連続再生ボタンとリスト名は左右逆のほうが安定するんじゃね？ 名前の長さによってボタンの位置がコロコロ変わらなくなるし」という対応。*/ \
+        position: absolute; margin-left: 90px;\
+      }\
+      #playlistContainerInner .thumbContainer, #playlistContainerInner .balloon{\
+        cursor: move;\
+      }\
 \
 \
       /* ページャーの字が小さくてクリックしにくいよね */\
-      #resultPagination {\n\
-        padding: 5px; font-weight: bolder; border: 1px dotted silter; font-size: 130%;\n\
-      }\n\n\
+      #resultPagination {\
+        padding: 5px; font-weight: bolder; border: 1px dotted silter; font-size: 130%;\
+      }\
 \
-      #playlistContainer #playlistContainerInner .playlistItem .balloon {\n\n\
-        bottom: auto; top: -2px; padding: auto;\n\n\
-      }\n\n\
+      #playlistContainer #playlistContainerInner .playlistItem .balloon {\
+        bottom: auto; top: -2px; padding: auto;\
+      }\
 \
-      body.w_channel #leftPanel .userIconContainer{\n\
-        display: none;\n\
-      }\n\n\
+      body.w_channel #leftPanel .userIconContainer{\
+        display: none;\
+      }\
       /* QWatch設定パネル */\
-      #watchItLaterConfigPanel {\n\
-        position: fixed; bottom:0; right:0; z-index: 10001; display: none;\n\
-        width: 400px; padding: 4px;\n\
-        background: #eff; border: 1px outset; color: black;\n\
-        \n\
-      }\n\n\
-      #watchItLaterConfigPanel .inner{\n\
-        margin: 0 12px; padding: 4px;\n\
-        max-height: 300px; overflow-y: auto;\n\
-        border: 1px inset\n\
-      }\n\n\
-      #watchItLaterConfigPanel li{\n\
-        margin: 4px auto;\n\
-      }\n\n\
-      #watchItLaterConfigPanel li:hover{\n\
+      #watchItLaterConfigPanel {\
+        position: fixed; bottom:0; right:0; z-index: 10001; display: none;\
+        width: 400px; padding: 4px;\
+        background: #eff; border: 1px outset; color: black;\
+        \
+      }\
+      #watchItLaterConfigPanel .inner{\
+        margin: 0 12px; padding: 4px;\
+        max-height: 500px; overflow-y: auto;\
+        border: 1px inset\
+      }\
+      #watchItLaterConfigPanel li{\
+        margin: 4px auto;\
+      }\
+      #watchItLaterConfigPanel li:hover{\
         background: #dff;\
-      }\n\n\
-      #watchItLaterConfigPanel li.buggy{\n\
-        color: #888;\n\
-      }\n\n\
-      #watchItLaterConfigPanel label{\n\
-        margin: 0 5px;\n\
-      }\n\n\
-      #watchItLaterConfigPanel label:hober{\n\
-      }\n\n\
-      #watchItLaterConfigPanel .bottom {\n\
-        text-align: right;padding: 0 12px; \n\
-      }\n\
-      #watchItLaterConfigPanel .closeButton{\n\
-        cursor: pointer; border: 1px solid;\n\
-      }\n\n\
+      }\
+      #watchItLaterConfigPanel li.buggy{\
+        color: #888;\
+      }\
+      #watchItLaterConfigPanel label{\
+        margin: 0 5px;\
+      }\
+      #watchItLaterConfigPanel label:hober{\
+      }\
+      #watchItLaterConfigPanel .bottom {\
+        text-align: right;padding: 0 12px; \
+      }\
+      #watchItLaterConfigPanel .closeButton{\
+        cursor: pointer; border: 1px solid;\
+      }\
       #watchItLaterConfigPanel.autoBrowserFull_false .disableAutoBrowserFullIfNicowari {\
         color: #ccc;\
       }\
@@ -1031,39 +1062,42 @@
       #watchItLaterConfigPanel.removeLeftPanel_true .leftPanelJack  {\
         color: #ccc;\
       }\
-      #content .openConfButton {\n\
-        position: absolute; bottom:0; right: 0;\n\
-      }\n\
-      #watchItLaterConfigPanel .debugOnly {\n\
+      #watchItLaterConfigPanel .reload .title:after  {\
+        content: \' (※)\'; font-size: 80%; color: #900;\
+      }\
+      #content .openConfButton {\
+        position: absolute; bottom:0; right: 0;\
+      }\
+      #watchItLaterConfigPanel .debugOnly {\
         display: none;\
-      }\n\
-      #watchItLaterConfigPanel.debugMode .debugOnly {\n\
+      }\
+      #watchItLaterConfigPanel.debugMode .debugOnly {\
         display: block; background: #ccc;\
-      }\n\
-      #watchItLaterConfigPanel .section {\n\
+      }\
+      #watchItLaterConfigPanel .section {\
         font-size: 120%; font-weight: bolder; margin: 16px 0;\
-      }\n\
-      #watchItLaterConfigPanel .section .description{\n\
+      }\
+      #watchItLaterConfigPanel .section .description{\
         display: block; font-size: 80%; margin: 4px;\
-      }\n\n\
-      #watchItLaterConfigPanel .shortcutSetting:not(.enable) span :not(.enable){\n\
+      }\
+      #watchItLaterConfigPanel .shortcutSetting:not(.enable) span :not(.enable){\
         color: silver;\
-      }\n\
-      #watchItLaterConfigPanel .shortcutSetting .enable {\n\
+      }\
+      #watchItLaterConfigPanel .shortcutSetting .enable {\
         cursor: pointer; margin: auto 10px;\
-      }\n\
-      #watchItLaterConfigPanel .shortcutSetting        .enable:before {\n\
+      }\
+      #watchItLaterConfigPanel .shortcutSetting        .enable:before {\
         content: \'○ \';\
-      }\n\
-      #watchItLaterConfigPanel .shortcutSetting.enable .enable:before {\n\
+      }\
+      #watchItLaterConfigPanel .shortcutSetting.enable .enable:before {\
         content: \'㋹ \'; color: blue;\
-      }\n\
-      #watchItLaterConfigPanel .shortcutSetting      .ctrl, #watchItLaterConfigPanel .shortcutSetting     .alt, #watchItLaterConfigPanel .shortcutSetting       .shift {\n\
+      }\
+      #watchItLaterConfigPanel .shortcutSetting      .ctrl, #watchItLaterConfigPanel .shortcutSetting     .alt, #watchItLaterConfigPanel .shortcutSetting       .shift {\
         cursor: pointer; border: 2px outset; margin: 4px 4px; padding: 2px 4px; width: 180px; border-radius: 4px;background: #eee;\
-      }\n\
-      #watchItLaterConfigPanel .shortcutSetting.ctrl .ctrl, #watchItLaterConfigPanel .shortcutSetting.alt .alt, #watchItLaterConfigPanel .shortcutSetting.shift .shift {\n\
+      }\
+      #watchItLaterConfigPanel .shortcutSetting.ctrl .ctrl, #watchItLaterConfigPanel .shortcutSetting.alt .alt, #watchItLaterConfigPanel .shortcutSetting.shift .shift {\
         border: 2px inset; color: blue;\
-      }\n\
+      }\
 \
 \
       /* 動画検索画面に出るお気に入りタグ・お気に入りマイリスト */\
@@ -1088,45 +1122,45 @@
       #searchResultNavigation #favoriteTagsMenu a:after,       #searchResultNavigation #favoriteMylistsMenu a:after,\
       #searchResultNavigation #mylistListMenu   a:after,       #searchResultNavigation #videoRankingMenu a:after{\
         content: "▼"; position: absolute; background: none; top: 0px; right: 10px;\
-      }\n\
+      }\
       #searchResultNavigation #favoriteTagsMenu.open a:after,  #searchResultNavigation #favoriteMylistsMenu.open a:after,\
       #searchResultNavigation #mylistListMenu.open   a:after,  #searchResultNavigation #videoRankingMenu.open a:after{\
         content: "▲";\
-      }\n\
+      }\
       #searchResultNavigation .slideMenu ul{\
-      }\n\
+      }\
       #searchResultNavigation .slideMenu ul li{\
         background: #fdfdfd; padding: 0; border: 0;font-size: 90%; height: auto !important;\
-      }\n\
+      }\
       #searchResultNavigation .slideMenu ul li a{\
         line-height: 165%; background: none;\
-      }\n\
+      }\
       #searchResultNavigation.w_touch .slideMenu ul li a{\
         line-height: 300%; font-size: 120%;\
-      }\n\
+      }\
         #searchResultNavigation .slideMenu ul li a:before{\
           background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;\
           display: inline-block; height: 14px; margin: -4px 4px 0 0; vertical-align: middle; width: 18px; content: ""\
-        }\n\
-        #searchResultNavigation .slideMenu ul li          a.defMylist:before{ background-position: 0 -253px;}\n\
-        #searchResultNavigation .slideMenu ul li.folder0  a:before{ background-position: 0 0;}\n\
-        #searchResultNavigation .slideMenu ul li.folder1  a:before{ background-position: 0 -23px;}\n\
-        #searchResultNavigation .slideMenu ul li.folder2  a:before{ background-position: 0 -46px;}\n\
-        #searchResultNavigation .slideMenu ul li.folder3  a:before{ background-position: 0 -69px;}\n\
-        #searchResultNavigation .slideMenu ul li.folder4  a:before{ background-position: 0 -92px;}\n\
-        #searchResultNavigation .slideMenu ul li.folder5  a:before{ background-position: 0 -115px;}\n\
-        #searchResultNavigation .slideMenu ul li.folder6  a:before{ background-position: 0 -138px;}\n\
-        #searchResultNavigation .slideMenu ul li.folder7  a:before{ background-position: 0 -161px;}\n\
-        #searchResultNavigation .slideMenu ul li.folder8  a:before{ background-position: 0 -184px;}\n\
-        #searchResultNavigation .slideMenu ul li.folder9  a:before{ background-position: 0 -207px;}\n\
+        }\
+        #searchResultNavigation .slideMenu ul li          a.defMylist:before{ background-position: 0 -253px;}\
+        #searchResultNavigation .slideMenu ul li.folder0  a:before{ background-position: 0 0;}\
+        #searchResultNavigation .slideMenu ul li.folder1  a:before{ background-position: 0 -23px;}\
+        #searchResultNavigation .slideMenu ul li.folder2  a:before{ background-position: 0 -46px;}\
+        #searchResultNavigation .slideMenu ul li.folder3  a:before{ background-position: 0 -69px;}\
+        #searchResultNavigation .slideMenu ul li.folder4  a:before{ background-position: 0 -92px;}\
+        #searchResultNavigation .slideMenu ul li.folder5  a:before{ background-position: 0 -115px;}\
+        #searchResultNavigation .slideMenu ul li.folder6  a:before{ background-position: 0 -138px;}\
+        #searchResultNavigation .slideMenu ul li.folder7  a:before{ background-position: 0 -161px;}\
+        #searchResultNavigation .slideMenu ul li.folder8  a:before{ background-position: 0 -184px;}\
+        #searchResultNavigation .slideMenu ul li.folder9  a:before{ background-position: 0 -207px;}\
 \
-        #searchResultNavigation .slideMenu ul li.g_ent2 a:before     {  background-position: 0 -23px;}\n\
-        #searchResultNavigation .slideMenu ul li.g_life2 a:before    {  background-position: 0 -46px;}\n\
-        #searchResultNavigation .slideMenu ul li.g_politics a:before {  background-position: 0 -69px;}\n\
-        #searchResultNavigation .slideMenu ul li.g_tech a:before     {  background-position: 0 -92px;}\n\
-        #searchResultNavigation .slideMenu ul li.g_culture2 a:before {  background-position: 0 -115px;}\n\
-        #searchResultNavigation .slideMenu ul li.g_other a:before    {  background-position: 0 -138px;}\n\
-        #searchResultNavigation .slideMenu ul li.r18 a:before        {  background-position: 0 -207px;}\n\
+        #searchResultNavigation .slideMenu ul li.g_ent2 a:before     {  background-position: 0 -23px;}\
+        #searchResultNavigation .slideMenu ul li.g_life2 a:before    {  background-position: 0 -46px;}\
+        #searchResultNavigation .slideMenu ul li.g_politics a:before {  background-position: 0 -69px;}\
+        #searchResultNavigation .slideMenu ul li.g_tech a:before     {  background-position: 0 -92px;}\
+        #searchResultNavigation .slideMenu ul li.g_culture2 a:before {  background-position: 0 -115px;}\
+        #searchResultNavigation .slideMenu ul li.g_other a:before    {  background-position: 0 -138px;}\
+        #searchResultNavigation .slideMenu ul li.r18 a:before        {  background-position: 0 -207px;}\
         #searchResultNavigation .slideMenu ul li.all        a.all,\
         #searchResultNavigation .slideMenu ul li.g_ent2     a.g_ent2,\
         #searchResultNavigation .slideMenu ul li.g_life2    a.g_life2,\
@@ -1135,18 +1169,18 @@
         #searchResultNavigation .slideMenu ul li.g_culture2 a.g_culture2,\
         #searchResultNavigation .slideMenu ul li.g_other    a.g_other,\
         #searchResultNavigation .slideMenu ul li.r18        a.r18 \
-        { font-weight: bolder; border-top: 1px dotted #ccc; }\n\
+        { font-weight: bolder; border-top: 1px dotted #ccc; }\
 \
 \
       #searchResultNavigation .slideMenu ul li a:after{\
         background: none !important;\
-      }\n\
+      }\
       #searchResultNavigation .slideMenu ul li a:hover{\
         background: #f0f0ff;\
-      }\n\
+      }\
       #searchResultNavigation .slideMenu ul .reload{\
         cursor: pointer; border: 1px solid; padding: 0;\
-      }\n\
+      }\
 \
       #searchResultNavigation .tagSearchHistory {\
         border-radius: 0px; margin-top: 2px; padding: 4px; background: #ccc;\
@@ -1240,46 +1274,46 @@
         display:none;\
       }\
 \
-\n\n\n\n\
+\
       #searchResultExplorer.w_adjusted #resultContainer, #searchResultExplorer.w_adjusted #resultlist {\
         width: 592px; padding-left: 0; min-width: 592px; max-width: auto;\
-      }\n\
+      }\
       #searchResultExplorer.w_adjusted #resultContainer .resultContentsWrap, #searchResultExplorer.w_adjusted #resultContainer .resutContentsWrap {\
         width: 592px; padding: 16px 0px;\
-      }\n\
+      }\
       #content.w_adjusted #searchResultNavigation:not(.w_touch)>ul>li,  body.videoSelection #content.w_adjusted #searchResultExplorerExpand {\
         height: 26px;\
-      }\n\
+      }\
       #content.w_adjusted #searchResultNavigation:not(.w_touch)>ul>li>a,body.videoSelection #content.w_adjusted #searchResultExplorerExpand a{\
         line-height: 26px; font-size: 100%;\
-      }\n\
+      }\
       #searchResultNavigation > ul > li a:after, #content.w_adjusted #searchResultExplorerExpand a#closeSearchResultExplorer:after {\
         top: 8px;\
-      }\n\
+      }\
       #searchResultExplorer.w_adjusted {\
         background: #333333;\
-      }\n\
+      }\
       body.videoSelection #footer.w_adjusted {\
         display: none;\
-      }\n\
+      }\
       #searchResultExplorer.w_adjusted #searchResultUadTagRelatedContainer .itemList>li {\
         width: 124px;\
-      }\n\
+      }\
 \
     /* 1列表示の時、動画タイトルの横の空白部分にまでクリック判定があるのはVistaのエクスプローラみたいで嫌なので、文字部分だけにしたい */\
       #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a{\
         display: inline;\
-      }\n\
+      }\
       #searchResultExplorer.w_adjusted #resultlist.column1 .videoInformationOuter a p {\
         display: inline;\
-      }\n\
+      }\
 \
       #searchResultExplorer.w_adjusted #resultlist.column1 .commentBlank {\
         width: 96%;\
-      }\n\
+      }\
       #searchResultExplorer.w_adjusted #resultlist.column4 .commentBlank {\
         width: 24%;\
-      }\n\
+      }\
       #searchResultNavigation .quickSearchInput {\
         background: none repeat scroll 0 0 #F4F4F4;\
         border: 1px inset silver;\
@@ -1288,14 +1322,14 @@
         position: absolute;\
         top: 2px;\
         width: 200px;\
-      }\n\
+      }\
       #searchResultNavigation.w_touch .quickSearchInput {\
         top: 4px; font-size: 20px;\
-      }\n\
+      }\
 \
       #resultlist.column4 .videoItem .balloon {\
         bottom: auto; top: 10px;\
-      }\n\
+      }\
       #resultlist .videoItem .columnVertical     .balloon {\
         top: -20px; /* 「再生リストに追加しました」が上の動画に被るのを防ぐ */\
       }\
@@ -1317,7 +1351,7 @@
       #resultContainer.dummyMylist #searchResultMylistSortOptions,\
       #resultContainer.dummyMylist #searchResultHeader {\
         display: none !important;\
-      }\n\
+      }\
 \
       #resultlist .videoItem .thumbnailHoverMenu {\
         position: absolute; padding: 0; box-shadow: 1px 1px 2px black;\
@@ -1341,7 +1375,7 @@
       }\
       #resultlist .videoItem:hover .thumbnailHoverMenu {\
         display: block;\
-      }\n\
+      }\
       #resultlist .log-user-video-upload {\
         background: #ffe; border-radius: 4px;\
       }\
@@ -1349,10 +1383,10 @@
       }\
       #resultContainer.enableMylistDeleteButton.mylist.isMine #resultlist .videoItem:hover .deleteFromMyMylist {\
         display: inline-block;\
-      }\n\
+      }\
       #searchResultExplorer.w_adjusted #resultContainer #searchResultContainer {\
         background: #fff;\
-      }\n\
+      }\
 \
       #searchResultExplorer.w_adjusted #resultContainer .resultAdsWrap {\
         margin-right: -290px; padding: 0; transition: margin-right .2s; -webkit-transition: margin-right .2s;\
@@ -1468,6 +1502,31 @@
       #outline.noNicommend #nicommendContainer, #outline.noIchiba  #nicoIchiba, #outline.noReview  #videoReview{\
         display: none;\
       }\
+      \
+      #content.w_flat #playerContainerWrapper, #content.w_flat #playlist .playlistInformation {\
+        background: #444;\
+      }\
+      #content.w_flat #leftPanel, #content.w_flat #playerCommentPanel {\
+        background: #ddd; border-radius: 0;\
+      }\
+      #content.w_flat #leftVideoInfo {\
+        border-radius: 0;\
+      }\
+      #content.w_flat #searchResultNavigation > ul > li, #content.w_flat #searchResultExplorerExpand {\
+        background: #f5f5f5;\
+      }\
+      #content.w_flat #searchResultNavigation > ul > li:hover {\
+        background: #e7e7e7;\
+      }\
+      #content.w_flat #searchResultNavigation > ul > li.active {\
+        background: #343434;\
+      }\
+      #content.w_flat #searchResultExplorerExpand a {\
+        text-shadow: none;\
+      }\
+      #content.w_flat #playerCommentPanel .section .commentTable .commentTableHeaderWrapper {\
+        background: gray;\
+      }\
       ',
     ''
     ].join('');
@@ -1519,7 +1578,7 @@
         values: {'する': true, 'しない': false},
         description: '連続再生中は解除しません'},
       {title: 'ウィンドウがアクティブの時だけ自動再生する', varName: 'autoPlayIfWindowActive',
-        description: 'QWatch側の設定パネルの自動再生はオフにしてください。\n\n■こんな人におすすめ\n・自動再生ONにしたいけど別タブで開く時は自動再生したくない\n・複数タブ開いたままブラウザ再起動したら全部のタブで再生が始まって「うるせー！」という経験のある人',
+        description: 'QWatch側の設定パネルの自動再生はオフにしてください。\n■こんな人におすすめ\n・自動再生ONにしたいけど別タブで開く時は自動再生したくない\n・複数タブ開いたままブラウザ再起動したら全部のタブで再生が始まって「うるせー！」という経験のある人',
         values: {'する': 'yes', 'しない': 'no'}},
       {title: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
         description: '全画面状態だと再生数がわからなくて不便、という時に',
@@ -1534,20 +1593,20 @@
         values: {'する': true, 'しない': false}, addClass: true},
       {title: '左のパネルを消滅させる', varName: 'removeLeftPanel',
         values: {'する': true, 'しない': false}, addClass: true},
-      {title: '左のパネルに動画情報・市場を表示', varName: 'leftPanelJack',
+      {title: '左のパネルに動画情報・市場を表示', varName: 'leftPanelJack', reload: true,
         values: {'する': true, 'しない': false}},
-      {title: 'ページのヘッダに再生数表示', varName: 'headerViewCounter',
+      {title: 'ページのヘッダに再生数表示', varName: 'headerViewCounter', reload: true,
         values: {'する': true, 'しない': false}},
-      {title: 'てれびちゃんメニュー内にニコニコ動画のロゴを復活', varName: 'hidariue',
+      {title: 'てれびちゃんメニュー内にニコニコ動画のロゴを復活', varName: 'hidariue', reload: true,
         values: {'させる': true, 'させない': false}},
-      {title: 'タグが2行以内なら自動で縦幅を縮める(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight',
+      {title: 'タグが2行以内なら自動で縦幅を縮める(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight', reload: true,
         description: '無駄な空白がなくなって画面の節約になります',
         values: {'する': true, 'しない': false}},
-      {title: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory',
+      {title: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory', reload: true,
         values: {'する': true, 'しない': false}},
       {title: '画面からニコニコニュースを消す', varName: 'hideNicoNews',
         values: {'消す': true, '消さない': false}},
-      {title: 'プレイリスト消えないモード(実験中)', varName: 'storagePlaylistMode',
+      {title: 'プレイリスト消えないモード(実験中)', varName: 'storagePlaylistMode', reload: true,
         description: '有効にすると、リロードしてもプレイリストが消えなくなります。',
         values:
           (conf.debugMode ?
@@ -1565,12 +1624,12 @@
 
 
       {title: '動画検索画面の設定'},
-      {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack',
+      {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack', reload: true,
         description: '便利ですがちょっと重いです。\n大きめのモニターだと快適ですが、小さいといまいちかも',
         values: {'する': true, 'しない': false}},
-      {title: 'お気に入りタグを表示', varName: 'enableFavTags',
+      {title: 'お気に入りタグを表示', varName: 'enableFavTags', reload: true,
         values: {'する': true, 'しない': false}},
-      {title: 'お気に入りマイリストを表示', varName: 'enableFavMylists',
+      {title: 'お気に入りマイリストを表示', varName: 'enableFavMylists', reload: true,
         description: '更新のあったリストが上に来るので、新着動画のチェックに便利です。',
         values: {'する': true, 'しない': false}},
       {title: 'サムネを4:3にする', varName: 'squareThumbnail',
@@ -1589,14 +1648,14 @@
         values: {'有効': true, '無効': false}},
 
       {title: 'その他の設定'},
-      {title: 'マウスを重ねるとマイリストメニューを表示', varName: 'enableHoverPopup',
+      {title: 'リンクにカーソルを重ねたらマイリストメニューを表示', varName: 'enableHoverPopup', reload: true,
         description: 'マウスカーソルを重ねた時に出るのが邪魔な人はオフにしてください',
         values: {'する': true, 'しない': false}},
       {title: 'ゆっくり再生(スロー再生)ボタンを表示する', varName: 'enableYukkuriPlayButton',
         values: {'する': true, 'しない': false}},
       {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
        description: '常に指定したいパラメータ指定するのに便利です\n例: 「-グロ -例のアレ」とすると、その言葉が含まれる動画が除外されます'},
-      {title: '「@ジャンプ」を無効化', varName: 'ignoreJumpCommand',
+      {title: '「@ジャンプ」を無効化', varName: 'ignoreJumpCommand', reload: true,
         description: '勝手に他の動画に飛ばされる機能を無効化します。',
         values: {'する': true, 'しない': false}},
       {title: '「ニコる」ボタンをなくす', varName: 'noNicoru',
@@ -1605,6 +1664,9 @@
       {title: 'タッチパネル向けモード(画面を右フリックで開始)', varName: 'enableQTouch',
         description: '指で操作しやすいように、一部のボタンやメニューが大きくなります',
         values: {'使う': true, '使わない': false}},
+      {title: 'グラデーションや角の丸みをなくす', varName: 'flatDesignMode',
+        description: '軽い表示になります',
+        values: {'なくす': 'on', 'なくさない': ''}},
 
 
       {title: 'マウスとキーボードの設定', description: '※Chromeはコメント入力中も反応してしまいます'},
@@ -1626,7 +1688,7 @@
 
 
       {title: '実験中の設定', debugOnly: true},
-      {title: 'プレイリスト消えないモード(※実験中)', varName: 'hashPlaylistMode', debugOnly: true,
+      {title: 'プレイリスト消えないモード(※実験中)', varName: 'hashPlaylistMode', debugOnly: true, reload: true,
         values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}}
 
 
@@ -1653,10 +1715,10 @@
               $item = $('<li class="section">'+ menus[i].title + '</li>');
             }
           }
-          $item.toggleClass('debugOnly', menus[i].debugOnly === true);
+          $item.toggleClass('debugOnly', menus[i].debugOnly === true).toggleClass('reload', menus[i].reload === true);
           $ul.append($item);
         }
-        var $close = w.jQuery('<p class="bottom">項目によっては再読み込みが必要です<button class="closeButton">閉じる</button></p>'), self = this;
+        var $close = w.jQuery('<p class="bottom">(※)のつく項目は、リロード後に反映されます　<button class="closeButton">閉じる</button></p>'), self = this;
         $close.click(function() {
           self.close();
         });
@@ -3260,22 +3322,6 @@
         $(window).scrollLeft(0);
         $body.toggleClass('content-fix', isContentFix);
       },
-      changeCommentPanelWidth: function(target) {
-        var $playerCommentPanelOuter = $('#playerCommentPanelOuter');
-        var px = target - $playerCommentPanelOuter.outerWidth();
-        var elms = [
-          '#playerCommentPanelOuter',
-          '#playerCommentPanel',
-          '#playerCommentPanel .commentTable',
-          '#playerCommentPanel .commentTable .commentTableContainer',
-          '#commentDefaultHeader'
-        ];
-        for (var v in elms) {
-          var $e = $(elms[v]);
-          $e.width($e.width() + px);
-        }
-        $playerCommentPanelOuter.css({'right': - $playerCommentPanelOuter.outerWidth() + 'px'});
-      },
       play: function() {
         nicoPlayer.playVideo();
       },
@@ -4817,7 +4863,7 @@
         $leftPanel.toggleClass('removed',v);
         setTimeout(function() {
           watch.SidePanelInitializer.panelSlideViewController.slide(true);
-        }, 1000);
+        }, 0);
       }
       EventDispatcher.addEventListener('on.config.removeLeftPanel', updateLeftPanelVisibility);
       updateLeftPanelVisibility(conf.removeLeftPanel);
@@ -5115,7 +5161,7 @@
               var mylist = mylists[i], lastVideo = mylist.lastVideo, $li = $('<li/>'),
                 title = [
                   '/mylist/', mylist.id, '\n',
-                  mylist.description, '\n\n',
+                  mylist.description, '\n',
                   '最新動画: ', lastVideo.title, '\n',
                   '投稿日時: ', lastVideo.postedAt, '\n',
                 ''].join(''),
@@ -5564,7 +5610,7 @@
         $smallVideoStyle.remove();
       }
       // コメントパネル召喚
-      var commentPanelWidth = $('#playerCommentPanelOuter').outerWidth();
+      var commentPanelWidth = conf.wideCommentPanel ? 420 : $('#playerCommentPanelOuter').outerWidth();
 
       var css = ['<style type="text/css" id="explorerHack">',
         'body.videoSelection #content.w_adjusted #playerContainerWrapper, \n',
@@ -5598,7 +5644,7 @@
         // 破滅！
         'body.videoSelection #content.w_adjusted #leftPanel {',
           ' display: block; top: ', (availableHeight + otherPluginsHeight), 'px !important; max-height: ', bottomHeight, 'px !important; width: ', (xdiff - 4), 'px !important; left: 0;',
-          ' height:', (Math.min(bottomHeight, 600) - 2) , 'px !important; display: block !important; border-radius: 0;',
+          ' height:', Math.min(bottomHeight, 600), 'px !important; display: block !important; border-radius: 0;',
         '}',
           'body.videoSelection #content.w_adjusted #leftPanel {',
           '}',
@@ -5669,7 +5715,7 @@
           'z-index: 100;',
         '}',
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter {',
-          '; top: 0px !important; height: 50px !important; background: #dfdfdf; border: 2px outset; border-radius: 4px;',
+          'top: 0px !important; height: 50px !important; background: #dfdfdf; border-radius: 4px;',
           'z-index: 99;',
           'transition: right 0.3s ease-out, height 0.3s ease-out;  -webkit-transition: right 0.3s ease-out, height 0.3s ease-out; margin-top: 114px;',
         '}',
@@ -5688,10 +5734,10 @@
         '}',
           'body.videoSelection #content.w_adjusted #playerCommentPanelOuter:hover:not(.w_active) #playerCommentPanel,',
           'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_active             #playerCommentPanel {',
-            'height: ', (availableHeight - 20 /* padding+borderの10x2pxを引く */), 'px !important; ',
-            'display: block; background: #dfdfdf; border: 2px outset;',
+            'height: ', (availableHeight - 18 /* padding+borderの10x2pxを引く */), 'px !important; ',
+            'display: block; background: #dfdfdf; border: 1px solid;',
           '}',
-        'body.videoSelection #content.w_adjusted #playerCommentPanelOuter #playerCommentPanel .panelClickHandler{',
+        'body.videoSelection .panelClickHandler{',
           'display: none !important;',
         '}',
         'body.size_small.no_setting_panel.videoSelection #content #searchResultExplorerExpand {', // 「閉じる」ボタン
@@ -5923,7 +5969,7 @@
 
     function initPlaylist($, conf, w) {
       var playlist = watch.PlaylistInitializer.playlist; //.getItems().length;
-      var blankVideoId = 'sm20353707', blankVideoUrl = 'http://www.nicovideo.jp/watch/' + blankVideoId;
+      var blankVideoId = 'sm20353707', blankVideoUrl = 'http://www.nicovideo.jp/watch/' + blankVideoId + '?';
 
       var items = {};
 
@@ -5947,7 +5993,7 @@
         watch.PlaylistInitializer.playlistView.resetView();
       }
 
-      function exportPlaylist(option, type) {
+      function exportPlaylist(option, type, continuous, shuffle) {
         var items = playlist.items, list = [];
         for (var i = 0, len = Math.min(300, items.length); i < len; i++) {
           var item = items[i];
@@ -5961,10 +6007,10 @@
           );
         }
         return {
-          a: WatchController.isPlaylistContinuous(),
-          r: WatchController.isPlaylistRandom(),
-          o: option || playlist.option,
-          t: type || playlist.type,
+          a: (typeof continuous === 'boolean') ? continuous : WatchController.isPlaylistContinuous(),
+          r: (typeof shuffle    === 'boolean') ? shuffle    : WatchController.isPlaylistRandom(),
+          o: option    || playlist.option,
+          t: type      || playlist.type,
           i: list
         };
       }
@@ -6022,7 +6068,6 @@
         if (list.a) { playlist.setPlaybackMode('continuous'); }
         if (list.r) {
           if (newItems[0].id === blankVideoId) {
-            playlist.setPlaybackMode('continuous');
             setTimeout(function() {WatchController.shufflePlaylist();}, 3000);
           } else {
             playlist.setPlaybackMode('random');
@@ -6030,9 +6075,14 @@
         }
       }
 
-      var $dialog = null, $savelink = null;
+      var $dialog = null, $savelink = null, $continuous, $shuffle;
       function openSaveDialog() {
         function resetLink() {
+          var playlist = exportPlaylist(null, null, $continuous.is(':checked'), $shuffle.is(':checked'));
+          playlist.o = playlist.o || [];
+          playlist.o.name = $savelink.text();
+          playlist.t = 'mylist';
+          LocationHashParser.setValue('playlist', playlist);
           $savelink
             .attr('href', blankVideoUrl + LocationHashParser.getHash())
             .unbind();
@@ -6048,28 +6098,37 @@
             '<div class="formWindow"><div  class="formWindowInner">',
               '<h3>プレイリスト保存用リンク(実験中)</h3>',
               '<p class="link"><a target="_blank" class="playlistSaveLink">保存用リンク</a><button class="editButton">編集</button></p>',
+              '<label><input type="checkbox" class="continuous">開始時に連続再生をONにする</label><br>',
+              '<label><input type="checkbox" class="shuffle">開始時にリストをシャッフルする</label>',
               '<p class="desc">リンクを右クリックしてコピーやブックマークする事で、現在のプレイリストを保存する事ができます。</p>',
               '<button class="closeButton">閉じる</button>',
             '</div></div>',
           ''].join('')));
-          $savelink = $dialog.find('a').attr('added', 1);
+          $savelink   = $dialog.find('a').attr('added', 1);
+          $continuous = $dialog.find('.continuous');
+          $shuffle    = $dialog.find('.shuffle');
           $dialog.find('.shadow').on('click', closeDialog);
           $dialog.find('.editButton').on('click', function() {
             var newTitle = prompt('タイトルを編集', $savelink.text());
             if (newTitle) {
-              LocationHashParser.setValue('playlist', exportPlaylist({name: newTitle}, 'mylist'));
-              resetLink();
               $savelink.text(newTitle);
+              resetLink();
             }
           });
+          $continuous.on('click', resetLink);
+          $shuffle   .on('click', resetLink);
           $dialog.find('.closeButton').on('click', closeDialog);
 
           $('body').append($dialog);
         }
-        LocationHashParser.setValue('playlist', exportPlaylist());
         $savelink.text(
-          $('#playlist .generationMessage').text().replace(/^.*?\n/, '').replace(/^.*「/, '').replace(/」.*?$/, '').replace(/ *- \d{4}-\d\d-\d\d \d\d:\d\d」.*?$/, '') +
-          ' - ' + WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M', new Date()));
+          $('#playlist .generationMessage')
+            .text()
+            .replace(/^.*?\n/, '').replace(/^.*「/, '').replace(/」.*?$/, '').replace(/ *- \d{4}-\d\d-\d\d \d\d:\d\d$/, '') +
+          ' - ' + WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M', new Date())
+        );
+        $continuous.attr('checked', WatchController.isPlaylistActive());
+        $shuffle   .attr('checked', WatchController.isPlaylistRandom());
         resetLink();
         $dialog.addClass('show');
       }
@@ -6314,13 +6373,36 @@
     }
 
     function initCommentPanel() {
-      EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
-        if (conf.wideCommentPanel) {
-  //      完全に横スクロール不要にしたい場合はこっち
-  //        var tarinaiWidth = $('#commentDefault .commentTableContainer').innerWidth() - $('#commentDefault .commentTableContainerInner').outerWidth();
-  //      WatchController.changeCommentPanelWidth(tarinaiWidth - 10);
-          WatchController.changeCommentPanelWidth(420);
+      var $playerCommentPanelOuter = $('#playerCommentPanelOuter'), wideCss = null;
+      function initWideCommentPanelCss(targetWidth) {
+        var px = targetWidth - $playerCommentPanelOuter.outerWidth();
+        var elms = [
+          '#playerCommentPanelOuter',
+          '#playerCommentPanel',
+          '#playerCommentPanel .commentTable',
+          '#playerCommentPanel .commentTable .commentTableContainer',
+          '#commentDefaultHeader'
+        ];
+        var css = [
+          '#playerCommentPanelOuter.w_wide { width: ', targetWidth,'px;}\n',
+          'body:not(.videoSelection) #playerCommentPanelOuter.w_wide { right: -', targetWidth, 'px !important;}\n'
+        ];
+        for (var v in elms) {
+          var $e = $(elms[v]), newWidth = $e.width() + px;
+          css.push([
+            '#playerCommentPanelOuter.w_wide ', elms[v],' { width: ', newWidth,'px !important;}\n'
+          ].join(''));
         }
+        wideCss = addStyle(css.join(''), 'wideCommentPanelCss');
+      }
+      function toggleWide(v) {
+        $playerCommentPanelOuter.toggleClass('w_wide', v).css('right', '');
+        EventDispatcher.dispatch('onWindowResize');
+      }
+      EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
+        initWideCommentPanelCss(420);
+        EventDispatcher.addEventListener('on.config.wideCommentPanel', toggleWide);
+        toggleWide(conf.wideCommentPanel);
         EventDispatcher.dispatch('onWindowResize');
         var $div = $([
             '<div id="sharedNgSettingContainer" style="display: none;">NG共有レベル: ',
@@ -6611,7 +6693,12 @@
     EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
       setTimeout(function() {
         watch.SidePanelInitializer.panelSlideViewController.slide(true);
-      }, 500);
+      }, 0);
+    });
+    EventDispatcher.addEventListener('onWindowResize', function() {
+      setTimeout(function() {
+        watch.SidePanelInitializer.panelSlideViewController.slide();
+      }, 0);
     });
   }
 
@@ -6845,12 +6932,17 @@
         } else
         if (name === 'noNicoru') {
           $('body').toggleClass('w_noNicoru', newValue);
+        } else
+        if (name === 'flatDesignMode') {
+          $('#content').toggleClass('w_flat', newValue);
         }
       });
 
       if (conf.enableMylistDeleteButton) $('#resultContainer').addClass('enableMylistDeleteButton');
 
       if (conf.noNicoru) $('body').addClass('w_noNicoru');
+
+      if (conf.flatDesignMode) $('#content').addClass('w_flat');
 
       WatchJsApi.nicos.addEventListener('nicoSJump', function(e) {
         if (conf.ignoreJumpCommand) {
