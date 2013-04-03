@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130403
+// @version        1.130404
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130404
+// - 省スペースモードの微調整
 
 // * ver 1.130403
 // - 「省スペース化の設定」項目を追加。 原宿ぐらいの密度になります。
@@ -1011,10 +1014,10 @@
         -webkit-transition: max-height 0.3s ease-out; transition: max-height 0.3s ease-out;\
       }\
       body:not(.full_with_browser):not(.videoSelection) #playlist:not(.w_show){\
-        max-height: 0px;/*position: absolute; top: -9999px;*/\
+        /*max-height: 0px;*/position: absolute; top: -9999px;\
       }\
       #playlist.w_show{\
-        max-height: 180px;\
+        /*max-height: 180px;*/\
       }\
       .playlistToggle:after {\
         content: "▼";\
@@ -1580,7 +1583,7 @@
         margin-top: 4px;\
       }\
       #content.w_compact #topVideoInfo .ch_prof, #topVideoInfo .userProfile {\
-        min-width: 297px;\
+        min-width: 297px; margin-top: -1px; \
       }\
       #content.w_compact #videoHeaderDetail .videoDetailExpand{\
         height: auto; padding: 0;\
@@ -1634,14 +1637,8 @@
         margin: 0 0 4px;\
       }\
       #outline.w_compact #videoShareLinks {\
-        margin: 0; /*float: right; width: 262px;*/\
+        margin: 0; \
       }\
-      /*#outline.w_compact ul.socialLinks li.socialLinkTwitter {\
-        width: 110px;\
-      }\
-      #outline.w_compact ul.socialLinks li.socialLinkFacebook {\
-        width: 102px;\
-      }*/\
       #outline.w_compact #bottomVideoDetailInformation {\
         margin: -18px 0 0;\
       }\
@@ -1694,8 +1691,21 @@
         /* 左パネルを隠した標準サイズのプレイヤーに合わせる */\
         width: 940px;\
       }\
-      ',
-    ''
+      #outline.w_compact #ichibaMain dl:nth-child(2n) {\
+        margin: 0 34px 30px;\
+      }\
+      #outline.w_compact #ichibaMain dl {\
+        margin: 0 0 30px;\
+      }\
+      \
+      body:not(.videoSelection).size_normal #chorus_seekbar {\
+        -webkit-transform: scaleX(1.33);\
+        margin-left: 111px;\
+      }\
+      body:not(.videoSelection).size_normal #content #inspire_category {\
+        margin-left: 219px;\
+      }\
+    '
     ].join(''); //
     addStyle(style, 'watchItLater');
   })();
