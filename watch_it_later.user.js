@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130404
+// @version        1.130406
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130406
+// - 小さいモニターむけの調整
 
 // * ver 1.130404
 // - 省スペースモードの微調整
@@ -665,7 +668,7 @@
         border:1px solid #444; cursor: pointer; font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; box-shadow: 1px 1px 0 rgba(0,0,0,0.3); text-align: center; color: #444; background-color: #ccc; margin: 0;\
         height: 24px; border-radius: 0 0 8px 8px;\
       }\
-      #outline .openConfButton { padding: 0 8px; letter-spacing: 4px; }\
+      #outline .openConfButton { padding: 0 8px; letter-spacing: 4px; width: 60px; }\
         .mylistPopupPanel.deflistSelected {\
           color: #ff9;\
         }\
@@ -1004,6 +1007,16 @@
       }\
       body.videoSelection .bottomAccessContainer{\
         display: none;\
+      }\
+      #outline.under940 .bottomAccessContainer{\
+        right: 60px;\
+      }\
+      #outline .sidebar {\
+        -webkit-transition: margin-top 0.3s ease-out;\
+        transition:         margin-top 0.3s ease-out;\
+      }\
+      #outline.under940 .sidebar {\
+        margin-top: 24px;\
       }\
       #videoHeader.menuClosed .watchItLaterMenu, #videoHeader.menuClosed .hidariue { display: none; }\
       #videoHeader .watchItLaterMenu {\
@@ -1574,7 +1587,7 @@
         width: 940px;\
       }\
       #content.w_compact #topVideoInfo .parentVideoInfo {\
-        margin-top: 0;\
+        margin-top: -9px; margin-bottom: 9x;\
       }\
       #content.w_compact #topVideoInfo .parentVideoInfo .cct{\
         margin-bottom: 0;\
@@ -1582,8 +1595,8 @@
       #content.w_compact #topVideoInfo .parentVideoInfo .videoThumb{\
         margin-top: 4px;\
       }\
-      #content.w_compact #topVideoInfo .ch_prof, #topVideoInfo .userProfile {\
-        min-width: 297px; margin-top: -1px; \
+      #content.w_compact #topVideoInfo .ch_prof, #content.w_compact #topVideoInfo .userProfile {\
+        min-width: 297px; margin-top: -1px; border: 1px solid #e7e7e7;\
       }\
       #content.w_compact #videoHeaderDetail .videoDetailExpand{\
         height: auto; padding: 0;\
@@ -1652,7 +1665,7 @@
         font-size: 90%; margin-top: -8px; padding: 0 0 4px 4px;\
       }\
       #outline.w_compact #videoComment {\
-        margin: 0px; border: 1px solid silver; border-radius: 4px 4px 4px 4px;\
+        margin: 0px; border: 1px solid silver; border-radius: 4px 4px 4px 4px; padding: 0 4px;\
       }\
       #outline.w_compact #videoComment h4{\
         padding-left: 4px;\
@@ -2082,6 +2095,27 @@
   })(conf, w);
   w.WatchItLater.event = EventDispatcher;
 
+  /*
+  * 通算視聴回数をカウント。 カウントしても意味はないけど、どれだけ無駄な時間を費やしたかを知りたくて実装。
+  */
+  var WatchCounter = (function(conf, w) {
+    var key = 'watchItLater_watchCounter';
+    function get() {
+      return JSON.parse(w.localStorage.getItem(key));
+    }
+    function add() {
+      var v = get() + 1;
+      w.localStorage.setItem(key, JSON.stringify(v));
+      if (conf.debugMode) console.log('watchCounter: ', v);
+      return v;
+    }
+    var self ={
+      get: get,
+      add: add
+    };
+    return self;
+  })(conf, w);
+  w.WatchItLater.counter = WatchCounter;
 
   /**
    *  動画タグ取得とポップアップ
@@ -4887,7 +4921,7 @@
       var newWatchId = watch.CommonModelInitializer.watchInfoModel.v;
       iframe.watchId(newVideoId, newWatchId);
       iframe.show();
-      conf.setValue('watchCounter', conf.watchCounter + 1);
+      WatchCounter.add();
 //      $('body').toggleClass('w_channel', watch.CommonModelInitializer.watchInfoModel.isChannelVideo());
 
       if (isFirst) {
@@ -5792,7 +5826,7 @@
         $smallVideoStyle.remove();
       }
       // コメントパネル召喚
-      var commentPanelWidth = conf.wideCommentPanel ? 420 : $('#playerCommentPanelOuter').outerWidth();
+      var commentPanelWidth = 420;//conf.wideCommentPanel ? 420 : $('#playerCommentPanelOuter').outerWidth();
 
       var css = ['<style type="text/css" id="explorerHack">',
         'body.videoSelection #content.w_adjusted #playerContainerWrapper, \n',
@@ -5881,14 +5915,16 @@
               'body.videoSelection:not(.content-fix) #content.w_adjusted #searchResultNavigation, ',
               'body.videoSelection:not(.content-fix) #content.w_adjusted .videoOwnerInfoContainer {padding-bottom: 72px; }'
             ].join('') :
-            [
+            ['body.videoSelection #content.w_adjusted #leftPanel { display: none !important;}'
+            /*
               'body.videoSelection #content.w_adjusted #leftPanel { min-width: 130px; padding: 0; margin: 0; left: ', (xdiff - 134), 'px !important ;}',
+              'body.videoSelection #content.w_adjusted #leftPanel:hover { left: 0px !important ;}',
               'body.videoSelection #content.w_adjusted #leftPanel img, body.videoSelection #content.w_adjusted #leftPanel .descriptionThumbnail { display: none; }',
               'body.videoSelection #content.w_adjusted #leftPanel #leftPanelTabContainer { display: none; }',
               'body.videoSelection #content.w_adjusted #leftPanel *   { padding: 0; margin: 0; }',
               'body.videoSelection:not(.content-fix) #content.w_adjusted #searchResultNavigation, ',
               'body.videoSelection:not(.content-fix) #content.w_adjusted .videoOwnerInfoContainer {padding-bottom: 72px; }'
-            ].join('')
+            */].join('')
           )
         ),
         // かなり 無理矢理 コメントパネルを 召喚するよ 不安定に なっても 知らない
@@ -6566,13 +6602,13 @@
           '#commentDefaultHeader'
         ];
         var css = [
-          '#playerCommentPanelOuter.w_wide { width: ', targetWidth,'px;}\n',
+          '#playerCommentPanelOuter.w_wide, body.videoSelection #content.w_adjusted #playerCommentPanelOuter { width: ', targetWidth,'px;}\n',
           'body:not(.videoSelection) #playerCommentPanelOuter.w_wide { right: -', targetWidth, 'px !important;}\n'
         ];
         for (var v in elms) {
           var $e = $(elms[v]), newWidth = $e.width() + px;
           css.push([
-            '#playerCommentPanelOuter.w_wide ', elms[v],' { width: ', newWidth,'px !important;}\n'
+            '#playerCommentPanelOuter.w_wide ', elms[v],' , body.videoSelection #content.w_adjusted ', elms[v], ' { width: ', newWidth,'px !important;}\n'
           ].join(''));
         }
         wideCss = addStyle(css.join(''), 'wideCommentPanelCss');
@@ -6726,7 +6762,6 @@
         if (e.which === 38 || e.which === 40) { toggleSearchType(':first'); }
       });
 
-//      var $li = $('<li class="watchItLaterMenu" />'), $conf = $('<button title="WatchItLaterの設定">設定</button>');
       var $container = $('<div class="bottomConfButtonContainer" />'), $conf = $('<button title="WatchItLaterの設定">設定</button>');
       $container.append($conf);
       $conf.addClass('openConfButton');
@@ -6736,7 +6771,15 @@
         ConfigPanel.toggle();
       });
       $('#outline .outer').before($container);
-      //$('#videoMenuTopList').append($container);
+
+
+//      $div.append($conf.clone(true));
+      var $body = $('body'), $window = $(window);
+      EventDispatcher.addEventListener('onWindowResize', function() {
+        if ($body.hasClass('videoSelection') || $body.hasClass('full_with_browser')) { return; }
+        var w = $div.outerWidth(), threshold = ($(window).innerWidth() - 940) / 2;
+        $('#outline').toggleClass('under940', w > threshold);
+      });
     }
 
     function toggleSearchType(suffix) {
@@ -6862,10 +6905,10 @@
             return (width(left) - width(right)) * 0.5;
           };
           p[q.LAYOUT_CENTER_LEFT]   = function(win, left, center, right) { // プレイヤーの左端をウィンドウ左合わせ?
-            return (width(center)  - $(win).width()) * 0.5;
+            return (width(center)  - $(win).width()) * 0.5 - 10;
           };
           p[q.LAYOUT_CENTER_RIGHT]  = function(win, left, center, right) { // プレイヤーの右端をウィンドウ右合わせ?
-            return ($(win).width() - width(center)) * 0.5;
+            return ($(win).width() - width(center))  * 0.5 + 10;
           };
           p[q.LAYOUT_LEFT_LEFT]     = function(win, left, center, right) { // 右にスライドして左パネル出す
             return (width(center) * 0.5 + width(left)) - $(win).width() * 0.5;
@@ -7095,9 +7138,7 @@
         var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
       }
 
-      $('#siteHeaderInner').width(
-        $('#siteHeaderInner').width() + 200
-      );
+      if (conf.headerViewCounter) $('#siteHeaderInner').width($('#siteHeaderInner').width() + 200);
 
       initAdditionalButtons();
       initSquareThumbnail();
@@ -7280,4 +7321,3 @@
     monkey(true);
   }
 })();
-
