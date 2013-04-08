@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130406
+// @version        1.130409
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,11 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130409
+// - ショートカットキー「コメントの背面表示ON/OFF」
+// - 省スペースモード時に市場が崩れる事があるのを修正
+
 
 // * ver 1.130406
 // - 小さいモニターむけの調整
@@ -439,6 +444,7 @@
       shortcutScrollToNicoPlayer: {char: 'P', shift: true,  ctrl: false, alt: false, enable: false}, // プレイヤーまでスクロールのショートカット
       shortcutShowOtherVideo:     {char: 'U', shift: true,  ctrl: false, alt: false, enable: false}, // 投稿者の関連動画表示のショートカット
       shortcutMute:               {char: 'T', shift: true,  ctrl: false, alt: false, enable: false}, // 音量ミュートのショートカット
+      shortcutDeepenedComment:    {char: 'B', shift: true,  ctrl: false, alt: false, enable: false}, // コメント背面表示
 
 
       watchCounter: 0, // お前は今までに見た動画の数を覚えているのか？をカウントする
@@ -1704,11 +1710,11 @@
         /* 左パネルを隠した標準サイズのプレイヤーに合わせる */\
         width: 940px;\
       }\
-      #outline.w_compact #ichibaMain dl:nth-child(2n) {\
-        margin: 0 34px 30px;\
-      }\
-      #outline.w_compact #ichibaMain dl {\
-        margin: 0 0 30px;\
+      /*#outline.w_compact #ichibaMain dl:nth-of-type(2n) {\
+        margin: 0 33px 30px; background: #ccc;\
+      }*/\
+      #outline.w_compact #ichibaMain dl.ichiba_mainitem {\
+        margin: 0 22px 30px 0;\
       }\
       \
       body:not(.videoSelection).size_normal #chorus_seekbar {\
@@ -1874,12 +1880,13 @@
       {title: 'とりあえずマイリスト登録',       varName: 'shortcutDefMylist',          type: 'keyInput'},
       {title: 'マイリスト登録',                 varName: 'shortcutMylist',             type: 'keyInput',
         description: '右下で選択中のマイリストに登録'},
-      {title: 'とりあえずマイリストを開く',     varName: 'shortcutOpenDefMylist',      type: 'keyInput'},
-      {title: '動画投稿者の関連動画を開く',     varName: 'shortcutShowOtherVideo',     type: 'keyInput'},
+      {title: 'とりあえずマイリストを開く',            varName: 'shortcutOpenDefMylist',      type: 'keyInput'},
+      {title: '動画投稿者の関連動画を開く',       varName: 'shortcutShowOtherVideo',     type: 'keyInput'},
       {title: '検索画面を開く',                 varName: 'shortcutOpenSearch',         type: 'keyInput'},
-      {title: 'コメント表示ON/OFF',             varName: 'shortcutCommentVisibility',  type: 'keyInput'},
-      {title: 'プレイヤーの位置までスクロール', varName: 'shortcutScrollToNicoPlayer', type: 'keyInput'},
+      {title: 'コメント表示ON/OFF',              varName: 'shortcutCommentVisibility',  type: 'keyInput'},
+      {title: 'プレイヤーの位置までスクロール',       varName: 'shortcutScrollToNicoPlayer', type: 'keyInput'},
       {title: 'ミュート',                       varName: 'shortcutMute',               type: 'keyInput'},
+      {title: 'コメントの背面表示ON/FF',          varName: 'shortcutDeepenedComment',    type: 'keyInput'},
 
 
       {title: '実験中の設定', debugOnly: true},
@@ -3672,6 +3679,18 @@
         } else {
           var pc = nicoPlayer.playerConfig.get();
           return pc.commentVisible;
+        }
+      },
+      deepenedComment: function(v) {
+        if (v === 'toggle') {
+          return this.deepenedComment(!this.deepenedComment());
+        } else
+        if (typeof v === 'boolean') {
+          nicoPlayer.playerConfig.set({deepenedComment: v});
+          return this;
+        } else {
+          var pc = nicoPlayer.playerConfig.get();
+          return pc.deepenedComment;
         }
       },
       mute: function(v) {
@@ -6959,7 +6978,8 @@
         scrollToPlayer    = KeyMatch.create(conf.shortcutScrollToNicoPlayer),
         commentVisibility = KeyMatch.create(conf.shortcutCommentVisibility),
         showOtherVideo    = KeyMatch.create(conf.shortcutShowOtherVideo),
-        mute              = KeyMatch.create(conf.shortcutMute)
+        mute              = KeyMatch.create(conf.shortcutMute),
+        deepenedComment   = KeyMatch.create(conf.shortcutDeepenedComment)
         ;
 
       ConfigPanel.addChangeEventListener(function(name, newValue, oldValue) {
@@ -6986,6 +7006,9 @@
         } else
         if (name === 'shortcutShowOtherVideo') {
           showOtherVideo = KeyMatch.create(conf.shortcutShowOtherVideo);
+        } else
+        if (name === 'shortcutDeepenedComment') {
+          deepenedComment = KeyMatch.create(conf.shortcutDeepenedComment);
         }
       });
 
@@ -7048,6 +7071,9 @@
         }
         if (mute.test(e)) {
           WatchController.mute('toggle');
+        }
+        if (deepenedComment.test(e)) {
+          WatchController.deepenedComment('toggle');
         }
       });
     }
@@ -7321,3 +7347,4 @@
     monkey(true);
   }
 })();
+
