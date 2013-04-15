@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130409
+// @version        1.130415
 // ==/UserScript==
 
 // TODO:
@@ -3609,11 +3609,29 @@
           watch.PlaylistInitializer.playlist.option
         );
       },
-      clearPlaylist: function() {
-        var x = watch.PlaylistInitializer.playlist.items, items = [];
-        for (var i = 0; i < x.length; i++) {
-          if (x[i]._isPlaying) {
+      clearPlaylist: function(target) {
+        var x = watch.PlaylistInitializer.playlist.items, items = [], i;
+        if (target === 'left') {
+          for (i = x.length - 1; i >= 0; i--) {
             items.unshift(x[i]);
+            if (x[i]._isPlaying) {
+              break;
+            }
+          }
+        } else
+        if (target === 'right') {
+          for (i = 0; i < x.length ; i++) {
+            items.push(x[i]);
+            if (x[i]._isPlaying) {
+              break;
+            }
+          }
+        }
+        else {
+          for (i = 0; i < x.length; i++) {
+            if (x[i]._isPlaying) {
+              items.unshift(x[i]);
+            }
           }
         }
         watch.PlaylistInitializer.playlist.reset(
@@ -5076,7 +5094,7 @@
           }
         };
         watch.ComponentInitializer.videoSelection.scrollUp = function(dur) {
-          var target = '#playlistReplaceButton';/*, '#searchResultContent'*/
+          var target = '#searchResultExplorer';// '#playlistReplaceButton';/*, '#searchResultContent'*/
           dur = dur || 200;
           if ($(target).offset().top < WatchController.scrollTop()) {
             WatchApp.ns.util.WindowUtil.scrollFitMinimum(target, dur);
@@ -5922,9 +5940,13 @@
               [
                 'body.videoSelection.content-fix #content.w_adjusted #leftPanel  .leftVideoInfo .videoOwnerInfoContainer {',
                   'position: fixed; top: auto !important; bottom: 2px;',
+                '}',
+                'body.videoSelection.content-fix #content.w_adjusted #leftPanel .leftVideoInfo .videoThumbnailContainer{',
+                  'position: fixed; top: auto; bottom: ', (bottomHeight - 106),'px',
                 '}'
               ].join('') :
-              ''
+              [
+              ].join('')
             )
           ].join('') :
           (
@@ -6391,25 +6413,35 @@
           });
           $ul.append($shuffle);
 
-          var $next = $('<li>検索結果を追加：次に再生</li>').click(function() {
+          var $next = $('<li>検索結果を追加： 次に再生</li>').click(function() {
             WatchController.appendSearchResultToPlaylist('next');
             enableContinuous();
           });
           $ul.append($next);
 
-          var $insert = $('<li>検索結果を追加：末尾</li>').click(function() {
+          var $insert = $('<li>検索結果を追加： 末尾</li>').click(function() {
             WatchController.appendSearchResultToPlaylist();
             enableContinuous();
           });
           $ul.append($insert);
 
-          var $clear = $('<li>リストを消去</li>').click(function() {
+          var $clear = $('<li>リストを消去： 全体</li>').click(function() {
             WatchController.clearPlaylist();
             watch.PlaylistInitializer.playlist.setPlaybackMode('normal');
           });
           $ul.append($clear);
 
-          var $saver = $('<li>プレイリスト保存用リンク(実験中)</li>').click(function() {
+          var $clearLeft = $('<li>リストを消去： 左</li>').click(function() {
+            WatchController.clearPlaylist('left');
+          });
+          $ul.append($clearLeft);
+          var $clearRight = $('<li>リストを消去： 右</li>').click(function() {
+            WatchController.clearPlaylist('right');
+          });
+          $ul.append($clearRight);
+
+
+          var $saver = $('<li>リストを保存(実験中)</li>').click(function() {
             openSaveDialog();
           });
           $ul.append($saver);
