@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130415
+// @version        1.130420
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130420
+// - 省スペースモードの調整
 
 // * ver 1.130409
 // - ショートカットキー「コメントの背面表示ON/OFF」
@@ -1068,23 +1071,35 @@
       body.w_channel #leftPanel .userIconContainer{\
         display: none;\
       }\
-      /* QWatch設定パネル */\
+      /* WatchItLater設定パネル */\
       #watchItLaterConfigPanel {\
         position: fixed; bottom:0; right:0; z-index: 10001; display: none;\
-        width: 400px; padding: 4px;\
-        background: #eff; border: 1px outset; color: black;\
+        width: 460px; padding: 0;\
         \
       }\
+      #watchItLaterConfigPanelShadow {\
+        position: fixed; bottom: 16px; right:16px; z-index: 10000; display: none;\
+        width: 430px; height: 500px; padding: 0;\
+        background: #000; /*box-shadow: 0 0 2px black; border-radius: 8px;*/ opacity: 0.8;\
+      }\
+      #watchItLaterConfigPanel .head {\
+        background-color: #CCCCCC;border-radius: 8px 8px 0 0;color: black;height: 50px;\
+        overflow: hidden;padding: 5px 0 0 16px;position: relative;\
+      }\
+      #watchItLaterConfigPanel .head h2 {\
+        font-size: 135%;\
+      }\
       #watchItLaterConfigPanel .inner{\
-        margin: 0 12px; padding: 4px;\
-        max-height: 500px; overflow-y: auto;\
-        border: 1px inset\
+        max-height: 500px;overflow-y: auto;border-width: 4px 16px 16px 16px; border-radius: 0 0 8px 8px;\
+        border-style: solid;border-color: #ccc;\
+      }\
+      #watchItLaterConfigPanel ul{\
+        border: 1px inset #ccc;\
       }\
       #watchItLaterConfigPanel li{\
-        margin: 4px auto;\
       }\
       #watchItLaterConfigPanel li:hover{\
-        background: #dff;\
+        /*background: #ddd;*/\
       }\
       #watchItLaterConfigPanel li.buggy{\
         color: #888;\
@@ -1092,39 +1107,49 @@
       #watchItLaterConfigPanel label{\
         margin: 0 5px;\
       }\
-      #watchItLaterConfigPanel label:hober{\
+      #watchItLaterConfigPanel label:hover{\
       }\
-      #watchItLaterConfigPanel .bottom {\
-        text-align: right;padding: 0 12px; \
+      #watchItLaterConfigPanel .foot {\
+        text-align: right; padding: 0 12px; \
       }\
       #watchItLaterConfigPanel .closeButton{\
-        cursor: pointer; border: 1px solid;\
+        border: 0 none;border-radius: 0 0 4px 4px;box-shadow: 0 1px 2px white;color: #666; border: 1px solid #999;\
+        cursor: pointer;float: right;margin-top: 8px;position: absolute;right: 16px;\
+        text-shadow: 0 1px 0 white;top: -10px; width: 60px;\
       }\
-      #watchItLaterConfigPanel.autoBrowserFull_false .disableAutoBrowserFullIfNicowari {\
-        color: #ccc;\
-      }\
+      #watchItLaterConfigPanel.autoBrowserFull_false .disableAutoBrowserFullIfNicowari,\
       #watchItLaterConfigPanel.autoBrowserFull_true .autoScrollToPlayer,\
       #watchItLaterConfigPanel.autoBrowserFull_true .autoOpenSearch,\
       #watchItLaterConfigPanel.removeLeftPanel_true .leftPanelJack  {\
-        color: #ccc;\
+        color: #ccc; text-shadow: -1px -1px 0 #888; \
       }\
-      #watchItLaterConfigPanel .reload .title:after  {\
+      #watchItLaterConfigPanel .reload .title:after {\
         content: \' (※)\'; font-size: 80%; color: #900;\
       }\
       #watchItLaterConfigPanel .debugOnly {\
         display: none;\
       }\
       #watchItLaterConfigPanel.debugMode .debugOnly {\
-        display: block; background: #ccc;\
+        display: block; background: #888;\
       }\
       #watchItLaterConfigPanel .section {\
-        font-size: 120%; font-weight: bolder; margin: 16px 0;\
+        border-style: solid;border-width: 20px 12px 12px 12px;color: white;font-size: 135%;\
+        font-weight: bolder; /*text-shadow: 2px 2px 1px #000000;*/\
+      }\
+      #watchItLaterConfigPanel .section > div {\
+        padding: 8px 0 8px 12px; box-shadow: 0 0 4px black;\
+      }\
+      #watchItLaterConfigPanel .section > div > span {\
+        background: #333;\
+      }\
+      #watchItLaterConfigPanel li:not(.section) {\
+        background: #fff; border-width: 4px 0px 4px 24px; border-style: solid; border-color: #fff;\
       }\
       #watchItLaterConfigPanel .section .description{\
-        display: block; font-size: 80%; margin: 4px;\
+        display: block; font-size: 80%;;\
       }\
       #watchItLaterConfigPanel .shortcutSetting:not(.enable) span :not(.enable){\
-        color: silver;\
+        color: #silver; \
       }\
       #watchItLaterConfigPanel .shortcutSetting .enable {\
         cursor: pointer; margin: auto 10px;\
@@ -1232,14 +1257,14 @@
 \
 \
       /* 動画タグが1行以下の時 */\
-      body:not(.full_with_browser) #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.oneLine {\
+      body:not(.full_with_browser) .tag1Line  #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit {\
         height: 12px; padding: 6px 4px 2px;\
       }\
-      body:not(.full_with_browser) #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.oneLine .toggleText{\
+      body:not(.full_with_browser) .tag1Line  #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit .toggleText{\
         display: none;\
       }\
       /* 動画タグが2行以下の時 */\
-      body:not(.full_with_browser) #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit.twoLines {\
+      body:not(.full_with_browser) .tag2Lines #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit {\
         height: 36px;\
       }\
       /* タグ領域とプレイヤーの隙間をなくす */\
@@ -1592,6 +1617,17 @@
       body:not(.full_with_browser) #content.w_compact #videoHeader {\
         width: 940px;\
       }\
+      .videoMenuToggle {\
+        -webkit-transform-origin: 100% 100%; -webkit-transition: -webkit-transform 0.8s;\
+        transform-origin: 100% 100%; transition: transform 0.8s;\
+        z-index: 1000;\
+      }\
+      #content.w_compact .tag1Line  .videoMenuToggle {\
+        transform: scale(0.41); -webkit-transform: scale(0.41);\
+      }\
+      #content.w_compact .tag2Lines .videoMenuToggle {\
+        transform: scale(0.8); -webkit-transform: scale(0.8);\
+      }\
       #content.w_compact #topVideoInfo .parentVideoInfo {\
         margin-top: -9px; margin-bottom: 9x;\
       }\
@@ -1611,7 +1647,7 @@
         background: #fff; margin: -24px 0 -12px; width: 80px; text-align: center;\
       }\
       #content.w_compact #videoDetailInformation .description {\
-        background: #fff; margin: 10px 0 0;padding: 4px 70px 4px 4px ;width: 866px; font-size: 90%;\
+        background: #fff; margin: 10px 0 0;padding: 4px ;width: 932px; font-size: 90%;\
       }\
       #content.w_compact #topVideoInfo .videoMainInfoContainer{\
         padding: 0; \
@@ -1717,13 +1753,6 @@
         margin: 0 22px 30px 0;\
       }\
       \
-      body:not(.videoSelection).size_normal #chorus_seekbar {\
-        -webkit-transform: scaleX(1.33);\
-        margin-left: 111px;\
-      }\
-      body:not(.videoSelection).size_normal #content #inspire_category {\
-        margin-left: 219px;\
-      }\
     '
     ].join(''); //
     addStyle(style, 'watchItLater');
@@ -1759,7 +1788,7 @@
 
   var ConfigPanel = (function(conf, w) {
     var pt = function(){};
-    var $panel = null;
+    var $panel = null, $shadow = null;
     var menus = [
       {title: '動画再生開始・終了時の設定'},
       {title: 'プレイヤーを自動で全画面化', varName: 'autoBrowserFull',
@@ -1905,27 +1934,36 @@
 
     pt.createPanelDom = function() {
       if ($panel === null) {
-        $panel = w.jQuery('<div id="watchItLaterConfigPanel"><h2>WatchItLater設定</h2><div class="inner"><ul></ul></div></div>');
+        $panel = w.jQuery([
+          '<div id="watchItLaterConfigPanel">',
+          '<div class="head"><button class="closeButton">&#9660;</button><h2>WatchItLaterの設定</h2>(※)のつく項目は、リロード後に反映されます</div>',
+          '<div class="inner"><ul></ul></div></div>'
+        ].join(''));
+
         var $ul = $panel.find('ul'), $item;
         for (var i = 0, len = menus.length; i < len; i++) {
           if (menus[i].varName) {
             $item = this.createMenuItem(menus[i]);
           } else {
             if (menus[i].description) {
-              $item = $('<li class="section">'+ menus[i].title + '<span class="description">'+ menus[i].description + '</span></li>');
+              $item = $('<li class="section" title="' + menus[i].title +'"><div><span>'+ menus[i].title + '</span><span class="description">'+ menus[i].description + '</span></div></li>');
             } else {
-              $item = $('<li class="section">'+ menus[i].title + '</li>');
+              $item = $('<li class="section" title="' +  menus[i].title + '"><div><span>'+ menus[i].title + '</span></div></li>');
             }
           }
           $item.toggleClass('debugOnly', menus[i].debugOnly === true).toggleClass('reload', menus[i].reload === true);
           $ul.append($item);
         }
-        var $close = w.jQuery('<p class="bottom">(※)のつく項目は、リロード後に反映されます　<button class="closeButton">閉じる</button></p>'), self = this;
-        $close.click(function() {
+        $panel.toggleClass('debugMode', conf.debugMode);
+        var $bottom = w.jQuery('<div class="foot"></div>'), self = this;
+        $panel.append($bottom);
+        $panel.find('.closeButton').click(function() {
           self.close();
         });
-        $panel.append($close);
-        $panel.toggleClass('debugMode', conf.debugMode);
+        if ($shadow === null) {
+          $shadow = $('<div id="watchItLaterConfigPanelShadow" />');
+          w.jQuery('body').append($shadow);
+        }
         w.jQuery('body').append($panel);
       }
     };
@@ -1984,7 +2022,7 @@
       return $menu;
     };
     pt.createTextMenuItem = function(menu) {
-      var title = menu.title, varName = menu.varName, values = menu.values;
+      var title = menu.title, varName = menu.varName;
       var $menu = w.jQuery('<li><p class="title">' + title + '</p></li>');
       if (menu.className) { $menu.addClass(menu.className);}
       if (menu.description) { $menu.attr('title', menu.description); }
@@ -2006,7 +2044,7 @@
     };
 
     pt.createKeyInputMenuItem = function(menu) {
-      var title = menu.title, varName = menu.varName, values = menu.values;
+      var title = menu.title, varName = menu.varName;
       var currentValue = conf.getValue(varName), currentKey = currentValue.char;
 
       function update() {
@@ -2050,8 +2088,8 @@
     pt.addChangeEventListener = function(callback) {
       listener.push(callback);
     };
-    pt.open = function() { $panel.show(200); };
-    pt.close = function() { $panel.hide(200); };
+    pt.open = function()  { $shadow.slideDown(400); $panel.slideDown(400); };
+    pt.close = function() { $shadow.slideUp(400);   $panel.slideUp(400); };
     pt.toggle = function() {
       this.createPanelDom();
       if ($panel.is(':visible')) {
@@ -3887,6 +3925,45 @@
     return self;
   })();
 
+  var SearchResultVideo = function() { this.initialize.apply(this, arguments); };
+  SearchResultVideo.prototype = {
+    id: 0,
+    length: 0,
+    mylist_counter: 0,
+    view_counter: 0,
+    num_res: 0,
+    first_retrieve: null,
+    thumbnail_url: null,
+    title: '',
+    type: 'video',
+    _info: {},
+    description_short: '',
+    initialize: function(info) {
+      this._info             = info._info || this;
+      this.id                = info.id;
+      this.length            = info.length;
+      this.mylist_counter    = info.mylist_counter || 0;
+      this.view_counter      = info.view_counter   || 0;
+      this.num_res           = info.num_res        || 0;
+      this.first_retrieve    = info.first_retrieve || '2000-01-01 00:00:00';
+      this.thumbnail_url     = info.thumbnail_url || 'http://res.nimg.jp/img/common/video_deleted_ja-jp.jpg';
+      this.title             = info.title || '';
+      this.type              = info.type || 'video';
+      this.description_short = info.description_short;
+    },
+    getType:        function() { return this.type; },
+    getInfo:        function() { return this; }, // 手抜き
+    getName:        function() { return this.title; },
+    getId:          function() { return this.id; },
+    getDescription: function() { return this.description_short; },
+
+    // マイリストAPIの応答にあるけど使ってなさそう？なので未実装
+    length_seconds: 0, // TODO:
+    create_time: parseInt(Date.now() / 1000, 10),  // TODO:
+    thread_update_time: '2000-01-01 00:00:00', // TODO:
+    mylist_comment: ''
+  };
+
 
   /**
    *  動画視聴履歴をマイリストAPIと互換のある形式で返すことで、ダミーマイリストとして表示してしまう作戦
@@ -3941,7 +4018,7 @@
               hoge
             ;
 
-            var item = {
+            var item = new SearchResultVideo({
               id: id,
               length: duration,
               mylist_counter: mylistCnt,
@@ -3950,22 +4027,9 @@
               first_retrieve: postedAt,
               thumbnail_url: thumbnail,
               title: title,
-              type: 'video',
               _info: {first_retrieve: postedAt},
-              description_short: $item.find('.section .posttime span').text(),
-              getType:        function() { return this.type; },
-              getInfo:        function() { return this;},
-              getName:        function() { return this.title;},
-              getId:          function() { return this.id; },
-              getDescription: function() { return ''; },
-
-              // マイリストAPIの応答にあるけど使ってなさそう？なので未実装
-              length_seconds: 0, // TODO:
-              create_time: parseInt(Date.now() / 1000, 10),  // TODO:
-              thread_update_time: '2000-01-01 00:00:00', // TODO:
-              mylist_comment: ''
-
-            };
+              description_short: $item.find('.section .posttime span').text()
+            });
             result.items.push(item);
           });
           result.page = 1;
@@ -4055,7 +4119,7 @@
             if (histories[video.id]) {
               delete histories[video.id];
             }
-            var item = {
+            var item = new SearchResultVideo({
               id: video.id,
               length: video.length,
               mylist_counter: video.mylist_counter,
@@ -4064,19 +4128,9 @@
               first_retrieve: video.first_retrieve,
               thumbnail_url:  video.thumbnail_url,
               title:          video.title_short,
-              type:           'video',
               _info: video,
-              description_short: '関連タグ: ' + video.recommend_tag,
-              getType: getType,
-              getInfo: function() { return this;},
-
-              // APIの応答みると必要そうだけど未実装
-              length_seconds: 0, // TODO:
-              create_time: parseInt(Date.now() / 1000, 10),  // TODO:
-              thread_update_time: '2000-01-01 00:00:00', // TODO:
-              mylist_comment: ''
-
-            };
+              description_short: '関連タグ: ' + video.recommend_tag
+            });
             histories[video.id] = item;
             //result.items.push(item);
           }
@@ -4206,7 +4260,7 @@
                 ownerPage = $item.find('.log-body a:last').attr('href');
               }
 
-              var item = {
+              var item = new SearchResultVideo({
                 id: id,
                 length: duration,
                 mylist_counter: mylistCnt,
@@ -4215,7 +4269,6 @@
                 first_retrieve: postedAt,
                 thumbnail_url: thumbnail,
                 title: title,
-                type: 'video',
                 _info: {
                   first_retrieve: postedAt,
                   nicorepo_className: this.className,
@@ -4227,20 +4280,8 @@
                     name: ownerName
                   }
                 },
-                description_short: description_short,
-                getType:        function() { return this.type; },
-                getInfo:        function() { return this;},
-                getName:        function() { return this.title;},
-                getId:          function() { return this.id; },
-                getDescription: function() { return ''; },
-
-                // マイリストAPIの応答にあるけど使ってなさそう？なので未実装
-                length_seconds: 0, // TODO:
-                create_time: parseInt(Date.now() / 1000, 10),  // TODO:
-                thread_update_time: '2000-01-01 00:00:00', // TODO:
-                mylist_comment: ''
-
-              };
+                description_short: description_short
+              });
               result.items.push(item);
             });
             result.page = 1;
@@ -4462,7 +4503,7 @@
         };
       $items.each(function() {
         var video = parseRssItem($(this));
-        var item = {
+        var item = new SearchResultVideo({
           id: video.id,
           length: video.duration,
           mylist_counter: video.mylistCnt,
@@ -4471,18 +4512,9 @@
           first_retrieve: video.postedAt,
           thumbnail_url: video.thumbnail,
           title: video.title,
-          type: 'video',
           _info: {first_retrieve: video.postedAt},
-          description_short: video.description.substring(0, 50),
-          getType: function() { return this.type; },
-          getInfo: function() { return this;},
-
-          // APIの応答みると必要そうだけど未実装
-          length_seconds: 0, // TODO:
-          create_time: parseInt(Date.now() / 1000, 10),  // TODO:
-          thread_update_time: '2000-01-01 00:00:00', // TODO:
-          mylist_comment: ''
-        };
+          description_short: video.description.substring(0, 50)
+        });
         result.items.push(item);
         result.itemCount++;
       });
@@ -5882,9 +5914,12 @@
         'body.videoSelection #content.w_adjusted #playlist { margin-left: ', xdiff, 'px; }\n',
         'body.videoSelection #searchResultExplorer.w_adjusted { min-height: ', (windowHeight + 200) ,'px !important; }\n',
 
-        'body.videoSelection #content.w_adjusted #chorus_seekbar {',
+        'body.videoSelection #content.w_adjusted #smart_music_kiosk {',
           '-webkit-transform: scaleX(', scaleX, ');',
           'left: ', ((availableWidth - seekbarWidth) / 2) ,'px !important;',
+        '}\n',
+        'body.videoSelection #content.w_adjusted #songrium_logo_mini {',
+          'left: ', (availableWidth + 5) ,'px !important;',
         '}\n',
         'body.videoSelection #content.w_adjusted #seekpoint rect{',
 //          '-webkit-transform: scaleX(', 1 / scaleX, ');',
@@ -6600,7 +6635,7 @@
 
     function initTags() {
       var $videoHeaderTagEditLinkArea = null, $toggleTagEditText = null, baseTagHeight = 72, currentHeight = 72;
-      var tagListView = watch.TagInitializer.tagViewController.tagListView;
+      var tagListView = watch.TagInitializer.tagViewController.tagListView, $videoHeader = $('.videoHeaderOuter');
 
       tagListView.getCurrentDefaultHeight_org = tagListView.getCurrentDefaultHeight;
       tagListView.getCurrentDefaultHeight = function() {
@@ -6622,15 +6657,18 @@
 
           if (baseTagHeight !== currentHeight) {
             var $toggle = $('#videoTagContainer').find('.toggleTagEdit');
-            $toggle.removeClass('oneLine').removeClass('twoLines');
+            $videoHeader.removeClass('tag1Line').removeClass('tag2Lines');
 
             if (currentHeight < 36) { // 1行以下の時
-              $toggle.addClass('oneLine');
+              $videoHeader.addClass('tag1Line');
             } else {
               if (currentHeight <= 60) { // 2行以下の時
-                $toggle.addClass('twoLines');
+                $videoHeader.addClass('tag2Lines');
               }
             }
+            watch.TagInitializer.tagViewController.tagListView.fit();
+          } else {
+            $videoHeader.removeClass('tag1Line').removeClass('tag2Lines');
             watch.TagInitializer.tagViewController.tagListView.fit();
           }
         } catch (e) {
@@ -6898,7 +6936,7 @@
         addStyle(squareCss, 'squareCss');
         isSquareCssInitialized = true;
       }
-      WatchApp.$('#resultlist').toggleClass('squareThumbnail', isSquare);
+      $('#resultlist').toggleClass('squareThumbnail', isSquare);
     }
 
     function initPageBottom($, conf, w) {
