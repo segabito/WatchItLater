@@ -15,7 +15,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130420
+// @version        1.130429
 // ==/UserScript==
 
 // TODO:
@@ -24,7 +24,12 @@
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
 
-// * ver 1.130420
+// * ver 1.130429
+// - 関連動画(オススメ)を開くショートカットキー追加 (「あなたにオススメの動画」とは違います)
+// - プレイリストのヘッダ部分をダブルクリックすると、現在の動画の位置にスクロールするようにした
+// - プレイリストのドラッグ中またはプレイリストの左右ボタン上でホイールを回すと左右移動できるようにした
+
+// * ver 1.130409
 // - 省スペースモードの調整
 
 // * ver 1.130409
@@ -443,6 +448,7 @@
       shortcutMylist:             {char: 'M', shift: false, ctrl: true , alt: false, enable: false}, // マイリスト登録のショートカット
       shortcutOpenSearch:         {char: 'S', shift: true,  ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
       shortcutOpenDefMylist:      {char: 'D', shift: true,  ctrl: false, alt: false, enable: false}, // とりマイオープンのショートカット
+      shortcutOpenRecommend:      {char: 'R', shift: true,  ctrl: false, alt: false, enable: false}, // 関連動画(オススメ)を開くショートカット
       shortcutCommentVisibility:  {char: 'V', shift: true,  ctrl: false, alt: false, enable: false}, // コメント表示ON/OFFのショートカット
       shortcutScrollToNicoPlayer: {char: 'P', shift: true,  ctrl: false, alt: false, enable: false}, // プレイヤーまでスクロールのショートカット
       shortcutShowOtherVideo:     {char: 'U', shift: true,  ctrl: false, alt: false, enable: false}, // 投稿者の関連動画表示のショートカット
@@ -574,7 +580,7 @@
       }\
       .tagItemsPopup, .playlistMenuPopup {\
         position: absolute; \
-        min-width: 150px; \
+        min-width: 200px; \
         font-Size: 10pt; \
         z-index: 2000000; \
         box-shadow: 2px 2px 2px #888;\
@@ -583,6 +589,7 @@
         position: relative; \
         list-style-type: none; \
         margin: 0; padding: 0; \
+        white-space: nowrap;\
       }\
       .playlistMenuPopup ul li {\
         cursor: pointer;\
@@ -1618,8 +1625,8 @@
         width: 940px;\
       }\
       .videoMenuToggle {\
-        -webkit-transform-origin: 100% 100%; -webkit-transition: -webkit-transform 0.8s;\
-        transform-origin: 100% 100%; transition: transform 0.8s;\
+        -webkit-transform-origin: 100% 100%; -webkit-transition: -webkit-transform 0.4s;\
+        transform-origin: 100% 100%; transition: transform 0.4s;\
         z-index: 1000;\
       }\
       #content.w_compact .tag1Line  .videoMenuToggle {\
@@ -1909,13 +1916,14 @@
       {title: 'とりあえずマイリスト登録',       varName: 'shortcutDefMylist',          type: 'keyInput'},
       {title: 'マイリスト登録',                 varName: 'shortcutMylist',             type: 'keyInput',
         description: '右下で選択中のマイリストに登録'},
-      {title: 'とりあえずマイリストを開く',            varName: 'shortcutOpenDefMylist',      type: 'keyInput'},
-      {title: '動画投稿者の関連動画を開く',       varName: 'shortcutShowOtherVideo',     type: 'keyInput'},
-      {title: '検索画面を開く',                 varName: 'shortcutOpenSearch',         type: 'keyInput'},
-      {title: 'コメント表示ON/OFF',              varName: 'shortcutCommentVisibility',  type: 'keyInput'},
+      {title: 'とりあえずマイリストを開く',           varName: 'shortcutOpenDefMylist',      type: 'keyInput'},
+      {title: '動画投稿者の関連動画を開く',           varName: 'shortcutShowOtherVideo',     type: 'keyInput'},
+      {title: '検索画面を開く',                       varName: 'shortcutOpenSearch',         type: 'keyInput'},
+      {title: '関連動画(オススメ)を開く',             varName: 'shortcutOpenRecommend',      type: 'keyInput'},
+      {title: 'コメント表示ON/OFF',                   varName: 'shortcutCommentVisibility',  type: 'keyInput'},
       {title: 'プレイヤーの位置までスクロール',       varName: 'shortcutScrollToNicoPlayer', type: 'keyInput'},
-      {title: 'ミュート',                       varName: 'shortcutMute',               type: 'keyInput'},
-      {title: 'コメントの背面表示ON/FF',          varName: 'shortcutDeepenedComment',    type: 'keyInput'},
+      {title: 'ミュート',                             varName: 'shortcutMute',               type: 'keyInput'},
+      {title: 'コメントの背面表示ON/FF',              varName: 'shortcutDeepenedComment',    type: 'keyInput'},
 
 
       {title: '実験中の設定', debugOnly: true},
@@ -3622,30 +3630,47 @@
       openUserVideo: function(userId, userNick) {
         watch.ComponentInitializer.videoSelection.showOtherUserVideos(userId, userNick);
       },
+      openRecommend: function() {
+        // memo: WatchApp.ns.init.ComponentInitializer.videoSelection.menuVC.buttonElementMap
+        watch.ComponentInitializer.videoSelection.menuVC.dispatchEvent('clicked', 'MenuType.buttonTypeRecommend');
+      },
       getMyNick: function() {
         return watch.CommonModelInitializer.viewerInfoModel.nickname;
       },
       getMyUserId: function() {
         return watch.CommonModelInitializer.viewerInfoModel.userId;
       },
-      shufflePlaylist: function() {
-        var x = watch.PlaylistInitializer.playlist.items;
+      shufflePlaylist: function(target) {
+        var x = watch.PlaylistInitializer.playlist.items, items = [], i;
+          if (target === 'right') {
+          for (i = 0; i < x.length;) {
+            if (x[0]._isPlaying) {
+              items.push(x.shift());
+              break;
+            } else {
+              items.push(x.shift());
+            }
+          }
+        }
+
         x = x.map(function(a){return {weight:Math.random(), value:a};})
           .sort(function(a, b){return a.weight - b.weight;})
           .map(function(a){return a.value;});
-        var items = [];
-        for (var i = 0; i < x.length; i++) {
+        for (i = 0; i < x.length; i++) {
           if (x[i]._isPlaying) {
             items.unshift(x[i]);
           } else {
             items.push(x[i]);
           }
         }
+        var pm = WatchApp.ns.view.playlist.PlaylistManager, pv = watch.PlaylistInitializer.playlistView, pl = watch.PlaylistInitializer.playlist;
+        var left = pm.getLeftSideIndex();
         watch.PlaylistInitializer.playlist.reset(
           items,
           watch.PlaylistInitializer.playlist.type,
           watch.PlaylistInitializer.playlist.option
         );
+        pv.scroll(left);
       },
       clearPlaylist: function(target) {
         var x = watch.PlaylistInitializer.playlist.items, items = [], i;
@@ -6267,6 +6292,46 @@
 
       var items = {};
 
+      // 表示位置調整
+      var toCenter = function() {
+        var pm = WatchApp.ns.view.playlist.PlaylistManager, pv = watch.PlaylistInitializer.playlistView, pl = watch.PlaylistInitializer.playlist;
+        var current = pl.getPlayingIndex(), cols = Math.floor($('#playlistContainerInner').innerWidth() / pm.getItemWidth()), center = Math.round(cols / 2);
+        if (cols < 1) { return; }
+        var currentLeft = pm.getLeftSideIndex();
+        pv.scroll(Math.max(0, current - center + 1));
+      };
+      var scroll = function(d) {
+        var isEffectEnabled = watch.PlaylistInitializer.playlistView.isEffectEnabled;
+        var left = WatchApp.ns.view.playlist.PlaylistManager.getLeftSideIndex();
+        watch.PlaylistInitializer.playlistView.isEffectEnabled = false;
+        watch.PlaylistInitializer.playlistView.scroll(Math.max(0, left + d));
+        watch.PlaylistInitializer.playlistView.isEffectEnabled = isEffectEnabled;
+      }
+      $('#playlist').find('.playlistInformation').on('dblclick.watchItLater', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toCenter();
+      });
+      EventDispatcher.addEventListener('onVideoInitialized', function() {
+        var pm = WatchApp.ns.view.playlist.PlaylistManager, pv = watch.PlaylistInitializer.playlistView, pl = watch.PlaylistInitializer.playlist;
+        var current = pl.getPlayingIndex(), cols = Math.floor($('#playlistContainerInner').innerWidth() / pm.getItemWidth()), center = Math.floor(cols / 2);
+        if (pm.getLeftSideIndex() + cols <= pl.getNextPlayingIndex()) { toCenter(); }
+      });
+      $('#playlistContainer .prevArrow, #playlistContainer .nextArrow').on('mousewheel.watchItLater', function(e, delta) {
+        e.preventDefault();
+        e.stopPropagation();
+        scroll(delta *-1);
+      }).attr('title', 'ホイールで左右に移動');
+      EventDispatcher.addEventListener('onWheelAndButton', function(e, delta, button) {
+        if ($('#playlist').hasClass('dragging')) {
+          e.preventDefault();
+          scroll(delta *-1);
+        }
+      });
+      //
+      //
+
+
       function updatePos() {
         if (
           conf.hashPlaylistMode === 2 || (conf.hashPlaylistMode === 1 && WatchController.isPlaylistActive())) {
@@ -6442,11 +6507,16 @@
           $popup.click(function() {
             self.hide();
           });
-          var $shuffle = $('<li>リストをシャッフル</li>').click(function() {
+          var $shuffle = $('<li >シャッフル: 全体</li>').click(function(e) {
             WatchController.shufflePlaylist();
             enableContinuous();
           });
           $ul.append($shuffle);
+          var $shuffleR = $('<li >シャッフル: 右</li>').click(function(e) {
+            WatchController.shufflePlaylist('right');
+            enableContinuous();
+          });
+          $ul.append($shuffleR);
 
           var $next = $('<li>検索結果を追加： 次に再生</li>').click(function() {
             WatchController.appendSearchResultToPlaylist('next');
@@ -7040,45 +7110,56 @@
 
 
     function initShortcutKey() {
-      var
-        defMylist         = KeyMatch.create(conf.shortcutDefMylist),
-        mylist            = KeyMatch.create(conf.shortcutMylist),
-        openDefMylist     = KeyMatch.create(conf.shortcutOpenDefMylist),
-        openSearch        = KeyMatch.create(conf.shortcutOpenSearch),
-        scrollToPlayer    = KeyMatch.create(conf.shortcutScrollToNicoPlayer),
-        commentVisibility = KeyMatch.create(conf.shortcutCommentVisibility),
-        showOtherVideo    = KeyMatch.create(conf.shortcutShowOtherVideo),
-        mute              = KeyMatch.create(conf.shortcutMute),
-        deepenedComment   = KeyMatch.create(conf.shortcutDeepenedComment)
-        ;
+      var list = [
+        {name: 'shortcutDefMylist',          exec: function(e) {
+          WatchController.addDefMylist();
+        }},
+        {name: 'shortcutMylist',             exec: function(e) {
+          $('#mylist_add_frame').find('.mylistAdd').click();
+        }},
+        {name: 'shortcutOpenDefMylist',      exec: function(e) {
+          WatchController.showDefMylist();
+          WatchController.scrollToVideoPlayer(true);
+        }},
+        {name: 'shortcutOpenSearch',         exec: function(e) {
+          WatchController.openSearch();
+          if (!$('body').hasClass('content-fix')) {
+            WatchController.scrollToVideoPlayer(true);
+          }
+        }},
+        {name: 'shortcutOpenRecommend',      exec: function(e) {
+          WatchController.openRecommend();
+          if (!$('body').hasClass('content-fix')) {
+            WatchController.scrollToVideoPlayer(true);
+          }
+        }},
+        {name: 'shortcutScrollToNicoPlayer', exec: function(e) {
+          WatchController.scrollToVideoPlayer(true);
+        }},
+        {name: 'shortcutCommentVisibility',  exec: function(e) {
+          WatchController.commentVisibility('toggle');
+        }},
+        {name: 'shortcutShowOtherVideo',     exec: function(e) {
+          $('.showOtherVideos:first').click();
+        }},
+        {name: 'shortcutMute',               exec: function(e) {
+          WatchController.mute('toggle');
+        }},
+        {name: 'shortcutDeepenedComment',    exec: function(e) {
+          WatchController.deepenedComment('toggle');
+        }},
+      ];
+      for (var v in list) {
+        var n = list[v].name;
+        list[v].keyMatch = KeyMatch.create(conf[n]);
+      }
 
       ConfigPanel.addChangeEventListener(function(name, newValue, oldValue) {
-        if (name === 'shortcutDefMylist') {
-          defMylist = KeyMatch.create(conf.shortcutDefMylist);
-        } else
-        if (name === 'shortcutOpenDefMylist') {
-          openDefMylist = KeyMatch.create(conf.shortcutOpenDefMylist);
-        } else
-        if (name === 'shortcutOpenSearch') {
-          openSearch = KeyMatch.create(conf.shortcutOpenSearch);
-        } else
-        if (name === 'shortcutScrollToNicoPlayer') {
-          scrollToPlayer = KeyMatch.create(conf.shortcutScrollToNicoPlayer);
-        } else
-        if (name === 'shortcutCommentVisibility') {
-          commentVisibility = KeyMatch.create(conf.shortcutCommentVisibility);
-        } else
-        if (name === 'shortcutMylist') {
-          mylist = KeyMatch.create(conf.shortcutMylist);
-        } else
-        if (name === 'shortcutMute') {
-          mute   = KeyMatch.create(conf.shortcutMute);
-        } else
-        if (name === 'shortcutShowOtherVideo') {
-          showOtherVideo = KeyMatch.create(conf.shortcutShowOtherVideo);
-        } else
-        if (name === 'shortcutDeepenedComment') {
-          deepenedComment = KeyMatch.create(conf.shortcutDeepenedComment);
+        for (var v in list) {
+          var n = list[v].name;
+          if (n === name) {
+            list[v].keyMatch = KeyMatch.create(newValue);
+          }
         }
       });
 
@@ -7114,36 +7195,11 @@
           }
         }
 */
-        if (defMylist.test(e)) {
-          WatchController.addDefMylist();
-        }
-        if (openDefMylist.test(e)) {
-          WatchController.showDefMylist();
-          WatchController.scrollToVideoPlayer(true);
-        }
-        if (openSearch.test(e)) {
-          WatchController.openSearch();
-          if (!$('body').hasClass('content-fix')) {
-            WatchController.scrollToVideoPlayer(true);
+        for (var v in list) {
+          var n = list[v].name;
+          if (list[v].keyMatch.test(e)) {
+            list[v].exec(e);
           }
-        }
-        if (scrollToPlayer.test(e)) {
-          WatchController.scrollToVideoPlayer(true);
-        }
-        if (commentVisibility.test(e)) {
-          WatchController.commentVisibility('toggle');
-        }
-        if (mylist.test(e)) {
-          $('#mylist_add_frame').find('.mylistAdd').click();
-        }
-        if (showOtherVideo.test(e)) {
-          $('.showOtherVideos:first').click();
-        }
-        if (mute.test(e)) {
-          WatchController.mute('toggle');
-        }
-        if (deepenedComment.test(e)) {
-          WatchController.deepenedComment('toggle');
         }
       });
     }
@@ -7165,13 +7221,29 @@
 
       function initWheelWatch() {
         var leftDown = false, rightDown = false, isVolumeChanged = false;
+        var event = {
+          cancel: false,
+          reset: function() { this.cancel = false; return this; },
+          preventDefault: function() { this.cancel = true;}
+        };
         $('body').on('mousewheel.watchItLaterWheelWatch', function(e, delta) {
+          var button = -1;
           // TODO: マジックナンバーを
           if (typeof e.buttons === 'number') { // firefox
-            if (e.buttons < 1 || conf.mouseClickWheelVolume != e.buttons) { return; }
+            button = e.buttons;
           } else { // chrome
-            if (conf.mouseClickWheelVolume === 1 && !leftDown)  { return; }
-            if (conf.mouseClickWheelVolume === 2 && !rightDown) { return; }
+            if (leftDown)  { button = 1; }
+            else
+            if (rightDown) { button = 2; }
+          }
+          if (button < 1) { return; }
+          EventDispatcher.dispatch('onWheelAndButton', event.reset(), delta, button);
+          if (event.cancel) {
+            e.preventDefault();
+            return;
+          }
+          if (conf.mouseClickWheelVolume !== button) {
+            return;
           }
 
           var v = WatchController.volume();
@@ -7199,9 +7271,9 @@
           isVolumeChanged = false;
         });
       }
-      if (conf.mouseClickWheelVolume > 0) {
+//      if (conf.mouseClickWheelVolume > 0) {
         initWheelWatch();
-      }
+//      }
     }
 
     function initTouch() {
