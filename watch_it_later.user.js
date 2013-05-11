@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130504
+// @version        1.130511
 // ==/UserScript==
 
 // TODO:
@@ -25,6 +25,10 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130511
+// - ニコレポにもマイリストコメントが出るようにした
+// - 投稿者アイコンをクリックした時は、その投稿者のニコレポが出るようにした
 
 // * ver 1.130504
 // - 検索画面の動画ランキングのソートを変更できるようにした。 ランキングの新作動画を探すのに便利
@@ -3838,6 +3842,13 @@
           return '';
         }
       },
+      getOwnerId: function() {
+        try {
+          return watchInfoModel.uploaderInfo.id;
+        } catch (e) {
+          return '0';
+        }
+      },
       isFavoriteOwner: function() {
         try {
           return watchInfoModel.uploaderInfo.isFavorited || !!(watchInfoModel.channelInfo && watchInfoModel.channelInfo.isFavorited);
@@ -4095,7 +4106,7 @@
       this.description_short = info.description_short;
       this.length            = info.length         || '00:00';
       this.length_seconds    = parseInt(info.length_seconds || 0, 10);
-      this.mylist_comment    = info.mylist_comment || '';
+      this._info.mylist_comment = info.mylist_comment || '';
 
       if (this.length_seconds === 0 && this.length && this.length.indexOf(':') >= 0) {
         var sp = this.length.split(':');
@@ -4291,6 +4302,9 @@
       } else
       if (type === 'mylist') {
         return base + 'お気に入りマイリストの動画';
+      } else
+      if (type === 'owner') {
+        return WatchController.getOwnerName() + 'のニコレポ';
       }
       return base + 'お気に入りユーザーの動画';
     }
@@ -4301,11 +4315,14 @@
       try{
           watch = w.WatchApp.ns.init;
           $ = w.$;
-          url = '/recommendations';
+          url = '';
           myNick = WatchController.getMyNick();
           myId = WatchController.getMyUserId();
           type = param.type ? param.type : 'user';
           baseUrl = '/my/top/' + type + '?innerPage=1&mode=next_page';
+          if (param.userId) {
+            baseUrl = '/user/'+ param.userId +'/top?innerPage=1&mode=next_page';
+          }
       } catch (e) {
         if (conf.debugMode) console.log(e);
         throw { message: 'エラーが発生しました', status: 'fail'};
@@ -4341,6 +4358,7 @@
               '.log-user-mylist-add',
               '.log-user-uad-advertise',
               '.log-user-video-upload',
+              '.log-user-video-review',
               '.log-mylist-added-video',
               '.log-community-video-upload',
               '.log-user-video-round-number-of-view-counter',
@@ -4361,7 +4379,9 @@
                 ownerMatch = ownerReg.exec(ownerPage),
                 ownerName  = $owner.text(),
                 ownerId    = (ownerMatch !== null && ownerMatch.length >= 3) ? ownerMatch[2] : null,
-                ownerIcon  = $item.find('.log-author img').attr('data-src');
+                ownerIcon  = $item.find('.log-author img').attr('data-src'),
+                mylistComment = $item.find('.log-content .log-subdetails').text()
+                ;
 
               $item.removeClass('log').removeClass('passive').removeClass('first');
               if (this.className === 'log-mylist-added-video') {
@@ -4377,6 +4397,7 @@
                 num_res: resCnt,
                 first_retrieve: postedAt,
                 thumbnail_url: thumbnail,
+                mylist_comment: mylistComment,
                 title: title,
                 _info: {
                   first_retrieve: postedAt,
@@ -4443,6 +4464,7 @@
       REPO_USER:   -11,
       REPO_CHCOM:  -12,
       REPO_MYLIST: -13,
+      REPO_OWNER:  -14,
       loadAll:    function(callback, p) {
         p = p || {};
         p.type = 'all';
@@ -4461,6 +4483,12 @@
       loadMylist: function(callback, p) {
         p = p || {};
         p.type = 'mylist';
+        self.load(callback, p);
+      },
+      loadOwner: function(callback, p) {
+        p = p || {};
+        p.type = 'owner';
+        p.userId = WatchController.getOwnerId();
         self.load(callback, p);
       }
     };
@@ -5313,6 +5341,11 @@
           $('#ch_prof').clone(true).attr('id', null)
             .addClass('ch_profile').find('a').attr('target', '_blank')
         );
+      $videoOwnerInfoContainer.find('.userIconLink').on('click', function(e) {
+        if (e.button != 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) { return; }
+        e.preventDefault();
+        WatchController.showMylist(NicorepoVideo.REPO_OWNER);
+      });
 
       $leftInfoPanel.find('*').unbind();
       $leftInfoPanel.empty().scrollTop(0).toggleClass('isFavorite', isFavorite).toggleClass('isChannel', watchInfoModel.isChannelVideo());
@@ -5768,6 +5801,9 @@
                 } else
                 if (p.id == NicorepoVideo.REPO_MYLIST) {
                   NicorepoVideo.loadMylist(onload, p);
+                } else
+                if (p.id == NicorepoVideo.REPO_OWNER) {
+                  NicorepoVideo.loadOwner(onload, p);
                 } else
                 if (typeof VideoRanking.getGenreName(p.id) === 'string') {
                   $('#resultContainer').addClass('ranking');
@@ -7531,3 +7567,4 @@
     monkey(true);
   }
 })();
+
