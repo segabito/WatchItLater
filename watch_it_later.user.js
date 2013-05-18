@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130511
+// @version        1.130518
 // ==/UserScript==
 
 // TODO:
@@ -25,6 +25,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130518
+// - 「@ジャンプ」によるシークの無効化または回数制限を追加。無限ループ動画の回数を制限できます
 
 // * ver 1.130511
 // - ニコレポにもマイリストコメントが出るようにした
@@ -417,6 +420,7 @@
       headerViewCounter: false, // ヘッダに再生数コメント数を表示
       popupViewCounter: 'full', // 動画切り替わり時にポップアップで再生数を表示
       ignoreJumpCommand: false, // @ジャンプ無効化
+      nicoSSeekCount: -1, // @ジャンプによるシーク(ループなど)を許可する回数 -1=無限 0以上はその回数だけ許可
       doubleClickScroll: true, // 空白部分ををダブルクリックで動画の位置にスクロールする
       hidePlaylist: true, // プレイリストを閉じる
       hidariue: true, // てれびちゃんメニュー内に、原宿以前のランダム画像復活
@@ -1915,6 +1919,9 @@
       {title: '「@ジャンプ」を無効化', varName: 'ignoreJumpCommand', reload: true,
         description: '勝手に他の動画に飛ばされる機能を無効化します。',
         values: {'する': true, 'しない': false}},
+      {title: '「@ジャンプ」によるシーク無効化(無限ループなど)', varName: 'nicoSSeekCount', reload: true,
+        description: '完全に無効にする以外に、一動画あたりの回数を指定できます',
+        values: {'2回まで有効': 2, '1回まで有効': 1, '完全無効化': 0, 'しない': -1}},
       {title: 'タッチパネル向けモード(画面を右フリックで開始)', varName: 'enableQTouch',
         description: '指で操作しやすいように、一部のボタンやメニューが大きくなります',
         values: {'使う': true, '使わない': false}},
@@ -7282,6 +7289,30 @@
       });
     }
 
+    function initNicoS($, conf, w) {
+      WatchJsApi.nicos.addEventListener('nicoSJump', function(e) {
+        if (conf.ignoreJumpCommand) {
+          e.cancel();
+          Popup.show('「@ジャンプ」コマンドをキャンセルしました');
+        }
+      });
+      var seekCount = 0;
+      WatchApp.ns.model.player.NicoSClientConnector.addEventListener('nicoSSeek', function(e) {
+        seekCount++;
+        if (conf.nicoSSeekCount < 0) return;
+        if (seekCount > conf.nicoSSeekCount) {
+          e.cancel();
+        }
+      });
+      // 動画が切り替わったか、最後まで視聴したらカウンターリセット
+      EventDispatcher.addEventListener('onVideoInitialized', function() {
+        seekCount = 0;
+      });
+      EventDispatcher.addEventListener('onVideoEnded', function() {
+        seekCount = 0;
+      });
+    }
+
     function initMouse() {
       ConfigPanel.addChangeEventListener(function(name, newValue, oldValue) {
         if (name === 'mouseClickWheelVolume') {
@@ -7439,14 +7470,6 @@
 
       if (conf.compactVideoInfo) $('#content, #outline').addClass('w_compact');
 
-
-      WatchJsApi.nicos.addEventListener('nicoSJump', function(e) {
-        if (conf.ignoreJumpCommand) {
-          e.cancel();
-          Popup.show('「@ジャンプ」コマンドをキャンセルしました');
-        }
-      });
-
       onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
 
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
@@ -7480,6 +7503,7 @@
     initPanelSlider($, conf, w);
     initTags();
     initMylist($);
+    initNicoS($, conf, w);
     initOther();
 
     onWindowResize();
