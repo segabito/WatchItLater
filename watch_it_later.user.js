@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130527
+// @version        1.130528
 // ==/UserScript==
 
 // TODO:
@@ -25,6 +25,10 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130528
+// - 右パネルに動画情報・市場・レビューを表示する設定を追加(実験中)
+// - 省スペースモード時、動画タイトルの無駄なスペースをより省けるように調整
 
 // * ver 1.130527
 // - プレイヤー下の要素をまとめて消す設定を追加
@@ -913,7 +917,7 @@
         background: none;\
       }\
 \
-      .videoInfo  .sideVideoInfo.isFavorite .userName:after, .videoInfo  .sideVideoInfo.isFavorite.isChannel .videoOwnerInfoContainer:after{\
+      .sideVideoInfo.isFavorite .userName:after, .sideVideoInfo.isFavorite.isChannel .videoOwnerInfoContainer:after{\
         content: \'★\'; color: gold; text-shadow: 1px 1px 1px black; \
       }\
 \
@@ -933,13 +937,13 @@
       }\
       #sidePanelTabContainer {\
         display: none;\
-        background: #666; position: absolute; list-style-type: none;\
+        position: absolute; list-style-type: none;\
         padding: 10px 6px 3px 0; right: -396px;top: 0; width: 350px; height: 50px;\
                 transform: rotate(90deg);         transform-origin: 0 0 0;\
         -webkit-transform: rotate(90deg); -webkit-transform-origin: 0 0 0;\
       }\
       body:not(.videoSelection) #sidePanelTabContainer.left {\
-        right: 300px;\
+        background: #000 /* firefoxはこれがないと欠ける */; right: auto; left: -375px; padding: 0;\
                 transform: rotate(-90deg);         transform-origin: 100% 0 0;\
         -webkit-transform: rotate(-90deg); -webkit-transform-origin: 100% 0 0;\
       }\
@@ -1710,6 +1714,12 @@
         transform-origin: 100% 100%; transition: transform 0.4s;\
         z-index: 1000;\
       }\
+      #content.w_compact .videoHeaderTitle {\
+        letter-spacing: -1px;\
+      }\
+      #content.w_compact .videoDetailExpand .arrow {\
+        position: absolute; top: 8px; right: -24px;\
+      }\
       #content.w_compact .tag1Line  .videoMenuToggle {\
         transform: scale(0.41); -webkit-transform: scale(0.41);\
       }\
@@ -1810,25 +1820,6 @@
       #outline.w_compact #nicommendList {\
         margin-top: 4px;\
       }\
-      /* 広告とレビューの幅が違ってて気持ち悪いので合わせる */\
-      /*#outline.w_compact #videoReview {\
-        margin: 16px 0 0; width: 300px;\
-      }\
-      #outline.w_compact textarea.newVideoReview {\
-        width: 277px;\
-      }\
-      #outline.w_compact #videoReviewHead {\
-        width: 283px;\
-      }\
-      #outline.w_compact .stream, #outline.w_compact .inner {\
-        width: 300px;\
-      }\
-      #outline.w_compact .commentConent, #outline.w_compact .resContainer {\
-        width: 278px;\
-      }\
-      #outline.w_compact .commentContentBody {\
-        width: 232px;\
-      }*/\
       #outline.w_compact .sidebar { width: 300px; }\
       \
       #outline.w_compact .outer {\
@@ -1842,8 +1833,6 @@
         margin: 0 22px 30px 0;\
       }\
       #footer     { z-index: 1; }\
-      #foot_inner { width: 940px; }\
-      html { background: #141414; }\
       \
     '
     ].join(''); //
@@ -1911,6 +1900,8 @@
       {title: '左のパネルを消滅させる', varName: 'removeLeftPanel',
         values: {'する': true, 'しない': false}, addClass: true},
       {title: '左のパネルに動画情報・市場を表示', varName: 'leftPanelJack', reload: true,
+        values: {'する': true, 'しない': false}},
+      {title: '右のパネルに動画情報・市場・レビューを表示(実験中)', varName: 'rightPanelJack',
         values: {'する': true, 'しない': false}},
       {title: 'ページのヘッダに再生数表示', varName: 'headerViewCounter', reload: true,
         values: {'する': true, 'しない': false}},
@@ -2019,9 +2010,7 @@
 
       {title: '実験中の設定', debugOnly: true},
       {title: 'プレイリスト消えないモード(※実験中)',       varName: 'hashPlaylistMode', debugOnly: true, reload: true,
-        values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}},
-      {title: '右のパネルに動画情報・市場・レビューを表示', varName: 'rightPanelJack',   debugOnly: true, reload: true,
-        values: {'する': true, 'しない': false}}
+        values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}}
 
     ];
 
@@ -3843,7 +3832,7 @@
         if (currentItem) { playlist.playingItem = currentItem; }
       },
       addDefMylist: function(description) {
-        var watchId = watch.CommonModelInitializer.watchInfoModel.id;
+        var watchId = watchInfoModel.id;
         setTimeout(function() {
           Mylist.addDefListItem(watchId, function(status, result, replaced) {
             Mylist.reloadDefList();
@@ -4917,11 +4906,11 @@
       vs    = watch.ComponentInitializer.videoSelection,
       isSearchOpen = false,
       $leftPanel     = $('#leftPanel').addClass('sidePanel'),
-      $leftInfoPanel = $('#leftPanelContent').clone().empty().attr({'id': 'leftVideoInfo',    'class': 'sideVideoInfo sidePanelInner'}),
-      $ichibaPanel   = $('#leftPanelContent').clone().empty().attr({'id': 'leftIchibaPanel',  'class': 'sideIchibaPanel sidePanelInner'}),
-      $rightInfoPanel   = $leftInfoPanel.clone()             .attr({'id': 'rightVideoInfo',   'class': 'sideVideoInfo sidePanelInner'}),
-      $rightIchibaPanel = $leftInfoPanel.clone()             .attr({'id': 'rightIchibaPanel', 'class': 'sideIchibaPanel sidePanelInner'}),
+      $leftInfoPanel = $('<div/>').attr({'id': 'leftVideoInfo',    'class': 'sideVideoInfo sidePanelInner'}),
+      $ichibaPanel   = $('<div/>').attr({'id': 'leftIchibaPanel',  'class': 'sideIchibaPanel sidePanelInner'}),
       $rightPanel = $('#playerCommentPanelOuter').addClass('sidePanel');
+    var watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
+
   //  var flashVars = pim.playerInitializeModel.flashVars;
 
     /**
@@ -5072,13 +5061,13 @@
     }
 
     function watchVideoStatus() {
-      var video_length = WatchApp.namespace.init.CommonModelInitializer.watchInfoModel.length;
+      var video_length = watchInfoModel.length;
       watchVideoId();
     }
 
     function watchVideoId() {
-      var newVideoId = w.WatchApp.namespace.init.CommonModelInitializer.watchInfoModel.id;
-      var newWatchId = w.WatchApp.namespace.init.CommonModelInitializer.watchInfoModel.v;
+      var newVideoId = watchInfoModel.id;
+      var newWatchId = watchInfoModel.v;
       if (video_id !== newVideoId) {
         onVideoChange(newVideoId, newWatchId);
         video_id = newVideoId;
@@ -5123,7 +5112,6 @@
     }
 
     function initVideoCounter() {
-      var watchInfoModel = watch.CommonModelInitializer.watchInfoModel;
       EventDispatcher.addEventListener('onWatchInfoReset', function(watchInfoModel){
         setVideoCounter(watchInfoModel, true);
       });
@@ -5198,12 +5186,12 @@
       AnchorHoverPopup.hidePopup().updateNow();
       tagv = watch.TagInitializer.tagViewController;
       pim  = watch.PlayerInitializer.playerInitializeModel;
-      var newVideoId = watch.CommonModelInitializer.watchInfoModel.id;
-      var newWatchId = watch.CommonModelInitializer.watchInfoModel.v;
+      var newVideoId = watchInfoModel.id;
+      var newWatchId = watchInfoModel.v;
       iframe.watchId(newVideoId, newWatchId);
       iframe.show();
       WatchCounter.add();
-//      $('body').toggleClass('w_channel', watch.CommonModelInitializer.watchInfoModel.isChannelVideo());
+//      $('body').toggleClass('w_channel', watchInfoModel.isChannelVideo());
 
       if (isFirst) {
         if (conf.autoPlayIfWindowActive === 'yes' && w.document.hasFocus()) {
@@ -5357,7 +5345,6 @@
 
     function sidePanelJack($sideInfoPanel, $ichibaPanel, $sidePanel, $template) {
 
-      var watchInfoModel = watch.CommonModelInitializer.watchInfoModel;
       var uploaderId = watchInfoModel.uploaderInfo.id, isFavorite = WatchController.isFavoriteOwner();
       var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
       var h = $sideInfoPanel.innerHeight() - 100, $inner = $('<div/>');
@@ -5526,7 +5513,7 @@
     var lastIchibaVideoId = 0;
     function resetLeftIchibaPanel($ichibaPanel, force) {
       if (!conf.leftPanelJack) { return; }
-      var videoId = watch.CommonModelInitializer.watchInfoModel.id;
+      var videoId = watchInfoModel.id;
       if (lastIchibaVideoId === videoId && !force) {
         return;
       }
@@ -5536,7 +5523,7 @@
     }
 
     function resetSideIchibaPanel($ichibaPanel, force) {
-      var watchInfoModel = watch.CommonModelInitializer.watchInfoModel, videoId = watchInfoModel.id;
+      var videoId = watchInfoModel.id;
 
       $ichibaPanel.scrollTop(0);
       $ichibaPanel.empty();
@@ -6590,7 +6577,7 @@
         WatchController.clearPlaylist();
         var currentItem = playlist.items[0];
         if (!currentItem) {
-          var wm = watch.CommonModelInitializer.watchInfoModel;
+          var wm = watchInfoModel;
           currentItem = new PlaylistItem({
             id:             wm.v,
             title:          wm.title,
@@ -6612,7 +6599,7 @@
 
           if (uniq[id]) { continue; }
           uniq[id] = true;
-          if (id == watch.CommonModelInitializer.watchInfoModel.v) {
+          if (id == watchInfoModel.v) {
             currentIndex = i;
             newItems.push(currentItem);
           } else {
@@ -6960,8 +6947,8 @@
       watch.TagInitializer.tagList.addEventListener('reset', onTagReset);
     }
 
-    function initRightPanel($rightInfoPanel, $rightIchibaPanel, $rightPanel) {
-      initRightPanelJack($rightInfoPanel, $rightIchibaPanel, $rightPanel);
+    function initRightPanel($rightPanel) {
+      initRightPanelJack($rightPanel);
       var $playerCommentPanelOuter = $rightPanel, wideCss = null;
       function initWideCommentPanelCss(targetWidth) {
         var px = targetWidth - $rightPanel.outerWidth();
@@ -7023,13 +7010,24 @@
 
     // - 右パネル乗っ取る
     var rightInfoPanelInitialized = false;
-    function initRightPanelJack($infoPanel, $ichibaPanel, $sidePanel) {
+    function initRightPanelJack($sidePanel) {
       if (!conf.rightPanelJack) { return; }
       if (rightInfoPanelInitialized) { return; }
       rightInfoPanelInitialized = true;
 
-      var $tab = $('<ul id="sidePanelTabContainer"><li class="tab comment" data-selection="w_comment">コメント</li><li class="tab videoInfo" data-selection="w_videoInfo">動画情報</li><li class="tab ichiba" data-selection="w_ichiba">ニコニコ市場</li><li class="tab review" data-selection="w_review">レビュー</li></ul>');
-      $sidePanel.append($tab).append($infoPanel).append($ichibaPanel).append($infoPanel.clone().attr({'id' :'rightReviewPanel', 'class': 'sideReviewPanel sidePanelInner'}));
+      var $tab = $(
+        [
+          '<ul id="sidePanelTabContainer">',
+          '<li class="tab comment" data-selection="w_comment">コメント</li>',
+          '<li class="tab videoInfo" data-selection="w_videoInfo">動画情報</li>',
+          '<li class="tab ichiba" data-selection="w_ichiba">ニコニコ市場</li>',
+          '<li class="tab review" data-selection="w_review">レビュー</li>',
+          '</ul>'
+        ].join(''));
+      var $infoPanel   = $('<div/>').attr({'id': 'rightVideoInfo',   'class': 'sideVideoInfo   sidePanelInner'});
+      var $ichibaPanel = $('<div/>').attr({'id': 'leftIchibaPanel',  'class': 'sideIchibaPanel sidePanelInner'});
+      var $reviewPanel = $('<div/>').attr({'id': 'rightReviewPanel', 'class': 'sideReviewPanel sidePanelInner'});
+      $sidePanel.append($tab).append($infoPanel).append($ichibaPanel).append($reviewPanel);
 
       var onTabSelect = function(e) {
         e.preventDefault();
@@ -7042,7 +7040,7 @@
       };
       var $videoReview = $('#videoReview'), toggleReview = function(f) {
         if (f) {
-          $('#rightReviewPanel').append($videoReview);
+          $reviewPanel.append($videoReview);
         } else {
           $('#playerBottomAd').after($videoReview);
         }
@@ -7059,11 +7057,13 @@
           toggleReview(true);
         } else
         if (selection === 'w_comment') {
-          setTimeout(function() { watch.PlaylistInitializer.playlistView.resetView(); }, 500);
+          setTimeout(function() {
+            watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
+           }, 500);
         }
       };
       var lastIchibaVideoId = '', resetIchiba = function(force) {
-        var videoId = watch.CommonModelInitializer.watchInfoModel.id;
+        var videoId = watchInfoModel.id;
         if (lastIchibaVideoId === videoId && !force) {
           return;
         }
@@ -7076,6 +7076,7 @@
 
       $infoPanel  .on('dblclick', resetScroll);
       $ichibaPanel.on('dblclick', resetScroll);
+      $reviewPanel.on('dblclick', resetScroll);
 
       $tab.on('click', onTabSelect).on('touchend', onTabSelect);
       changeTab(conf.lastRightTab);
@@ -7100,7 +7101,7 @@
       ''].join(''));
 
       EventDispatcher.addEventListener('onWindowResize', function() {
-        var $body = $('body'), $left = $('#leftPanel'), $right = $sidePanel;//$('#playerCommentPanelOuter');
+        var $body = $('body'), $left = $('#leftPanel'), $right = $('#playerCommentPanelOuter');
         if ($body.hasClass('videoSelection') || $body.hasClass('full_with_browser')) { return; }
         var w = $('#external_nicoplayer').outerWidth(), margin = 84;
         w += $left.is(':visible')  ? $left.outerWidth()  : 0;
@@ -7109,12 +7110,12 @@
       });
 
       EventDispatcher.addEventListener('onVideoInitialized', function() {
-        sidePanelJack($rightInfoPanel, $ichibaPanel, $sidePanel, $infoPanelTemplate.clone());
+        sidePanelJack($infoPanel, $ichibaPanel, $sidePanel, $infoPanelTemplate.clone());
         if ($ichibaPanel.is(':visible')) {
           resetIchiba(true);
         }
         setTimeout(function() {
-          $sidePanel.toggleClass('reviewEmpty', $('#videoReview').find('.stream').length < 1)
+          $sidePanel.toggleClass('reviewEmpty', $('#videoReview').find('.stream').length < 1);
         }, 2000);
       });
     } //
@@ -7150,6 +7151,18 @@ body.videoSelection .sidePanel.w_review #videoReview .stream { width: 400px; }
 body.videoSelection .sidePanel.w_review #videoReview .inner { width: 400px; }
 body.videoSelection .sidePanel.w_review .commentContent { width: 378px; }
 body.videoSelection .sidePanel.w_review .commentContentBody { width: 332px; }
+
+body:not(.videoSelection) .sidePanel .commentUserProfile {
+  display: none;
+}
+body.videoSelection .sidePanel .commentUserProfile {
+  position: fixed;
+  top:  36px !important;
+  left: auto !important;
+  right:  0 !important;
+  z-index: 11000;
+}
+
       */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1];
       var reviewCss = addStyle(__css__, 'videoReviewCss');
 
@@ -7206,7 +7219,7 @@ body.videoSelection .sidePanel.w_review .commentContentBody { width: 332px; }
       // watch.WatchInitializer.watchModel.addEventListener('error', function() {console.log(arguments);});
 
 
-      watch.CommonModelInitializer.watchInfoModel.addEventListener('reset', onWatchInfoReset);
+      watchInfoModel.addEventListener('reset', onWatchInfoReset);
       watch.PlayerInitializer.playerScreenMode.addEventListener('change', onScreenModeChange);
 
       vs.addEventListener("videoSelectPanelOpeningEvent", onVideoSelectPanelOpening);
@@ -7410,7 +7423,7 @@ body.videoSelection .sidePanel.w_review .commentContentBody { width: 332px; }
         $('#outline').toggleClass('noReview', v === 'hidden');
       }
       function updateBottomContentsVisibility(v) {
-        $('#bottomContentTabContainer').toggleClass('noBottom', v === 'hidden');
+        $('#bottomContentTabContainer, #footer').toggleClass('noBottom', v === 'hidden');
       }
       EventDispatcher.addEventListener('on.config.hideVideoExplorerExpand',     updateHideVideoExplorerExpand);
       EventDispatcher.addEventListener('on.config.nicommendVisibility',         updateNicommendVisibility);
@@ -7706,6 +7719,15 @@ body.videoSelection .sidePanel.w_review .commentContentBody { width: 332px; }
       });
     }
 
+    function initCss() {
+      var __css__ = (function() {/*
+        #foot_inner { width: 940px; }
+        #footer.noBottom #foot_inner { padding: 0; }
+        html { background: #141414; }
+      */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1];
+      addStyle(__css__, 'videoReviewCss');
+    }
+
     function initOther() {
       if (conf.leftPanelJack) {
         var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
@@ -7766,7 +7788,7 @@ body.videoSelection .sidePanel.w_review .commentContentBody { width: 332px; }
 
       if (conf.compactVideoInfo) $('#content, #outline').addClass('w_compact');
 
-      onWatchInfoReset(watch.CommonModelInitializer.watchInfoModel);
+      onWatchInfoReset(watchInfoModel);
 
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
 
@@ -7789,7 +7811,7 @@ body.videoSelection .sidePanel.w_review .commentContentBody { width: 332px; }
     initEvents();
     initPager();
     initSearchOption();
-    initRightPanel($rightInfoPanel, $rightIchibaPanel, $rightPanel);
+    initRightPanel($rightPanel);
     initLeftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
     initVideoReview($, conf, w);
     initHidariue();
@@ -7801,6 +7823,7 @@ body.videoSelection .sidePanel.w_review .commentContentBody { width: 332px; }
     initTags();
     initMylist($);
     initNicoS($, conf, w);
+    initCss();
     initOther();
 
     onWindowResize();
