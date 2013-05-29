@@ -26,6 +26,9 @@
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
 
+// * ver 1.130529
+// - 海外版でレイアウトが崩れるのを修正
+
 // * ver 1.130528
 // - 右パネルに動画情報・市場・レビューを表示する設定を追加(実験中)
 // - 省スペースモード時、動画タイトルの無駄なスペースをより省けるように調整
@@ -1833,6 +1836,10 @@
         margin: 0 22px 30px 0;\
       }\
       #footer     { z-index: 1; }\
+      \
+      body.en-us #playerContainerSlideArea, body.zh-tw #playerContainerSlideArea {\
+        padding-right: 0;\
+      }\
       \
     '
     ].join(''); //
