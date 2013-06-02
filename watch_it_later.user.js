@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130601
+// @version        1.130603
 // ==/UserScript==
 
 // TODO:
@@ -26,7 +26,10 @@
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
 
-// * ver 1.130601
+// * ver 1.130603
+// - コメント数・再生数・マイリスト数がリアルタイム更新をわかりやすく
+
+// * ver 1.130603
 // - コメント数・再生数・マイリスト数がリアルタイム更新されるようにした
 // - レイアウトの微調整
 
@@ -851,8 +854,25 @@
       .sidePanel .sideVideoInfo .videoInfo{\
         background: #ccc; text-align: center; padding: 4px;\
       }\
-      .videoInfo .blink {\
+      .sideVideoInfo .sideVideoInfoInner{\
+        -webkit-transition: opacity 1s ease-out, color 3s ease-out;\
+        transition: opacity 1s ease-out, color 3s ease-out;\
+        opacity: 0;\
+      }\
+      .sideVideoInfo.show .sideVideoInfoInner{\
+        opacity: 1;\
+      }\
+      .videoCount.blink {\
         color: #fff;\
+      }\
+      .videoCountDiff {\
+        position: absolute; color: orange; top: -32px; right: 0; opacity: 0; font-weight: bolder; font-size: 140%; z-index: 100; text-shadow: 1px 1px 0 red;\
+      }\
+      .videoCountDiff.blink {\
+        opacity: 1; color: orange; top: -8px;\
+      }\
+      .videoCountDiff:before {\
+        content: \'+\';\
       }\
       #trueBrowserFullShield .blink, #videoCounter .blink {\
         color: #000;\
@@ -938,7 +958,7 @@
       }\
 \
       .sideVideoInfo.isFavorite .userName:after, .sideVideoInfo.isFavorite.isChannel .videoOwnerInfoContainer:after{\
-        content: \'★\'; color: gold; text-shadow: 1px 1px 1px black; \
+        content: \' ★ \'; color: gold; text-shadow: 1px 1px 1px black; \
       }\
 \
       .sidePanel.videoInfo  #leftPanelContent, .sidePanel.ichiba  #leftPanelContent {\
@@ -5177,7 +5197,8 @@
       EventDispatcher.addEventListener('onVideoCountUpdated', function(c, type, diff) {
         var $target = $('.sidePanel .videoInfo, #trueBrowserFullShield, #videoCounter');
         assignVideoCountToDom($target, c);
-        blinkItem($target.find('.' + type));
+        $target.find('.' + type + 'Diff').text(diff);
+        blinkItem($target.find('.' + type + ', .' + type + 'Diff'));
       });
 
       function setVideoCounter(watchInfoModel) {
@@ -5267,15 +5288,19 @@
     function onVideoChangeStatusUpdated(isChanging) {
       AnchorHoverPopup.hidePopup();
       if (isChanging) {
+        $('.sidePanel .sideVideoInfo').removeClass('show');
+        //$('.sidePanel .sideVideoInfoInner').animate({opacity: 0}, 800);
+        /*
         var $description = $('.sidePanel .videoDetails');
         $description.css({maxHeight: $description.outerHeight(), minHeight: 0})
           .animate({maxHeight: 0}, 800, function() {
             $description.empty();
             $('.sidePanel .sideVideoInfoInner')
               .animate({opacity: 0}, 800,
-                function() { $('.sidePanel .sideVideoInfo').empty(); }
+                function() {  }
               );
           });
+        */
       }
       if (conf.enableAutoPlaybackContinue && watch.PlayerInitializer.noUserOperationController.autoPlaybackModel._isAutoPlayback) {
         watch.PlayerInitializer.noUserOperationController.autoPlaybackModel.setCount(0);
@@ -5305,9 +5330,9 @@
         '<div class="videoInfo">',
           '<span class="videoPostedAt"></span>',
           '<ul class="videoStats">',
-            '<li>再生: <span class="viewCount"></span></li>',
-            '<li>コメント: <span class="commentCount"></span></li>',
-            '<li>マイリスト: <span class="mylistCount"></span></li>',
+            '<li style="position: relative;">再生: <span       class="viewCountDiff     videoCountDiff"></span><span class="videoCount viewCount"></span></li>',
+            '<li style="position: relative;">コメント: <span   class="commentCountDiff  videoCountDiff"></span><span class="videoCount commentCount"></span></li>',
+            '<li style="position: relative;">マイリスト: <span class="mylistCountDiff   videoCountDiff"></span><span class="videoCount mylistCount"></span></li>',
           '</ul>',
         '</div>',
 
@@ -5391,7 +5416,6 @@
         if ($ichibaPanel.is(':visible')) {
           resetSideIchibaPanel($ichibaPanel, true);
         }
-//        leftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel);
       });
 
       var updateLeftPanelVisibility = function(v) {
@@ -5402,11 +5426,6 @@
       };
       EventDispatcher.addEventListener('on.config.removeLeftPanel', updateLeftPanelVisibility);
       updateLeftPanelVisibility(conf.removeLeftPanel);
-    }
-
-    function leftPanelJack($leftInfoPanel, $ichibaPanel, $leftPanel) {
-      if (!conf.leftPanelJack) { return; }
-
     }
     function assignVideoCountToDom($tpl, count) {
       var addComma = WatchApp.ns.util.StringUtil.addComma;
@@ -5427,17 +5446,12 @@
       var $videoInfo2 = $template.find('.videoInfo');
       var videoDescriptionHtml2 = $('.videoDescription:first').html();
 
-      $template.css('opacity', 0);
+//      $template.css('opacity', 0);
 
       $template.find('.videoTitle').html(watchInfoModel.title);
 
-      // var $videoThumbnailContainer = $template.find('.videoThumbnailContainer');
-      // $videoThumbnailContainer.append($('#videoThumbnailImage').clone(true).attr('id', null)).find('img:last').click(function() {
-      //   showLargeThumbnail($(this).attr('src'));
-      // });
-
       var $videoDetails = $template.find('.videoDetails');
-      $videoDetails.css({maxHeight: 0, overflowY: 'hidden', minHeight: 0});
+      $videoDetails.css({overflowY: 'hidden', minHeight: 0});
 
       assignVideoCountToDom($template, watchInfoModel);
       $template.find('.videoPostedAt').text($('.videoPostedAt:last').text());
@@ -5501,7 +5515,7 @@
             .find('.channelNameInner')
               .text(channelInfo.name).end()
             .find('.showOtherVideos')
-              .attr({'href': chUrl}) // TODO: チャンネル動画取得
+              .attr({'href': chUrl}); // TODO: チャンネル動画取得
         }
         $userIconContainer.remove();
       } else {
@@ -5537,20 +5551,22 @@
       }
 
       $sideInfoPanel.find('*').unbind();
-      $sideInfoPanel.empty().scrollTop(0).toggleClass('isFavorite', isFavorite).toggleClass('isChannel', WatchController.isChannelVideo());
-
-      $sideInfoPanel.append($template);
-      $template.animate({opacity: 1}, 800, function() {
-        var mh = $sidePanel.innerHeight() - $template.outerHeight() - 16;
-          $videoDetails
-            .animate({maxHeight: 500}, 1000,
-              function() { $videoDetails.css({maxHeight: ''}); }
-            );
-      });
 
       $sidePanel
-        .toggleClass('ichibaEmpty',    $('#ichibaMain').find('.ichiba_mainitem').length < 1)
-        .toggleClass('nicommendEmpty', $('#nicommendList').find('.content').length < 1);
+        .toggleClass('ichibaEmpty',    $('#ichibaMain')   .find('.ichiba_mainitem').length < 1)
+        .toggleClass('nicommendEmpty', $('#nicommendList').find('.content')        .length < 1);
+
+      $sideInfoPanel
+        .empty()
+        .scrollTop(0)
+        .toggleClass('isFavorite', isFavorite)
+        .toggleClass('isChannel', WatchController.isChannelVideo())
+        .append($template);
+
+      setTimeout(function() {
+        $sideInfoPanel.addClass('show');
+      }, 100);
+
     }
 
 
