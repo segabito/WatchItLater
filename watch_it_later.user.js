@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130603
+// @version        1.130604
 // ==/UserScript==
 
 // TODO:
@@ -25,6 +25,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130604
+// - リンクに触れてからメニューが出るまでの時間(秒)の設定を追加
 
 // * ver 1.130603
 // - コメント数・再生数・マイリスト数がリアルタイム更新をわかりやすく
@@ -469,6 +472,7 @@
       hashPlaylistMode: 0,    // location.hashにプレイリストを保持 0 =無効 1=連続再生時 2=常時
       storagePlaylistMode: '', // localStorageにプレイリストを保持
       compactVideoInfo: false, //
+      hoverMenuDelay: 0.4, // リンクをホバーした時のメニューが出るまでの時間(秒)
 
       hideVideoExplorerExpand: true, // 「動画をもっと見る」ボタンを小さくする
       nicommendVisibility: 'visible', // ニコメンドの表示 'visible', 'underIchiba', 'hidden'
@@ -2014,9 +2018,11 @@
         values: {'なくす': true, 'なくさない': false}},
 
       {title: 'その他の設定'},
-      {title: 'リンクにカーソルを重ねたらマイリストメニューを表示', varName: 'enableHoverPopup', reload: true,
+      {title: '動画リンクにカーソルを重ねたらメニューを表示', varName: 'enableHoverPopup', reload: true,
         description: 'マウスカーソルを重ねた時に出るのが邪魔な人はオフにしてください',
         values: {'する': true, 'しない': false}},
+      {title: '動画リンクにカーソルを重ねてからメニューが出るまでの時間(秒)', varName: 'hoverMenuDelay',
+       type: 'text', description: '単位は秒。 標準は0.4です'},
       {title: 'ゆっくり再生(スロー再生)ボタンを表示する', varName: 'enableYukkuriPlayButton',
         values: {'する': true, 'しない': false}},
       {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
@@ -3376,11 +3382,17 @@
    *  リンクのマウスオーバーに仕込む処理
    *  ここの表示は再考の余地あり
    */
-  var AnchorHoverPopup = (function(w) {
-    var mylistPanel = Mylist.getPanel('');
+  var AnchorHoverPopup = (function(w, conf,EventDispatcher) {
+    var mylistPanel = Mylist.getPanel(''), hoverMenuDelay = conf.hoverMenuDelay * 1000;
     mylistPanel.className += ' popup';
     mylistPanel.style.display    = 'none';
     document.body.appendChild(mylistPanel);
+
+    EventDispatcher.addEventListener('on.config.hoverMenuDelay', function(delay) {
+      delay = parseFloat(delay, 10);
+      if (isNaN(delay)) { return; }
+      hoverMenuDelay = Math.abs(delay * 1000);
+    });
 
     function showPanel(watchId, baseX, baseY, w_touch) {
 
@@ -3444,7 +3456,7 @@
             showPanel(watchId, mx + 8, my + 8);
           }
           addlink(mylistPanel, self, watchId);
-        }, 400);
+        }, hoverMenuDelay);
 
         if (!this.w_eventInit) {
           this.addEventListener('mouseout', function() {
@@ -3564,7 +3576,7 @@
       setInterval(bindLoop, 500);
     }
     return self;
-  })(w);
+  })(w, conf, EventDispatcher);
 
 
   //===================================================
@@ -5177,19 +5189,16 @@
         counter = {mylistCount: 0, viewCount: 0, commentCount: 0};
       playerAreaConnector.addEventListener('onWatchCountUpdated', function(c) {
         var diff = c - counter.viewCount;
-        if (diff == 0) return;
         counter.viewCount    = c;
         EventDispatcher.dispatch('onVideoCountUpdated', counter, 'viewCount', diff);
       });
       playerAreaConnector.addEventListener('onCommentCountUpdated', function(c) {
         var diff = c - counter.commentCount;
-        if (diff == 0) return;
         counter.commentCount = c;
         EventDispatcher.dispatch('onVideoCountUpdated', counter, 'commentCount', diff);
       });
       playerAreaConnector.addEventListener('onMylistCountUpdated', function(c) {
         var diff = c - counter.mylistCount;
-        if (diff == 0) return;
         counter.mylistCount  = c;
         EventDispatcher.dispatch('onVideoCountUpdated', counter, 'mylistCount', diff);
       });
@@ -7809,8 +7818,8 @@ body.videoSelection .sidePanel .commentUserProfile {
         #footer.noBottom #foot_inner { padding: 0; }
         html { background: #141414; }
         .animateBlink{
-          -webkit-transition: 1s ease-in-out;
-          transition: 1s ease-in-out;
+          -webkit-transition: 1s ease-in;
+          transition: 1s ease-in;
         }
       */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1];
       addStyle(__css__, 'videoReviewCss');
