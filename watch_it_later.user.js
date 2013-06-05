@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130604
+// @version        1.130606
 // ==/UserScript==
 
 // TODO:
@@ -25,6 +25,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130606
+// - 動画ヘッダにもコメント数・再生数・マイリスト数増減表示
 
 // * ver 1.130604
 // - リンクに触れてからメニューが出るまでの時間(秒)の設定を追加
@@ -867,19 +870,31 @@
         opacity: 1;\
       }\
       .videoCount.blink {\
-        color: #fff;\
+        color: #ccc;\
       }\
-      .videoCountDiff {\
-        position: absolute; color: orange; top: -32px; right: 0; opacity: 0; font-weight: bolder; font-size: 140%; z-index: 100; text-shadow: 1px 1px 0 red;\
+      .sidePanel .videoCountDiff {\
+        position: absolute; color: white; right: 0; opacity: 0; z-index: 100; text-shadow: 1px 1px 0 orange;\
       }\
-      .videoCountDiff.blink {\
-        opacity: 1; color: orange; top: -8px;\
+      .sidePanel .videoCountDiff.blink {\
+        opacity: 1; color: white;\
+      }\
+      #siteHeader .videoCount, #siteHeader .videoCountDiff {\
+        min-width: 32px; text-align: right; display: inline-block;\
+      }\
+      #siteHeader .videoCountDiff, #trueBrowserFullShield .videoCountDiff {\
+        position: absolute; color: yellow; opacity: 0; font-weight: bolder; text-shadow: 1px 1px 0 red;\
+      }\
+      #siteHeader .videoCountDiff.blink, #trueBrowserFullShield .videoCountDiff.blink {\
+        opacity: 1; color: yellow;\
+      }\
+      #trueBrowserFullShield .blink, #videoCounter .blink {\
+        color: #000;\
       }\
       .videoCountDiff:before {\
         content: \'+\';\
       }\
-      #trueBrowserFullShield .blink, #videoCounter .blink {\
-        color: #000;\
+      .videoCountDiff.down:before {\
+        content: \'-\';\
       }\
       .sidePanel .sideVideoInfo .videoDescription{\
         overflow-x: hidden; text-align: left;\
@@ -5189,16 +5204,19 @@
         counter = {mylistCount: 0, viewCount: 0, commentCount: 0};
       playerAreaConnector.addEventListener('onWatchCountUpdated', function(c) {
         var diff = c - counter.viewCount;
+        if (diff === 0) return;
         counter.viewCount    = c;
         EventDispatcher.dispatch('onVideoCountUpdated', counter, 'viewCount', diff);
       });
       playerAreaConnector.addEventListener('onCommentCountUpdated', function(c) {
         var diff = c - counter.commentCount;
+        if (diff === 0) return;
         counter.commentCount = c;
         EventDispatcher.dispatch('onVideoCountUpdated', counter, 'commentCount', diff);
       });
       playerAreaConnector.addEventListener('onMylistCountUpdated', function(c) {
         var diff = c - counter.mylistCount;
+        if (diff === 0) return;
         counter.mylistCount  = c;
         EventDispatcher.dispatch('onVideoCountUpdated', counter, 'mylistCount', diff);
       });
@@ -5206,7 +5224,7 @@
       EventDispatcher.addEventListener('onVideoCountUpdated', function(c, type, diff) {
         var $target = $('.sidePanel .videoInfo, #trueBrowserFullShield, #videoCounter');
         assignVideoCountToDom($target, c);
-        $target.find('.' + type + 'Diff').text(diff);
+        $target.find('.' + type + 'Diff').text(diff).toggleClass('down', diff < 0);
         blinkItem($target.find('.' + type + ', .' + type + 'Diff'));
       });
 
@@ -5217,7 +5235,7 @@
         counter.commentCount = watchInfoModel.commentCount;
 
         var $tpl = $(
-          '<span>再生: <span class="viewCount"></span> コメ: <span class="commentCount"></span> マイ: <span class="mylistCount"></span></span>'
+          '<span>再生: <span class="viewCountDiff videoCountDiff"></span><span class="viewCount videoCount"></span> コメ: <span class="commentCountDiff videoCountDiff"></span><span class="commentCount videoCount"></span> マイ: <span class="mylistCountDiff  videoCountDiff"></span><span class="mylistCount videoCount"></span></span>'
         );
         assignVideoCountToDom($tpl, counter);
 
