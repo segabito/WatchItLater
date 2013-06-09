@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130606
+// @version        1.130609
 // ==/UserScript==
 
 // TODO:
@@ -25,6 +25,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130609
+// - 細かな不具合修正
 
 // * ver 1.130606
 // - 動画ヘッダにもコメント数・再生数・マイリスト数増減表示
@@ -438,7 +441,7 @@
       autoOpenSearch: false, // 再生開始時に自動検索画面
       autoScrollToPlayer: true, // プレイヤー位置に自動スクロール(自動全画面化オフ時)
       hideNewsInFull: true, // 全画面時にニュースを閉じる
-      wideCommentPanel: true, // コメントパネルをワイドにする
+      wideCommentPanel: false, // コメントパネルをワイドにする
       removeLeftPanel: false, // 左パネルを消滅させる
       leftPanelJack: true, // 左パネルに動画情報を表示
       rightPanelJack: false, // 右パネルに動画情報を表示
@@ -890,12 +893,9 @@
       #trueBrowserFullShield .blink, #videoCounter .blink {\
         color: #000;\
       }\
-      .videoCountDiff:before {\
-        content: \'+\';\
-      }\
-      .videoCountDiff.down:before {\
-        content: \'-\';\
-      }\
+      .videoCountDiff:before      {content: \'+\';}\
+      .videoCountDiff.down:before {content: \'\'; }\
+      #popupMarquee .videoCountDiff {display: none;}\
       .sidePanel .sideVideoInfo .videoDescription{\
         overflow-x: hidden; text-align: left;\
       }\
@@ -7645,7 +7645,7 @@ body.videoSelection .sidePanel .commentUserProfile {
           WatchController.commentVisibility('toggle');
         }},
         {name: 'shortcutShowOtherVideo',     exec: function(e) {
-          $('.showOtherVideos:first').click();
+          WatchController.openUpNushiVideo();
         }},
         {name: 'shortcutMute',               exec: function(e) {
           WatchController.mute('toggle');
