@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130609
+// @version        1.130609b
 // ==/UserScript==
 
 // TODO:
@@ -976,7 +976,7 @@
         background: none;\
       }\
 \
-      .sideVideoInfo.isFavorite .userName:after, .sideVideoInfo.isFavorite.isChannel .videoOwnerInfoContainer:after{\
+      .sideVideoInfo.isFavorite .userName:after, .sideVideoInfo.isFavorite.isChannel .videoOwnerInfoContainer .channelName:after{\
         content: \' ★ \'; color: gold; text-shadow: 1px 1px 1px black; \
       }\
 \
