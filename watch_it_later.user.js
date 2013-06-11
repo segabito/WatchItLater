@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130609b
+// @version        1.130611
 // ==/UserScript==
 
 // TODO:
@@ -25,6 +25,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130611
+// - 投稿者のニコレポから投稿者の動画一覧に遷移できるようにした
 
 // * ver 1.130609
 // - 細かな不具合修正
@@ -1568,7 +1571,7 @@
       #resultContainer.dummyMylist #searchResultContainer .favMylistEditContainer,\
       #resultContainer.dummyMylist:not(.ranking) #searchResultMylistSortOptions,\
       #resultContainer.dummyMylist .favMylistEditContainer,\
-      #resultContainer.dummyMylist #searchResultHeader {\
+      #resultContainer.dummyMylist:not(.ownerNicorepo) #searchResultHeader {\
         display: none !important;\
       }\
 \
@@ -1964,7 +1967,7 @@
         values: {'する': true, 'しない': false}, addClass: true},
       {title: '左のパネルに動画情報・市場を表示', varName: 'leftPanelJack', reload: true,
         values: {'する': true, 'しない': false}},
-      {title: '右のパネルに動画情報・市場・レビューを表示(実験中)', varName: 'rightPanelJack',
+      {title: '右のパネルに動画情報・市場・レビューを表示', varName: 'rightPanelJack',
         values: {'する': true, 'しない': false}},
       {title: 'ページのヘッダに再生数表示', varName: 'headerViewCounter', reload: true,
         values: {'する': true, 'しない': false}},
@@ -4145,6 +4148,7 @@
     rawData: {},
     page: 1,
     perPage: 32,
+//    default_sort: "4",
     initialize: function(param) {
       this.rawData = {
         status: 'ok',
@@ -4497,8 +4501,8 @@
           id: '-10',
           sort: '1',
           name: getNicorepoTitle(type),
-          user_id: myId,
-          user_name: 'ニコニコ動画'
+          user_id:   type === 'owner' ? WatchController.getOwnerId()   : myId,
+          user_name: type === 'owner' ? WatchController.getOwnerName() :'ニコニコ動画'
         });
       function req(callback, param, pageCount, maxPageCount) {
         var WatchApp = w.WatchApp, $ = w.$, url = baseUrl, escapeHTML = WatchApp.ns.util.StringUtil.escapeHTML;
@@ -5990,11 +5994,21 @@
         var self = watch.ComponentInitializer.videoSelection.loaderAgent.mylistVideoLoader;
         currentMylistId = p.id;
         if (p.id >= 0) {
-          $('#resultContainer').removeClass('dummyMylist').removeClass('ranking').addClass('mylist').toggleClass('isMine', Mylist.isMine(p.id));
+          $('#resultContainer')
+            .removeClass('dummyMylist')
+            .removeClass('ranking')
+            .removeClass('ownerNicorepo')
+            .addClass('mylist')
+            .toggleClass('isMine', Mylist.isMine(p.id));
           self.load_org(p, onload, onerror);
         } else {
           // マイリストIDに負の数字(通常ないはず)が来たら乗っ取るサイン
-            $('#resultContainer').addClass('dummyMylist').removeClass('mylist').removeClass('isMine').removeClass('ranking');
+            $('#resultContainer')
+              .addClass('dummyMylist')
+              .removeClass('mylist')
+              .removeClass('isMine')
+              .removeClass('ownerNicorepo')
+              .removeClass('ranking');
             setTimeout(function() {
               try {
                 // TODO: マジックナンバーを
@@ -6017,6 +6031,7 @@
                   NicorepoVideo.loadMylist(onload, p);
                 } else
                 if (p.id == NicorepoVideo.REPO_OWNER) {
+                  $('#resultContainer').addClass('ownerNicorepo');
                   NicorepoVideo.loadOwner(onload, p);
                 } else
                 if (typeof VideoRanking.getGenreName(p.id) === 'string') {
