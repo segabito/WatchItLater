@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130611
+// @version        1.130620
 // ==/UserScript==
 
 // TODO:
@@ -25,6 +25,10 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130620
+// - ハードウェアアクセラレーションへの対応 (ショートカットキー等)
+// - 一部エフェクトをCSS3アニメーションに移行して軽量化
 
 // * ver 1.130611
 // - 投稿者のニコレポから投稿者の動画一覧に遷移できるようにした
@@ -501,9 +505,12 @@
       shortcutShowOtherVideo:     {char: 'U', shift: true,  ctrl: false, alt: false, enable: false}, // 投稿者の関連動画表示のショートカット
       shortcutMute:               {char: 'T', shift: true,  ctrl: false, alt: false, enable: false}, // 音量ミュートのショートカット
       shortcutDeepenedComment:    {char: 'B', shift: true,  ctrl: false, alt: false, enable: false}, // コメント背面表示
+      shortcutToggleStageVideo:   {char: 'H', shift: true,  ctrl: false, alt: false, enable: false}, // ハードウェアアクセラレーション(StageVideo)のショートカット
 
 
       watchCounter: 0, // お前は今までに見た動画の数を覚えているのか？をカウントする
+      forceEnableStageVideo: false,
+      forceExpandStageVideo: false,
       lastLeftTab: 'videoInfo',
       lastRightTab: 'w_comment',
       enableSortTypeMemory: true, // 検索のソート順を記憶する
@@ -1173,11 +1180,14 @@
         position: absolute; width: 100px; left: -55px; top: 32px;\
       }\
       /* プレイリスト出したり隠したり */\
-      body:not(.full_with_browser) #playlist{\
-        -webkit-transition: max-height 0.3s ease-out; transition: max-height 0.3s ease-out;\
+      #playlist>* {\
+        -webkit-transition: opacity 0.6s; transition: opacity 0.6s;\
+      }\
+      body:not(.full_with_browser):not(.videoSelection) #playlist.w_closing>* {\
+        opacity: 0;\
       }\
       body:not(.full_with_browser):not(.videoSelection) #playlist:not(.w_show){\
-        /*max-height: 0px;*/position: absolute; top: -9999px;\
+        position: absolute; top: -9999px;\
       }\
       #playlist.w_show{\
         /*max-height: 180px;*/\
@@ -1214,24 +1224,43 @@
       }\
       /* WatchItLater設定パネル */\
       #watchItLaterConfigPanel {\
-        position: fixed; bottom:0; right:0; z-index: 10001; display: none;\
+        position: fixed; bottom: 0px; right: 16px; z-index: 10001;\
         width: 460px; padding: 0;\
-        \
+        transition: transform 0.4s ease-in-out; -webkit-transition: -webkit-transform 0.4s ease-in-out;\
+        transform-origin-y: 50% 0; -webkit-transform-origin-y: 50% 0;\
+        transform: scaleY(0);  -webkit-transform: scaleY(0);\
+      }\
+      #watchItLaterConfigPanel.open {\
+        transform: scaleY(1); -webkit-transform: scaleY(1);\
       }\
       #watchItLaterConfigPanelShadow {\
-        position: fixed; bottom: 16px; right:16px; z-index: 10000; display: none;\
-        width: 430px; height: 500px; padding: 0;\
-        background: #000; /*box-shadow: 0 0 2px black; border-radius: 8px;*/ opacity: 0.8;\
+        position: fixed; bottom: 16px; right: 16px; z-index: 10000;\
+        width: 446px; height: 559px; padding: 0;\
+        background: #000; /*box-shadow: 0 0 2px black; border-radius: 8px;*/ -webkit-filter: opacity(80%);\
+        transition: transform 0.4s ease-in-out; -webkit-transition: -webkit-transform 0.4s ease-in-out;\
+        transform-origin-y: 50% 0; -webkit-transform-origin-y: 50% 0;\
+        transform: scaleY(0); -webkit-transform: scaleY(0);\
+      }\
+      #watchItLaterConfigPanelShadow.open {\
+        transform: scaleY(1); -webkit-transform: scaleY(1);\
+      }\
+      #watchItLaterConfigPanelShadowTop {\
+        position: fixed; bottom: 563px; right:0px; z-index: 10000; background: #333;\
+        width: 492px; height: 20px; padding: 0; border-radius: 32px; -webkit-filter: opacity(90%); display: none;\
+      }\
+      #watchItLaterConfigPanelOverShadow {\
+        position: fixed; bottom: 575px; right: 0px; width: 488px; height: 8px;\
+        box-shadow: 0 4px 16px #333;z-index: 10002; display: none;\
       }\
       #watchItLaterConfigPanel .head {\
-        background-color: #CCCCCC;border-radius: 8px 8px 0 0;color: black;height: 50px;\
+        background-color: #CCCCCC;border-radius: 0;color: black;height: 50px;\
         overflow: hidden;padding: 5px 0 0 16px;position: relative;\
       }\
       #watchItLaterConfigPanel .head h2 {\
         font-size: 135%;\
       }\
       #watchItLaterConfigPanel .inner{\
-        max-height: 500px;overflow-y: auto;border-width: 4px 16px 16px 16px; border-radius: 0 0 8px 8px;\
+        max-height: 500px;overflow-y: auto;border-width: 4px 16px 16px 16px; border-radius: 0 0 16px 16px;\
         border-style: solid;border-color: #ccc;\
       }\
       #watchItLaterConfigPanel ul{\
@@ -1281,7 +1310,7 @@
         padding: 8px 0 8px 12px; box-shadow: 0 0 4px black;\
       }\
       #watchItLaterConfigPanel .section > div > span {\
-        background: #333;\
+        /*background: #333;*/\
       }\
       #watchItLaterConfigPanel li:not(.section) {\
         background: #fff; border-width: 4px 0px 4px 24px; border-style: solid; border-color: #fff;\
@@ -1955,11 +1984,11 @@
       {title: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
         description: '全画面状態だと再生数がわからなくて不便、という時に',
         values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
-      {title: 'コメント表示', varName: 'commentVisibility',
-        values: {'オン': 'visible', 'オフ': 'hidden', '前回の状態': 'lastState'}},
+      {title: '動画のコメント表示', varName: 'commentVisibility',
+        values: {'オフ': 'hidden', '最後の状態を記憶': 'lastState', 'オン': 'visible'}},
 
       {title: '動画プレイヤーの設定'},
-      {title: 'コメントパネルのワイド化', varName: 'wideCommentPanel',
+      {title: 'コメントパネルを広くする', varName: 'wideCommentPanel',
         values: {'する': true, 'しない': false}},
       {title: 'コメントパネルにNG共有設定を表示', varName: 'enableSharedNgSetting',
         values: {'する': true, 'しない': false}, addClass: true},
@@ -2074,6 +2103,7 @@
       {title: 'プレイヤーの位置までスクロール',       varName: 'shortcutScrollToNicoPlayer', type: 'keyInput'},
       {title: 'ミュート',                             varName: 'shortcutMute',               type: 'keyInput'},
       {title: 'コメントの背面表示ON/FF',              varName: 'shortcutDeepenedComment',    type: 'keyInput'},
+      {title: 'ハードウェアアクセラレーションON/FF',  varName: 'shortcutToggleStageVideo',   type: 'keyInput'},
 
 
       {title: '実験中の設定', debugOnly: true},
@@ -2093,7 +2123,7 @@
       if ($panel === null) {
         $panel = w.jQuery([
           '<div id="watchItLaterConfigPanel">',
-          '<div class="head"><button class="closeButton">&#9660;</button><h2>WatchItLaterの設定</h2>(※)のつく項目は、リロード後に反映されます</div>',
+          '<div class="head"><button class="closeButton" title="閉じる">▲</button><h2>WatchItLaterの設定</h2>(※)のつく項目は、リロード後に反映されます</div>',
           '<div class="inner"><ul></ul></div></div>'
         ].join(''));
 
@@ -2118,15 +2148,13 @@
           self.close();
         });
         if ($shadow === null) {
-          $shadow = $('<div id="watchItLaterConfigPanelShadow" />');
-          w.jQuery('body').append($shadow);
+          $shadow = $('<div id="watchItLaterConfigPanelShadow" /><div id="watchItLaterConfigPanelShadowTop"/><div id="watchItLaterConfigPanelOverShadow"/>');
         }
-        w.jQuery('body').append($panel);
       }
     };
 
     pt.refresh = function() {
-      var isVisible = $panel.is(':visible');
+      var isVisible = $panel.hasClass('open');
       $panel.remove().empty();
       $panel = null;
       this.createPanelDom();
@@ -2245,11 +2273,21 @@
     pt.addChangeEventListener = function(callback) {
       listener.push(callback);
     };
-    pt.open = function()  { $shadow.slideDown(400); $panel.slideDown(400); };
-    pt.close = function() { $shadow.slideUp(400);   $panel.slideUp(400); };
+    pt.open = function()  {
+      w.jQuery('body').append($shadow).append($panel);
+      setTimeout(function() {
+      $shadow.addClass('open'); $panel.addClass('open');
+      }, 50);
+    };
+    pt.close = function() {
+      $shadow.removeClass('open'); $panel.removeClass('open');
+      setTimeout(function() {
+        $shadow.detach(); $panel.detach();
+      }, 800);
+    };
     pt.toggle = function() {
       this.createPanelDom();
-      if ($panel.is(':visible')) {
+      if ($panel.hasClass('open')) {
         this.close();
       } else {
         this.open();
@@ -3946,6 +3984,37 @@
           return pc.deepenedComment;
         }
       },
+      allowStageVideo: function(v) {
+        var exp = w.document.getElementById('external_nicoplayer');
+        if (v === 'toggle') {
+          return this.allowStageVideo(!this.allowStageVideo());
+        } else
+        if (typeof v === 'boolean') {
+          nicoPlayer.playerConfig.set({allowStageVideo: v});
+          return this;
+        } else {
+          var pc = nicoPlayer.playerConfig.get();
+          return pc.allowStageVideo;
+        }
+      },
+      isStageVideoSupported: function() {
+        try {
+          var exp = w.document.getElementById('external_nicoplayer');
+          return exp.isStageVideoSupported();
+        } catch(e) {
+          if (conf.debugMode) console.log(e);
+          return false;
+        }
+      },
+      isStageVideoAvailable: function() {
+        try {
+          var exp = w.document.getElementById('external_nicoplayer');
+          return exp.isStageVideoAvailable();
+        } catch(e) {
+          if (conf.debugMode) console.log(e);
+          return false;
+        }
+      },
       mute: function(v) {
         var exp = w.document.getElementById('external_nicoplayer');
 
@@ -4015,6 +4084,9 @@
       },
       isSearchMode: function() {
         return $('body').hasClass('videoSelection');
+      },
+      isFullScreen: function() {
+        return $('body').hasClass('full_with_browser');
       }
     };
   })(w);
@@ -6198,7 +6270,7 @@
      */
     var $smallVideoStyle = null, lastAvailableWidth = 0, lastBottomHeight = 0;
     function adjustSmallVideoSize() {
-      if (!conf.videoExplorerHack || !$('body').hasClass('videoSelection')) { return; }
+      if (!conf.videoExplorerHack || !WatchController.isSearchMode()) { return; }
 
       $('#leftVideoInfo').find('.videoDetails').attr('style', '');
       $('#searchResultExplorer, #content, #bottomContentTabContainer').addClass('w_adjusted');
@@ -6414,7 +6486,7 @@
 
       var refreshCommentPanelTimer = null;
       function refreshCommentPanelHeight() {
-        if (!$('body').hasClass('videoSelection')) {
+        if (!WatchController.isSearchMode()) {
           return;
         }
         if (refreshCommentPanelTimer !== null) {
@@ -6429,7 +6501,7 @@
 
       $('#searchResultExplorer, #content, #footer').addClass('w_adjusted');
       $('#nicommendPanelCreateOpen').mousedown(function() {
-        if (!$('body').hasClass('videoSelection')) { return; }
+        if (!WatchController.isSearchMode()) { return; }
         WatchController.closeSearch();
         setTimeout(function() {
           WatchApp.ns.util.WindowUtil.scrollFit('#nicommendCreateStart', 200);
@@ -6529,7 +6601,7 @@
               // ユーザーニコ割があるときは自動全画面にしない
               return;
             }
-            if ($('body').hasClass('videoSelection')) {
+            if (WatchController.isSearchMode()) {
               var settingSize = (localStorage["PLAYER_SETTINGS.LAST_PLAYER_SIZE"] === '"normal"') ? 'normal' : 'medium';
               WatchController.changeScreenMode(settingSize);
             }
@@ -6537,13 +6609,13 @@
             onWindowResize();
           }, 100);
         } else {
-          if (conf.autoOpenSearch && !$('body').hasClass('videoSelection') && !$('body').hasClass('full_with_browser')) {
+          if (conf.autoOpenSearch && !WatchController.isSearchMode() && !$('body').hasClass('full_with_browser')) {
             $('#openSearchResultExplorer').click();
           }
           if (conf.autoScrollToPlayer) {
             // 初回のみ、プレイヤーが画面内に納まっていてもタグの位置まで自動スクロールさせる。(ファーストビューを固定するため)
             // 二回目以降は説明文や検索結果からの遷移なので、必要最小限の動きにとどめる
-            if (!$('body').hasClass('videoSelection') || isFirst) {
+            if (!WatchController.isSearchMode() || isFirst) {
               WatchController.scrollToVideoPlayer(isFirst);
             }
           }
@@ -6583,6 +6655,7 @@
           v = (typeof v === 'boolean') ? v : !$('body').hasClass('trueBrowserFull');
           $('body').toggleClass('trueBrowserFull', v);
           conf.setValue('enableTrueBrowserFull', v);
+          try { $('#external_nicoplayer')[0].setIsForceExpandStageVideo(v || conf.forceExpandStageVideo);} catch(e) {console.log(e);}
           if (!v) {
             watch.PlaylistInitializer.playlistView.resetView();
           }
@@ -7224,7 +7297,7 @@
 
       EventDispatcher.addEventListener('onWindowResize', function() {
         var $body = $('body'), $left = $('#leftPanel'), $right = $('#playerCommentPanelOuter');
-        if ($body.hasClass('videoSelection') || $body.hasClass('full_with_browser')) { return; }
+        if (WatchController.isSearchMode() || $body.hasClass('full_with_browser')) { return; }
         var w = $('#external_nicoplayer').outerWidth(), margin = 84;
         w += $left.is(':visible')  ? $left.outerWidth()  : 0;
         w += $right.is(':visible') ? $right.outerWidth() : 0;
@@ -7403,18 +7476,26 @@ body.videoSelection .sidePanel .commentUserProfile {
     }
 
     function initAdditionalButtons() {
-      var $div = $('<div></div>');
+      var $div = $('<div/>');
 
       $div.addClass('bottomAccessContainer');
       var $playlistToggle = $('<button title="プレイリスト表示/非表示">プレイリスト</button>');
       $playlistToggle.addClass('playlistToggle');
 
-      $('#playlist').toggleClass('w_show', !conf.hidePlaylist);
-      $playlistToggle.toggleClass('w_show', $('#playlist').hasClass('w_show'));
+      $('#playlist').toggleClass('w_show', !conf.hidePlaylist).toggleClass('w_closing', conf.hidePlaylist);
+      $playlistToggle.toggleClass('w_show', !conf.hidePlaylist);
       $playlistToggle.on('click', function() {
-        $('#playlist').toggleClass('w_show');
-        conf.setValue('hidePlaylist', !$('#playlist').hasClass('w_show'));
-        $playlistToggle.toggleClass('w_show', $('#playlist').hasClass('w_show'));
+        var $playlist = $('#playlist');
+        var current = $playlist.hasClass('w_show');
+        conf.setValue('hidePlaylist', current);
+        if (current) {
+          $playlist.addClass('w_closing');
+          setTimeout(function() { $playlist.removeClass('w_show');}, 500);
+        } else {
+          $playlist.addClass('w_show').removeClass('w_closing');
+        }
+        //$playlist.toggleClass('w_show', current);
+        $playlistToggle.toggleClass('w_show', !current);
         AnchorHoverPopup.hidePopup();
       });
       $div.append($playlistToggle);
@@ -7450,7 +7531,7 @@ body.videoSelection .sidePanel .commentUserProfile {
 //      $div.append($conf.clone(true));
       var $body = $('body'), $window = $(window);
       EventDispatcher.addEventListener('onWindowResize', function() {
-        if ($body.hasClass('videoSelection') || $body.hasClass('full_with_browser')) { return; }
+        if (WatchController.isSearchMode() || $body.hasClass('full_with_browser')) { return; }
         var w = $div.outerWidth(), threshold = ($(window).innerWidth() - 940) / 2;
         $('#outline').toggleClass('under940', w > threshold);
       });
@@ -7667,7 +7748,23 @@ body.videoSelection .sidePanel .commentUserProfile {
         }},
         {name: 'shortcutDeepenedComment',    exec: function(e) {
           WatchController.deepenedComment('toggle');
-        }}
+        }},
+        {name: 'shortcutToggleStageVideo',   exec: function(e) {
+          if (!WatchController.isStageVideoSupported()) {
+//            Popup.alert('ハードウェアアクセラレーションを使用できない状態か、未対応の環境です');
+//            return;
+          }
+          WatchController.allowStageVideo('toggle');
+          setTimeout(function() {
+            var isAllowed = WatchController.allowStageVideo();
+            var isAvailable = WatchController.isStageVideoAvailable();
+            Popup.show('ハードウェアアクセラレーション:' +
+              (isAllowed ? '設定ON' : '設定OFF') + ' / ' +
+              (isAvailable ? '使用可能' : '使用不能')
+            );
+          }, 100);
+
+        }},
       ];
       for (var v in list) {
         var n = list[v].name;
@@ -7858,6 +7955,27 @@ body.videoSelection .sidePanel .commentUserProfile {
       addStyle(__css__, 'videoReviewCss');
     }
 
+    function initStageVideo($, conf, w) {
+      var onStageVideoAvailabilityUpdated = function(v) {
+        $('#nicoplayerContainerInner').toggleClass('stageVideo', v);
+      };
+
+      if (conf.forceEnableStageVideo) {
+        $('#external_nicoplayer')[0].setIsForceUsingStageVideo(true)
+      }
+      if (conf.forceExpandStageVideo) {
+        $('#external_nicoplayer')[0].setIsForceExpandStageVideo(true)
+      }
+
+      pac.addEventListener('onStageVideoAvailabilityUpdated', onStageVideoAvailabilityUpdated);
+      onStageVideoAvailabilityUpdated(WatchController.isStageVideoAvailable());
+
+      // console.log('StageVideo', $('#external_nicoplayer')[0].isStageVideoSupported() ? 'supported' : 'not supported');
+      // console.log('ColorSpaces', $('#external_nicoplayer')[0].getStageVideoSupportedColorSpaces());
+
+    }
+
+
     function initOther() {
       if (conf.leftPanelJack) {
         var panelSVC = WatchApp.ns.init.SidePanelInitializer.panelSlideViewController;
@@ -7922,6 +8040,8 @@ body.videoSelection .sidePanel .commentUserProfile {
 
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
 
+
+
       if (conf.debugMode) {
         console.log(JSON.parse($('#watchAPIDataContainer').text()));
       }
@@ -7954,6 +8074,7 @@ body.videoSelection .sidePanel .commentUserProfile {
     initMylist($);
     initNicoS($, conf, w);
     initCss();
+    initStageVideo($, conf, w);
     initOther();
 
     onWindowResize();
