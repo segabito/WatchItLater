@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130620
+// @version        1.130621
 // ==/UserScript==
 
 // TODO:
@@ -25,6 +25,10 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130621
+// - 全画面表示時に右下のマイリストメニューを消すor目立たなくする設定を追加
+
 
 // * ver 1.130620
 // - ハードウェアアクセラレーションへの対応 (ショートカットキー等)
@@ -492,6 +496,7 @@
       ichibaVisibility:    'visible', // 市場の表示 '',   'visible', 'hidden'
       reviewVisibility:    'visible', // レビューの表示   'visible', 'hidden'
       bottomContentsVisibility: 'visible', // 動画下のコンテンツ表示表示非表示
+      hideMenuInFull: 'hide', // 全画面時にマイリストメニューを隠す '', 'hide' = 目立たなくする, 'hideAll' = 完全非表示
 
       flatDesignMode: '',  // 'on' グラデーションや角丸をなくす
 
@@ -603,6 +608,33 @@
         display: inline-block; \
         background: #eee; \
       }\
+      .mylistPopupPanel.fixed {\
+        position: fixed; right: 0; bottom: 0;\
+        transition: right 0.1s ease-out;\
+      }\
+      .mylistPopupPanel.fixed>* {\
+        transition: opacity 0.1s ease-out;\
+      }\
+      .mylistPopupPanel>*>* {\
+        transition: background 0.5s ease 0.5s, color 0.5s ease 0.5s;\
+      }\
+        .full_with_browser .mylistPopupPanel{\
+          background: #000; border: 0;\
+        }\
+        body.full_with_browser .mylistPopupPanel *{\
+          background: #000; color: #888; border-color: #333;\
+        }\
+        .full_with_browser .mylistPopupPanel.hideAllInFull{\
+          display: none;\
+        }\
+        .full_with_browser .mylistPopupPanel.hideInFull.fixed:not(:hover) {\
+          right: -100px;\
+          transition: right 0.8s ease-in-out 0.5s;\
+        }\
+        .full_with_browser .mylistPopupPanel.hideInFull:not(:hover)>*{\
+          opacity: 0;\
+          transition: opacity 0.3s ease-out 1s;\
+        }\
       .mylistPopupPanel.w_touch {\
         height: 40px;\
       }\
@@ -1227,7 +1259,7 @@
         position: fixed; bottom: 0px; right: 16px; z-index: 10001;\
         width: 460px; padding: 0;\
         transition: transform 0.4s ease-in-out; -webkit-transition: -webkit-transform 0.4s ease-in-out;\
-        transform-origin-y: 50% 0; -webkit-transform-origin-y: 50% 0;\
+        transform-origin: 50% 0; -webkit-transform-origin: 50% 0;\
         transform: scaleY(0);  -webkit-transform: scaleY(0);\
       }\
       #watchItLaterConfigPanel.open {\
@@ -1238,7 +1270,7 @@
         width: 446px; height: 559px; padding: 0;\
         background: #000; /*box-shadow: 0 0 2px black; border-radius: 8px;*/ -webkit-filter: opacity(80%);\
         transition: transform 0.4s ease-in-out; -webkit-transition: -webkit-transform 0.4s ease-in-out;\
-        transform-origin-y: 50% 0; -webkit-transform-origin-y: 50% 0;\
+        transform-origin: 50% 0; -webkit-transform-origin: 50% 0;\
         transform: scaleY(0); -webkit-transform: scaleY(0);\
       }\
       #watchItLaterConfigPanelShadow.open {\
@@ -2045,9 +2077,11 @@
       {title: '全画面時に操作パネルとコメント入力欄を隠す', varName: 'controllerVisibilityInFull',
         description: '全画面の時は少しでも動画を大きくしたい場合に便利',
         values: {'隠す': 'hidden', '隠さない': ''}},
-      {title: '真のブラウザ全画面モード (黒枠がなくなる)', varName: 'enableTrueBrowserFull',
+      {title: 'フチなし全画面モード (黒枠がなくなる)', varName: 'enableTrueBrowserFull',
         description: 'F11でブラウザを最大化した状態だと、モニター全画面表示より大きくなります。 \nただし、操作パネルが若干はみ出します。',
         values: {'有効': true, '無効': false}},
+      {title: '右下のマイリストメニュー', varName: 'hideMenuInFull',
+        values: {'消す': 'hideAll', '色だけ変える': '', '目立たなくする': 'hide'}},
 
       {title: '省スペース化の設定'},
       {title: 'タグが2行以内の時に縦幅を縮める(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight', reload: true,
@@ -6415,7 +6449,7 @@
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter {',
           'top: 0px !important; height: 50px !important; background: #dfdfdf; border-radius: 4px;',
           'z-index: 99;',
-          'transition: right 0.3s ease-out, height 0.3s ease-out;  -webkit-transition: right 0.3s ease-out, height 0.3s ease-out; margin-top: 114px;',
+          'transition: right 0.3s ease-out 0.5s; margin-top: 114px;',
         '}',
         'body.videoSelection #content.w_adjusted #playerCommentPanelOuter.w_touch:not(.w_active) {',
           'right: -60px !important;',
@@ -6585,12 +6619,20 @@
       }, 500);
     }
 
-    function initIframe() {
+    function initIframe($, conf, w) {
       iframe.id = "mylist_add_frame";
       iframe.className += " fixed";
-      $(iframe).css({position: 'fixed', right: 0, bottom: 0});
+      //$(iframe).css({position: 'fixed', right: 0, bottom: 0});
       w.document.body.appendChild(iframe);
       iframe.hide(); // ページの初期化が終わるまでは表示しない
+
+      var toggleMylistMenuInFull = function(v) {
+        $('.mylistPopupPanel')
+          .toggleClass('hideInFull',    v === 'hide')
+          .toggleClass('hideAllInFull', v === 'hideAll');
+      };
+      EventDispatcher.addEventListener('on.config.hideMenuInFull', toggleMylistMenuInFull);
+      toggleMylistMenuInFull(conf.hideMenuInFull);
     }
 
     function initScreenMode() {
@@ -7754,9 +7796,11 @@ body.videoSelection .sidePanel .commentUserProfile {
 //            Popup.alert('ハードウェアアクセラレーションを使用できない状態か、未対応の環境です');
 //            return;
           }
+          var isAllowed = WatchController.allowStageVideo(), exp = $('#external_nicoplayer')[0];
           WatchController.allowStageVideo('toggle');
           setTimeout(function() {
-            var isAllowed = WatchController.allowStageVideo();
+            isAllowed = WatchController.allowStageVideo();
+            exp.setIsForceUsingStageVideo(isAllowed && conf.forceEnableStageVideo);
             var isAvailable = WatchController.isStageVideoAvailable();
             Popup.show('ハードウェアアクセラレーション:' +
               (isAllowed ? '設定ON' : '設定OFF') + ' / ' +
@@ -7960,12 +8004,14 @@ body.videoSelection .sidePanel .commentUserProfile {
         $('#nicoplayerContainerInner').toggleClass('stageVideo', v);
       };
 
-      if (conf.forceEnableStageVideo) {
-        $('#external_nicoplayer')[0].setIsForceUsingStageVideo(true)
-      }
-      if (conf.forceExpandStageVideo) {
-        $('#external_nicoplayer')[0].setIsForceExpandStageVideo(true)
-      }
+      EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
+        if (conf.forceEnableStageVideo) {
+          try {$('#external_nicoplayer')[0].setIsForceUsingStageVideo(true);  } catch (e) { console.log(e);}
+        }
+        if (conf.forceExpandStageVideo) {
+          try {$('#external_nicoplayer')[0].setIsForceExpandStageVideo(true); } catch (e) { console.log(e);}
+        }
+      });
 
       pac.addEventListener('onStageVideoAvailabilityUpdated', onStageVideoAvailabilityUpdated);
       onStageVideoAvailabilityUpdated(WatchController.isStageVideoAvailable());
@@ -8025,8 +8071,11 @@ body.videoSelection .sidePanel .commentUserProfile {
         } else
         if (name === 'compactVideoInfo') {
           $('#content, #outline').toggleClass('w_compact', newValue);
+        } else
+        if (name === 'hideMenuInFull') {
         }
       });
+
 
       if (conf.enableMylistDeleteButton) $('#resultContainer').addClass('enableMylistDeleteButton');
 
@@ -8053,7 +8102,7 @@ body.videoSelection .sidePanel .commentUserProfile {
     }
 
     LocationHashParser.initialize();
-    initIframe();
+    initIframe($, conf, w);
     initNews();
     initShortcutKey();
     initMouse();
