@@ -17,7 +17,7 @@
 // @grant          GM_getValue
 // @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
-// @version        1.130621
+// @version        1.130624
 // ==/UserScript==
 
 // TODO:
@@ -26,9 +26,11 @@
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
 
+// * ver 1.130624
+// - フルスクリーン時はプレイリストのどこでもホイールで回せるようにした
+
 // * ver 1.130621
 // - 全画面表示時に右下のマイリストメニューを消すor目立たなくする設定を追加
-
 
 // * ver 1.130620
 // - ハードウェアアクセラレーションへの対応 (ショートカットキー等)
@@ -1832,6 +1834,9 @@
       body:not(.full_with_browser) #content.w_compact #videoHeader {\
         width: 940px;\
       }\
+      body:not(.full_with_browser).size_normal #content.w_compact #videoHeader {\
+        width: 1166px;\
+      }\
       .videoMenuToggle {\
         -webkit-transform-origin: 100% 100%; -webkit-transition: -webkit-transform 0.4s;\
         transform-origin: 100% 100%; transition: transform 0.4s;\
@@ -1870,6 +1875,9 @@
       #content.w_compact #videoDetailInformation .description {\
         background: #fff; margin: 10px 0 0;padding: 4px ;width: 932px; font-size: 90%;\
       }\
+      .size_normal #content.w_compact #videoDetailInformation .description {\
+        width: 1158px\
+      }\
       #content.w_compact #topVideoInfo .videoMainInfoContainer{\
         padding: 0; \
       }\
@@ -1887,6 +1895,9 @@
       }\
       body:not(.full_with_browser) #content.w_compact #videoTagContainer{\
         width: 880px;\
+      }\
+      body:not(.full_with_browser).size_normal #content.w_compact #videoTagContainer{\
+        width: 1103px;\
       }\
       body:not(.full_with_browser) #content.w_compact #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit {\
         width: 72px;\
@@ -2349,8 +2360,7 @@
       events[name].push(callback);
     }
 
-    function dispatch(name) {
-      if (conf.debugMode) console.log('dispatch:', name, arguments);
+    function _dispatch(name) {
       name = name.toLowerCase();
       if (!events[name]) { return; }
       var e = events[name];
@@ -2358,13 +2368,18 @@
         try {
           e[i].apply(null, Array.prototype.slice.call(arguments, 1));
         } catch (ex) {
-          console.log(name, i, e[i], ex);
+          console.log('%c' + name, 'background:red; color: white; font-family: impact;', i, e[i], ex);
         }
       }
     }
+     function dispatch(name) {
+      if (conf.debugMode) console.log('%cevent:', 'background: blue; color: white;', name, arguments);
+      _dispatch.apply(null, arguments);
+    }
     return {
       addEventListener: addEventListener,
-      dispatch: dispatch
+      dispatch: dispatch,
+      _dispatch: _dispatch // コンソール汚したくない用
     };
   })(conf, w);
   w.WatchItLater.event = EventDispatcher;
@@ -2380,7 +2395,7 @@
     function add() {
       var v = get() + 1;
       w.localStorage.setItem(key, JSON.stringify(v));
-      if (conf.debugMode) console.log('watchCounter: ', v);
+      if (conf.debugMode) console.log('%cwatchCounter: %c%d', 'color: orange;', 'font-weight: bolder;', v);
       return v;
     }
     var self ={
@@ -6769,18 +6784,26 @@
         if (pm.getLeftSideIndex() + cols <= pl.getNextPlayingIndex()) { toCenter(); }
       });
       $('#playlistContainer .prevArrow, #playlistContainer .nextArrow').on('mousewheel.watchItLater', function(e, delta) {
+        if (WatchController.isFullScreen()) { return; }
         e.preventDefault();
         e.stopPropagation();
         scroll(delta *-1);
-      }).attr('title', 'ホイールで左右に移動');
+      }).attr('title', 'ホイールで左右にスクロール');
+      // フルスクリーン中はプレイリストのどこでもスクロールできたほうがいいね
+      $('#playlist').on('mousewheel.watchItLater', function(e, delta) {
+        if (WatchController.isFullScreen() || WatchController.isSearchMode()) {
+          e.preventDefault();
+          e.stopPropagation();
+          scroll(delta *-1);
+        }
+      });
       EventDispatcher.addEventListener('onWheelAndButton', function(e, delta, button) {
+        if (WatchController.isFullScreen()) { return; }
         if ($('#playlist').hasClass('dragging')) {
           e.preventDefault();
           scroll(delta *-1);
         }
       });
-      //
-      //
 
 
       function updatePos() {
@@ -7797,10 +7820,10 @@ body.videoSelection .sidePanel .commentUserProfile {
 //            return;
           }
           var isAllowed = WatchController.allowStageVideo(), exp = $('#external_nicoplayer')[0];
-          WatchController.allowStageVideo('toggle');
+          exp.setIsForceUsingStageVideo(!isAllowed && conf.forceEnableStageVideo);
+          WatchController.allowStageVideo(!isAllowed);
           setTimeout(function() {
             isAllowed = WatchController.allowStageVideo();
-            exp.setIsForceUsingStageVideo(isAllowed && conf.forceEnableStageVideo);
             var isAvailable = WatchController.isStageVideoAvailable();
             Popup.show('ハードウェアアクセラレーション:' +
               (isAllowed ? '設定ON' : '設定OFF') + ' / ' +
@@ -7921,7 +7944,10 @@ body.videoSelection .sidePanel .commentUserProfile {
             else
             if (rightDown) { button = 2; }
           }
-          if (button < 1) { return; }
+          if (button < 1) {
+            EventDispatcher._dispatch('onWheelNoButton', delta);
+            return;
+          }
           EventDispatcher.dispatch('onWheelAndButton', event.reset(), delta, button);
           if (event.cancel) {
             e.preventDefault();
@@ -8005,6 +8031,7 @@ body.videoSelection .sidePanel .commentUserProfile {
       };
 
       EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
+        onStageVideoAvailabilityUpdated(WatchController.isStageVideoAvailable());
         if (conf.forceEnableStageVideo) {
           try {$('#external_nicoplayer')[0].setIsForceUsingStageVideo(true);  } catch (e) { console.log(e);}
         }
@@ -8014,7 +8041,6 @@ body.videoSelection .sidePanel .commentUserProfile {
       });
 
       pac.addEventListener('onStageVideoAvailabilityUpdated', onStageVideoAvailabilityUpdated);
-      onStageVideoAvailabilityUpdated(WatchController.isStageVideoAvailable());
 
       // console.log('StageVideo', $('#external_nicoplayer')[0].isStageVideoSupported() ? 'supported' : 'not supported');
       // console.log('ColorSpaces', $('#external_nicoplayer')[0].getStageVideoSupportedColorSpaces());
