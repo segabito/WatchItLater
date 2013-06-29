@@ -14,8 +14,6 @@
 // @match          http://ch.nicovideo.jp/*
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
-// @grant          GM_getValue
-// @grant          GM_setValue
 // @grant          GM_xmlhttpRequest
 // @version        1.130630
 // ==/UserScript==
@@ -27,7 +25,7 @@
 // 軽量化
 
 // * ver 1.130630
-// - 下半身の開閉をいつでもできるように変更
+// - フルスクリーン時にホイールを回すとメニュー・コメントパネルを出せるようにした
 
 // * ver 1.130624
 // - フルスクリーン時はプレイリストのどこでもホイールで回せるようにした
@@ -493,14 +491,15 @@
       hideNicoNews: false, // ニコニコニュースを消す
       hashPlaylistMode: 0,    // location.hashにプレイリストを保持 0 =無効 1=連続再生時 2=常時
       storagePlaylistMode: '', // localStorageにプレイリストを保持
-      compactVideoInfo: false, //
+      compactVideoInfo: true, //
       hoverMenuDelay: 0.4, // リンクをホバーした時のメニューが出るまでの時間(秒)
+      enableFullScreenMenu: true, // 全画面時にホイールでメニューを出す
 
       hideVideoExplorerExpand: true, // 「動画をもっと見る」ボタンを小さくする
       nicommendVisibility: 'visible', // ニコメンドの表示 'visible', 'underIchiba', 'hidden'
       ichibaVisibility:    'visible', // 市場の表示 '',   'visible', 'hidden'
       reviewVisibility:    'visible', // レビューの表示   'visible', 'hidden'
-      bottomContentsVisibility: 'visible', // 動画下のコンテンツ表示表示非表示
+      bottomContentsVisibility: 'hidden', // 動画下のコンテンツ表示表示非表示
       hideMenuInFull: 'hide', // 全画面時にマイリストメニューを隠す '', 'hide' = 目立たなくする, 'hideAll' = 完全非表示
 
       flatDesignMode: '',  // 'on' グラデーションや角丸をなくす
@@ -667,7 +666,10 @@
         padding: 8px 18px;\
       }\
       .mylistPopupPanel.w_touch .mylistSelect {\
-        font-size: 170%; width: 130px;\
+        font-size: 170%; width: 130px; border: none;\
+      }\
+      .mylistPopupPanel.w_touch .mylistSelect:focus {\
+        border: 1px dotted;\
       }\
       .mylistPopupPanel.deflistSelected button {\
       }\
@@ -687,6 +689,9 @@
       }\
       .mylistPopupPanel .mylistAdd, .mylistPopupPanel .tagGet, #yukkuriPanel .yukkuriButton {\
         border:1px solid #777; cursor: pointer; font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #eee; background-color: #888; margin: 0;\
+      }\
+      .mylistPopupPanel .mylistAdd:focus, .mylistPopupPanel .tagGet:focus, #yukkuriPanel .yukkuriButton:focus {\
+        border-style: outset; color: orange;\
       }\
       .mylistPopupPanel.deflistSelected {\
         color: #ff9;\
@@ -1048,6 +1053,7 @@
                 transform: rotate(90deg);         transform-origin: 0 0 0;\
         -webkit-transform: rotate(90deg); -webkit-transform-origin: 0 0 0;\
       }\
+      .full_with_browser #sidePanelTabContainer { background: #000; }\
       body:not(.videoSelection) #sidePanelTabContainer.left {\
         background: #000 /* firefoxはこれがないと欠ける */; right: auto; left: -375px; padding: 0;\
                 transform: rotate(-90deg);         transform-origin: 100% 0 0;\
@@ -1738,7 +1744,7 @@
       body.full_with_browser.trueBrowserFull #playlist {\
         display: none;\
       }\
-      body.full_with_browser.trueBrowserFull .mylistPopupPanel,body.full_with_browser.trueBrowserFull .yukkuriButton { display:none; }\
+      body.full_with_browser.trueBrowserFull .mylistPopupPanel.fixed,body.full_with_browser.trueBrowserFull .yukkuriButton { display:none; }\
       #trueBrowserFullShield {\
         -webkit-transition: opacity 0.2s ease-out;\
         position:absolute; \
@@ -1963,9 +1969,6 @@
         /* 左パネルを隠した標準サイズのプレイヤーに合わせる */\
         width: 940px;\
       }\
-      /*#outline.w_compact #ichibaMain dl:nth-of-type(2n) {\
-        margin: 0 33px 30px; background: #ccc;\
-      }*/\
       #outline.w_compact #ichibaMain dl.ichiba_mainitem {\
         margin: 0 22px 30px 0;\
       }\
@@ -1973,6 +1976,28 @@
       \
       body.en-us #playerContainerSlideArea, body.zh-tw #playerContainerSlideArea {\
         padding-right: 0;\
+      }\
+      #footer .toggleBottom {\
+        cursor: pointer; text-align: center; width: 200px; padding: 0px 12px; margin: auto; border-radius: 16px 16px 0 0;\
+        border: 1px solid #333; background: #666; transition: background 0.4s ease-out, box-shadow 0.4s;\
+      }\
+      #footer:hover .toggleBottom {\
+        border: 1px outset; background: #ccc;\
+      }\
+      #footer .toggleBottom:hover {\
+        box-shadow: 0px 0px 8px #fff;\
+      }\
+     #footer.noBottom .toggleBottom {\
+        border-radius: 0 0 16px 16px;\
+      }\
+      #footer .toggleBottom .openBottom, #footer.noBottom .toggleBottom .closeBottom  {\
+        display: none;\
+      }\
+      #footer.noBottom .toggleBottom .openBottom {\
+        display: block;\
+      }\
+      #footer .toggleBottom>div {\
+        -webkit-transform: scaleX(3); transform: scaleX(3);\
       }\
       \
     '
@@ -2067,9 +2092,9 @@
         values: {'非表示': 'hidden', '表示': 'visible'}},
       {title: 'レビューの位置', varName: 'reviewVisibility',
         values: {'非表示': 'hidden', '表示': 'visible'}},
-      {title: 'プレイヤー下の要素をまとめて消す', varName: 'bottomContentsVisibility',
-        description: 'ニコメンド・市場・レビューをまとめて消します',
-        values: {'消す': 'hidden', '消さない': 'visible'}},
+//      {title: 'プレイヤー下の要素をまとめて消す', varName: 'bottomContentsVisibility',
+//        description: 'ニコメンド・市場・レビューをまとめて消します',
+//        values: {'消す': 'hidden', '消さない': 'visible'}},
 
       {title: '動画検索画面の設定'},
       {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack', reload: true,
@@ -2096,6 +2121,8 @@
         values: {'有効': true, '無効': false}},
       {title: '右下のマイリストメニュー', varName: 'hideMenuInFull',
         values: {'消す': 'hideAll', '色だけ変える': '', '目立たなくする': 'hide'}},
+      {title: 'マウスホイールでコメントパネル/メニューを出す', varName: 'enableFullScreenMenu',
+        values: {'する': true, 'しない': false}},
 
       {title: '省スペース化の設定'},
       {title: 'タグが2行以内の時に縦幅を縮める(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight', reload: true,
@@ -2947,12 +2974,12 @@
           sel.appendChild(opt);
           return opt;
         }
-        appendO(sel, 'とりマイ', 'default');
+        appendO(sel, '0:とりマイ', 'default');
         sel.selectedIndex = 0;
         setTimeout(function() {
           for (var i = 0, len = mylistlist.length; i < len; i++) {
             var mylist = mylistlist[i];
-            appendO(sel, mylist.name, mylist.id);
+            appendO(sel, (i + 1).toString(36) + ':' +  mylist.name, mylist.id);
           }
         }, initialized ? 0 : 3000);
         sel.addEventListener('change', function() {
@@ -2976,7 +3003,7 @@
         return sel;
       }
 
-      function createSubmitButton(sel) {
+      function createSubmitButton() {
         var btn = document.createElement('button');
         btn.appendChild(document.createTextNode('my'));
         btn.className = 'mylistAdd';
@@ -3075,11 +3102,18 @@
       }
 
 
-      var sel = createSelector(mylistlist);
-      nobr.appendChild(sel);
-
+      var sel = createSelector();
       var submit = createSubmitButton(sel);
+      nobr.appendChild(sel);
       nobr.appendChild(submit);
+      if (w.jQuery) {
+        w.jQuery(sel).keydown(function(e) {
+          e.stopPropagation();
+          if (e.keyCode === 13) { // ENTER
+            submit.click();
+          }
+        });
+      }
 
       var tagBtn = createTagListButton();
       nobr.appendChild(tagBtn);
@@ -3724,7 +3758,9 @@
       $('table:first td.main_frm_bg').css({height: '20px'});
       $('table:first table:first').hide();
 
-      $('select').css({width: '64px',position: 'absolute', top:0, left:0, margin: 0}).addClass('mylistSelect');
+      $('select')
+        .css({width: '64px',position: 'absolute', top:0, left:0, margin: 0})
+        .addClass('mylistSelect');
       $('select')[0].selectedIndex = $('select')[0].options.length - 1;
       $('#select_group option:last')[0].innerHTML = 'とりマイ';
 
@@ -4139,6 +4175,18 @@
       },
       isFullScreen: function() {
         return $('body').hasClass('full_with_browser');
+      },
+      // フルスクリーンの時にタグとかプレイリストを表示する設定かどうか
+      isFullScreenContentAll: function() {
+        try {
+          var content = localStorage.BROWSER_FULL_OPTIONS;
+          if (typeof content !== 'string') return false;
+          var isAll = JSON.parse(content).content === 'all';
+          return isAll;
+        } catch(e) {
+          console.log('%cexception', 'background: red; color: white;', e);
+          return false;
+        }
       }
     };
   })(w);
@@ -6735,6 +6783,7 @@
 
         EventDispatcher.addEventListener('onScreenModeChange', function(sc) {
           var mode = sc.mode;
+          $('body').removeClass('w_fullScreenMenu');
           if (mode === 'browserFull' && lastScreenMode !== mode) {
             lastPlayerConfig = watch.PlayerInitializer.nicoPlayerConnector.playerConfig.get();
             hideIfNeed();
@@ -6749,7 +6798,48 @@
         $(window).on('beforeunload.watchItLater', function(e) {
           restoreVisibility();
         });
-//      }
+        var wheelCounter = 0, wheelTimer = null;
+        EventDispatcher.addEventListener('onWheelNoButton', function(e, delta) {
+          if (!conf.enableFullScreenMenu) return;
+          if (e.target.tagName !== 'OBJECT' || !WatchController.isFullScreen()) return;
+          if (wheelTimer) {
+            wheelCounter += delta;
+         } else {
+            wheelCounter = 0;
+            wheelTimer = setTimeout(function() {//
+              wheelTimer = null;
+              if (Math.abs(wheelCounter) > 5) {
+                EventDispatcher
+                  .dispatch('onToggleFullScreenMenu',
+                    $('body').toggleClass('w_fullScreenMenu', wheelCounter < 0).hasClass('w_fullScreenMenu')
+                );
+              } else {
+              }
+            }, 500);
+          }
+        });
+        TouchEventDispatcher.onflick(function(e) {
+          if (!conf.enableFullScreenMenu) return;
+          if ((e.direction !=='up' && e.direction !=='down') || e.startEvent.target.tagName !== 'OBJECT' || !WatchController.isFullScreen()) return;
+          if (wheelTimer) {
+            clearTimeout(wheelTimer);
+            wheelTimer = null;
+          }
+          EventDispatcher
+            .dispatch('onToggleFullScreenMenu',
+              $('body').toggleClass('w_fullScreenMenu', e.direction === 'down').hasClass('w_fullScreenMenu')
+          );
+        });
+
+        var $fullScreenModeSwitch = $([
+            '<div id="fullScreenModeSwitch">',
+              '画面モード: ',
+              '<span class="modeStatus mode_normal">通常</span>',
+              '<span class="modeStatus mode_noborder">最大化 </span>',
+            '</div>'
+        ].join('')).attr('title', 'クリックでモード切替え').click(toggleTrueBrowserFull);
+        $('body').append($fullScreenModeSwitch);
+
     }
 
 
@@ -6794,7 +6884,7 @@
       }).attr('title', 'ホイールで左右にスクロール');
       // フルスクリーン中はプレイリストのどこでもスクロールできたほうがいいね
       $('#playlist').on('mousewheel.watchItLater', function(e, delta) {
-        if (WatchController.isFullScreen() || WatchController.isSearchMode()) {
+        if (WatchController.isFullScreen() || WatchController.isSearchMode() || $('#footer').hasClass('noBottom')) {
           e.preventDefault();
           e.stopPropagation();
           scroll(delta *-1);
@@ -7710,6 +7800,14 @@ body.videoSelection .sidePanel .commentUserProfile {
       if (conf.ichibaVisibility    !== 'visible') { updateIchibaVisibility(conf.ichibaVisibility); }
       if (conf.reviewVisibility    !== 'visible') { updateReviewVisibility(conf.reviewVisibility); }
       if (conf.bottomContentsVisibility !== 'visible') { updateBottomContentsVisibility(conf.bottomContentsVisibility); }
+
+      var $bottomToggle = $('<div class="toggleBottom"><div class="openBottom">▽</div><div class="closeBottom">△</div></div>');
+      $bottomToggle.on('click', function() {
+        var v = conf.bottomContentsVisibility;
+        conf.setValue('bottomContentsVisibility', v === 'hidden' ? 'visible' : 'hidden');
+        //ConfigPanel.refresh();
+      }).attr('title', '市場・レビューの開閉');
+      $('#footer').append($bottomToggle);
     }
 
   function initPanelSlider($, conf, w) {
@@ -7868,7 +7966,7 @@ body.videoSelection .sidePanel .commentUserProfile {
         if (e.keyCode === 176) { // 次の曲
           WatchController.nextVideo();
         }
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
           return;
         }
         // 全画面時はFlashにフォーカスがなくてもショートカットキーが効くようにする
@@ -7948,7 +8046,7 @@ body.videoSelection .sidePanel .commentUserProfile {
             if (rightDown) { button = 2; }
           }
           if (button < 1) {
-            EventDispatcher._dispatch('onWheelNoButton', delta);
+            EventDispatcher._dispatch('onWheelNoButton', e, delta);
             return;
           }
           EventDispatcher.dispatch('onWheelAndButton', event.reset(), delta, button);
@@ -8018,12 +8116,49 @@ body.videoSelection .sidePanel .commentUserProfile {
     function initCss() {
       var __css__ = (function() {/*
         #foot_inner { width: 940px; }
+        .size_normal #foot_inner { width: 1166px; }
         #footer.noBottom #foot_inner { padding: 0; }
-        html { background: #141414; }
-        .animateBlink{
+        #footer.noBottom a:nth-of-type(3):after, #footer.noBottom a:nth-of-type(6):after  {
+          content: ' | '; color: white;
+        }
+        #footer.noBottom br {
+          display: none;
+        }
+         html { background: #141414; }
+        .animateBlink {
           -webkit-transition: 1s ease-in;
           transition: 1s ease-in;
         }
+
+        body.full_with_browser #playerCommentPanelOuter {
+          right: 50px !important; top: -120% !important;
+          transition: top 0.2s ease-out; max-height: 500px;
+        }
+        body.full_with_browser.w_fullScreenMenu #playerCommentPanelOuter {
+          top: 20% !important;
+        }
+        #fullScreenModeSwitch { display: none; }
+        body.full_with_browser #fullScreenModeSwitch {
+        display: block; position: absolute; top: -500px; left: 50px; z-index: 1;
+          background: #ccc; padding: 8px; cursor: pointer;
+          font-size: 120%;
+          border: 3px outset #ccc;
+          transition: top 0.2s ease-out;
+        }
+        body.full_with_browser.w_fullScreenMenu #fullScreenModeSwitch {
+          top: 50px;
+        }
+        #fullScreenModeSwitch:hover {
+        border: 3px outset; box-shadow: 4px 4px 2px #888;
+        }
+        #fullScreenModeSwitch:active {
+          border: 3px inset !important;
+        }
+        #fullScreenModeSwitch .modeStatus { display: none; font-weight: bolder;}
+        body.trueBrowserFull #fullScreenModeSwitch .modeStatus { color: blue;}
+        body:not(.trueBrowserFull) #fullScreenModeSwitch .mode_normal, body.trueBrowserFull #fullScreenModeSwitch .mode_noborder { display: inline; }
+
+
       */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1];
       addStyle(__css__, 'videoReviewCss');
     }
