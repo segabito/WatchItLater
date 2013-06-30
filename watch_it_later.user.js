@@ -15,7 +15,7 @@
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130630
+// @version        1.130701
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130701
+// - フルスクリーンメニューを改良。タグも出るようにした
 
 // * ver 1.130630
 // - フルスクリーン時にホイールを回すとメニュー・コメントパネルを出せるようにした
@@ -1744,7 +1747,7 @@
       body.full_with_browser.trueBrowserFull #playlist {\
         display: none;\
       }\
-      body.full_with_browser.trueBrowserFull .mylistPopupPanel.fixed,body.full_with_browser.trueBrowserFull .yukkuriButton { display:none; }\
+      body.full_with_browser.trueBrowserFull:not(.w_fullScreenMenu) .mylistPopupPanel.fixed,body.full_with_browser.trueBrowserFull .yukkuriButton { display:none; }\
       #trueBrowserFullShield {\
         -webkit-transition: opacity 0.2s ease-out;\
         position:absolute; \
@@ -1754,7 +1757,7 @@
         background: black;\
         display: block;\
         bottom: 100px; \
-        right:  100px;\
+        right:  50px;\
         z-index: 10000; \
         min-width: 400px;\
         cursor: nw-resize;\
@@ -1769,7 +1772,7 @@
       body.full_with_browser #trueBrowserFullShield .ownerIcon {\
         float: left; height: 55px; padding: 8px;\
       }\
-      body.full_with_browser #trueBrowserFullShield:hover, body.full_with_browser #trueBrowserFullShield.active { \
+      body.full_with_browser #trueBrowserFullShield:hover, body.full_with_browser #trueBrowserFullShield.active, body.w_fullScreenMenu #trueBrowserFullShield { \
         opacity: 1;\
       }\
       body:not(.full_with_browser) #trueBrowserFullShield { display: none; }\
@@ -2037,7 +2040,7 @@
     var pt = function(){};
     var $panel = null, $shadow = null;
     var menus = [
-      {title: '動画再生開始・終了時の設定'},
+      {title: '動画再生開始・終了時の設定', className: 'videoStart'},
       {title: 'プレイヤーを自動で全画面化', varName: 'autoBrowserFull',
         values: {'する': true, 'しない': false}, addClass: true},
       {title: '自動全画面化オンでも、ユーザーニコ割のある動画は', varName: 'disableAutoBrowserFullIfNicowari',
@@ -2058,7 +2061,7 @@
       {title: '動画のコメント表示', varName: 'commentVisibility',
         values: {'オフ': 'hidden', '最後の状態を記憶': 'lastState', 'オン': 'visible'}},
 
-      {title: '動画プレイヤーの設定'},
+      {title: '動画プレイヤーの設定', className: 'playerSetting'},
       {title: 'コメントパネルを広くする', varName: 'wideCommentPanel',
         values: {'する': true, 'しない': false}},
       {title: 'コメントパネルにNG共有設定を表示', varName: 'enableSharedNgSetting',
@@ -2085,7 +2088,7 @@
             {'有効(ウィンドウを閉じるまで)': 'sessionStorage', '無効': ''})
       },
 
-      {title: '動画プレイヤー下の設定'},
+      {title: '動画プレイヤー下の設定', className: 'playerBottom'},
       {title: 'ニコメンドの表示', varName: 'nicommendVisibility',
         values: {'非表示': 'hidden', '市場の下': 'underIchiba', '市場の上(標準)': 'visible'}},
       {title: '市場の位置', varName: 'ichibaVisibility',
@@ -2096,7 +2099,7 @@
 //        description: 'ニコメンド・市場・レビューをまとめて消します',
 //        values: {'消す': 'hidden', '消さない': 'visible'}},
 
-      {title: '動画検索画面の設定'},
+      {title: '動画検索画面の設定', className: 'videoExplorer'},
       {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack', reload: true,
         description: '便利ですがちょっと重いです。\n大きめのモニターだと快適ですが、小さいといまいちかも',
         values: {'する': true, 'しない': false}},
@@ -2112,19 +2115,20 @@
         description: 'マイリストの整理に便利。\n ※ 消す時に確認ダイアログは出ないので注意',
         values: {'する': true, 'しない': false}},
 
-      {title: '全画面モードの設定'},
+      {title: '全画面モードの設定', className: 'fullScreen'},
       {title: '全画面時に操作パネルとコメント入力欄を隠す', varName: 'controllerVisibilityInFull',
         description: '全画面の時は少しでも動画を大きくしたい場合に便利',
         values: {'隠す': 'hidden', '隠さない': ''}},
-      {title: 'フチなし全画面モード (黒枠がなくなる)', varName: 'enableTrueBrowserFull',
-        description: 'F11でブラウザを最大化した状態だと、モニター全画面表示より大きくなります。 \nただし、操作パネルが若干はみ出します。',
-        values: {'有効': true, '無効': false}},
+//      {title: 'フチなし全画面モード (黒枠がなくなる)', varName: 'enableTrueBrowserFull',
+//        description: 'F11でブラウザを最大化した状態だと、モニター全画面表示より大きくなります。 \nただし、操作パネルが若干はみ出します。',
+//        values: {'有効': true, '無効': false}},
       {title: '右下のマイリストメニュー', varName: 'hideMenuInFull',
         values: {'消す': 'hideAll', '色だけ変える': '', '目立たなくする': 'hide'}},
-      {title: 'マウスホイールでコメントパネル/メニューを出す', varName: 'enableFullScreenMenu',
+      {title: 'マウスホイールでコメントパネル/メニューを表示', varName: 'enableFullScreenMenu',
+        description: 'ホイールを大きく下に回すとメニューが出ます。タッチパネルも対応',
         values: {'する': true, 'しない': false}},
 
-      {title: '省スペース化の設定'},
+      {title: '省スペース化の設定', className: 'compact'},
       {title: 'タグが2行以内の時に縦幅を縮める(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight', reload: true,
         values: {'する': true, 'しない': false}},
       {title: '「動画をもっと見る」ボタンを小さく', varName: 'hideVideoExplorerExpand',
@@ -2139,7 +2143,7 @@
         description: '画面上から見えなくなります。',
         values: {'なくす': true, 'なくさない': false}},
 
-      {title: 'その他の設定'},
+      {title: 'その他の設定', className: 'other'},
       {title: '動画リンクにカーソルを重ねたらメニューを表示', varName: 'enableHoverPopup', reload: true,
         description: 'マウスカーソルを重ねた時に出るのが邪魔な人はオフにしてください',
         values: {'する': true, 'しない': false}},
@@ -2160,7 +2164,7 @@
         values: {'使う': true, '使わない': false}},
 
 
-      {title: 'マウスとキーボードの設定', description: '※Chromeはコメント入力中も反応してしまいます'},
+      {title: 'マウスとキーボードの設定', description: '※Chromeはコメント入力中も反応してしまいます', className: 'shortcut'},
       {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
         description: 'なにもない場所をダブルクリックすると、動画の位置にスクロールします。\n 市場を見てからプレイヤーに戻りたい時などに便利',
         values: {'する': true, 'しない': false}},
@@ -2181,7 +2185,7 @@
       {title: 'ハードウェアアクセラレーションON/FF',  varName: 'shortcutToggleStageVideo',   type: 'keyInput'},
 
 
-      {title: '実験中の設定', debugOnly: true},
+      {title: '実験中の設定', debugOnly: true, className: 'forDebug'},
       {title: 'プレイリスト消えないモード(※実験中)',       varName: 'hashPlaylistMode', debugOnly: true, reload: true,
         values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}}
 
@@ -2208,9 +2212,9 @@
             $item = this.createMenuItem(menus[i]);
           } else {
             if (menus[i].description) {
-              $item = $('<li class="section" title="' + menus[i].title +'"><div><span>'+ menus[i].title + '</span><span class="description">'+ menus[i].description + '</span></div></li>');
+              $item = $('<li class="section ' +menus[i].className + '" title="' + menus[i].title + '"><div><span>'+ menus[i].title + '</span><span class="description">'+ menus[i].description + '</span></div></li>');
             } else {
-              $item = $('<li class="section" title="' +  menus[i].title + '"><div><span>'+ menus[i].title + '</span></div></li>');
+              $item = $('<li class="section ' +menus[i].className + '" title="' + menus[i].title + '"><div><span>'+ menus[i].title + '</span></div></li>');
             }
           }
           $item.toggleClass('debugOnly', menus[i].debugOnly === true).toggleClass('reload', menus[i].reload === true);
@@ -2351,8 +2355,13 @@
     pt.open = function()  {
       w.jQuery('body').append($shadow).append($panel);
       setTimeout(function() {
-      $shadow.addClass('open'); $panel.addClass('open');
+        $shadow.addClass('open'); $panel.addClass('open');
       }, 50);
+      setTimeout(function() {
+        if (WatchController.isFullScreen()) {
+         $('#watchItLaterConfigPanel .inner').scrollTop($('#watchItLaterConfigPanel .fullScreen').position().top - 50);
+        }
+      }, 1000);
     };
     pt.close = function() {
       $shadow.removeClass('open'); $panel.removeClass('open');
@@ -4102,6 +4111,23 @@
           if (conf.debugMode) console.log(e);
           return false;
         }
+      },
+      toggleStageVideo: function() {
+        if (!this.isStageVideoSupported()) {
+//        Popup.alert('ハードウェアアクセラレーションを使用できない状態か、未対応の環境です');
+//        return;
+        }
+        var isAllowed = this.allowStageVideo(), exp = $('#external_nicoplayer')[0];
+        exp.setIsForceUsingStageVideo(!isAllowed && conf.forceEnableStageVideo);
+        this.allowStageVideo(!isAllowed);
+        setTimeout($.proxy(function() {
+          isAllowed = this.allowStageVideo();
+          var isAvailable = this.isStageVideoAvailable();
+          Popup.show('ハードウェアアクセラレーション:' +
+            (isAllowed ? '設定ON' : '設定OFF') + ' / ' +
+            (isAvailable ? '使用可能' : '使用不能')
+          );
+        }, this), 100);
       },
       mute: function(v) {
         var exp = w.document.getElementById('external_nicoplayer');
@@ -6786,6 +6812,7 @@
           $('body').removeClass('w_fullScreenMenu');
           if (mode === 'browserFull' && lastScreenMode !== mode) {
             lastPlayerConfig = watch.PlayerInitializer.nicoPlayerConnector.playerConfig.get();
+            //$('body').toggleClass('w_fullWithPlaylist', WatchController.isFullScreenContentAll());
             hideIfNeed();
             toggleTrueBrowserFull(conf.enableTrueBrowserFull);
           } else
@@ -6813,6 +6840,7 @@
                   .dispatch('onToggleFullScreenMenu',
                     $('body').toggleClass('w_fullScreenMenu', wheelCounter < 0).hasClass('w_fullScreenMenu')
                 );
+                AnchorHoverPopup.hidePopup();
               } else {
               }
             }, 500);
@@ -6829,16 +6857,35 @@
             .dispatch('onToggleFullScreenMenu',
               $('body').toggleClass('w_fullScreenMenu', e.direction === 'down').hasClass('w_fullScreenMenu')
           );
+          AnchorHoverPopup.hidePopup();
         });
 
+        var $fullScreenMenuContainer = $('<div id="fullScreenMenuContainer"/>');
         var $fullScreenModeSwitch = $([
-            '<div id="fullScreenModeSwitch">',
+            '<button class="fullScreenModeSwitch button">',
               '画面モード: ',
-              '<span class="modeStatus mode_normal">通常</span>',
+              '<span class="modeStatus mode_normal">標準</span>',
               '<span class="modeStatus mode_noborder">最大化 </span>',
-            '</div>'
-        ].join('')).attr('title', 'クリックでモード切替え').click(toggleTrueBrowserFull);
-        $('body').append($fullScreenModeSwitch);
+            '</button>'
+        ].join('')).attr('title', '全画面時の表示切り替え').click(toggleTrueBrowserFull);
+         var $toggleStageVideo = $([
+            '<button class="stageVideoSwitch button">',
+              'アクセラレーション: ',
+              '<span class="modeStatus mode_off">OFF</span>',
+              '<span class="modeStatus mode_on">ON</span>',
+            '</button>'
+        ].join('')).attr('title', 'ハードウェアアクセラレーションのON/OFF').click(function() {WatchController.toggleStageVideo()});
+        var $toggleSetting = $([
+            '<button class="toggleSetting button">',
+              '設定',
+            '</button>'
+        ].join('')).attr('title', '設定パネルを開閉します').click(function() { ConfigPanel.toggle();});
+        if (conf.debugMode) {
+          $fullScreenMenuContainer.append($fullScreenModeSwitch).append($toggleStageVideo).append($toggleSetting);
+        } else {
+          $fullScreenMenuContainer.append($fullScreenModeSwitch).append($toggleSetting);
+        }
+        $('#nicoplayerContainerInner').append($fullScreenMenuContainer);
 
     }
 
@@ -7916,22 +7963,7 @@ body.videoSelection .sidePanel .commentUserProfile {
           WatchController.deepenedComment('toggle');
         }},
         {name: 'shortcutToggleStageVideo',   exec: function(e) {
-          if (!WatchController.isStageVideoSupported()) {
-//            Popup.alert('ハードウェアアクセラレーションを使用できない状態か、未対応の環境です');
-//            return;
-          }
-          var isAllowed = WatchController.allowStageVideo(), exp = $('#external_nicoplayer')[0];
-          exp.setIsForceUsingStageVideo(!isAllowed && conf.forceEnableStageVideo);
-          WatchController.allowStageVideo(!isAllowed);
-          setTimeout(function() {
-            isAllowed = WatchController.allowStageVideo();
-            var isAvailable = WatchController.isStageVideoAvailable();
-            Popup.show('ハードウェアアクセラレーション:' +
-              (isAllowed ? '設定ON' : '設定OFF') + ' / ' +
-              (isAvailable ? '使用可能' : '使用不能')
-            );
-          }, 100);
-
+          WatchController.toggleStageVideo();
         }},
       ];
       for (var v in list) {
@@ -8130,36 +8162,55 @@ body.videoSelection .sidePanel .commentUserProfile {
           transition: 1s ease-in;
         }
 
-        body.full_with_browser #playerCommentPanelOuter {
-          right: 50px !important; top: -120% !important;
-          transition: top 0.2s ease-out; max-height: 500px;
+        body.full_with_browser #playerCommentPanelOuter, body.full_with_browser:not(.videoSelection) #playerCommentPanelOuter.w_wide {
+          top: auto !important; bottom: 3000px !important; right: 50px !important;
+          transition: bottom 0.2s ease-out; max-height: 500px;
         }
-        body.full_with_browser.w_fullScreenMenu #playerCommentPanelOuter {
-          top: 20% !important;
+        body.full_with_browser.w_fullScreenMenu:not(.videoSelection) #playerCommentPanelOuter {
+          top: auto !important; bottom:  200px !important; right: 50px !important;
         }
-        #fullScreenModeSwitch { display: none; }
-        body.full_with_browser #fullScreenModeSwitch {
-        display: block; position: absolute; top: -500px; left: 50px; z-index: 1;
-          background: #ccc; padding: 8px; cursor: pointer;
-          font-size: 120%;
-          border: 3px outset #ccc;
-          transition: top 0.2s ease-out;
+
+        #fullScreenMenuContainer { display: none;}
+        body.full_with_browser #fullScreenMenuContainer {
+          display: block; position: absolute; bottom: 3000px; left: 50px; z-index: 1;
+          background: #fff; cursor: pointer;
+          transition: bottom 0.2s ease-out;
         }
-        body.full_with_browser.w_fullScreenMenu #fullScreenModeSwitch {
-          top: 50px;
+        body.full_with_browser.w_fullScreenMenu #fullScreenMenuContainer {
+          bottom: 100px;
         }
-        #fullScreenModeSwitch:hover {
-        border: 3px outset; box-shadow: 4px 4px 2px #888;
+
+        #fullScreenMenuContainer .button {
+          padding: 8px; cursor: pointer;
+          transition: color 0.4s ease-out;
         }
-        #fullScreenModeSwitch:active {
-          border: 3px inset !important;
-        }
-        #fullScreenModeSwitch .modeStatus { display: none; font-weight: bolder;}
-        body.trueBrowserFull #fullScreenModeSwitch .modeStatus { color: blue;}
-        body:not(.trueBrowserFull) #fullScreenModeSwitch .mode_normal, body.trueBrowserFull #fullScreenModeSwitch .mode_noborder { display: inline; }
+        #fullScreenMenuContainer .modeStatus { display: none; font-weight: bolder;}
+        body.trueBrowserFull       #fullScreenMenuContainer .fullScreenModeSwitch { color: blue;}
+        body:not(.trueBrowserFull) #fullScreenMenuContainer .fullScreenModeSwitch .mode_normal,
+        body.trueBrowserFull       #fullScreenMenuContainer .fullScreenModeSwitch .mode_noborder { display: inline; }
+
+        #nicoplayerContainerInner.stageVideo       #fullScreenMenuContainer .stageVideoSwitch { color: blue; }
+        #nicoplayerContainerInner:not(.stageVideo) #fullScreenMenuContainer .stageVideoSwitch .mode_off,
+        #nicoplayerContainerInner.stageVideo       #fullScreenMenuContainer .stageVideoSwitch .mode_on { display: inline; }
 
 
-      */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1];
+        body.full_with_browser.w_fullScreenMenu .videoHeaderOuter {
+          position: absolute; z-index: 1000; width: 100%;
+        }
+
+     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1];
+        /*
+       body.full_with_browser.w_fullScreenMenu:not(.w_fullWithPlaylist) #playlist {
+          position: absolute; z-index: 1000; bottom: -130px;
+          transition: bottom 0.2s ease-in-out;
+        }
+        body.full_with_browser.w_fullScreenMenu:not(.w_fullWithPlaylist) #playlist:hover {
+          bottom: 0px;
+        }
+        body.full_with_browser.w_fullScreenMenu {
+          overflow: hidden !important;
+        }
+        */
       addStyle(__css__, 'videoReviewCss');
     }
 
