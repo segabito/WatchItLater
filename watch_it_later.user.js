@@ -15,7 +15,7 @@
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130701
+// @version        1.130702
 // ==/UserScript==
 
 // TODO:
@@ -2070,7 +2070,7 @@
         values: {'する': true, 'しない': false}, addClass: true},
       {title: '左のパネルに動画情報・市場を表示', varName: 'leftPanelJack', reload: true,
         values: {'する': true, 'しない': false}},
-      {title: '右のパネルに動画情報・市場・レビューを表示', varName: 'rightPanelJack',
+      {title: '右のパネルに動画情報・市場・レビューを表示', varName: 'rightPanelJack', reload: true,
         values: {'する': true, 'しない': false}},
       {title: 'ページのヘッダに再生数表示', varName: 'headerViewCounter', reload: true,
         values: {'する': true, 'しない': false}},
@@ -6975,7 +6975,7 @@
               parseInt(item.mylistCounter,                10).toString(36),
               parseInt(item.viewCounter,                  10).toString(36),
               parseInt(item.numRes,                       10).toString(36),
-              parseInt(item.thumbnailUrl.split('?i=')[1], 10).toString(36)
+              (item.thumbnailUrl ? parseInt(item.thumbnailUrl.split('?i=')[1], 10).toString(36) : 'c490r'),
             ].join(',') + ':' + item.title
           );
         }
