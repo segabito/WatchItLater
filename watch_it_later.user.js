@@ -15,7 +15,7 @@
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130702
+// @version        1.130704
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130704
+// - 設定パネルが長くなったので折りたたむようにした
 
 // * ver 1.130701
 // - フルスクリーンメニューを改良。タグも出るようにした
@@ -484,7 +487,6 @@
       noNicoru: false, // ニコるボタンをなくす
       enoubleTouchPanel: false, // タッチパネルへの対応を有効にする
       mouseClickWheelVolume: 0, // マウスボタン+ホイールで音量調整を有効にする 1 = 左ボタン 2 = 右ボタン
-      enableAutoPlaybackContinue: false, // 一定時間操作しなかくても自動再生を続行
       enableQTouch: false, // タッチパネルモード有効
       commentVisibility: 'visible', // 'visible', 'hidden', 'lastState'
       lastCommentVisibility: 'visible',
@@ -523,6 +525,7 @@
       watchCounter: 0, // お前は今までに見た動画の数を覚えているのか？をカウントする
       forceEnableStageVideo: false,
       forceExpandStageVideo: false,
+      enableAutoPlaybackContinue: false, // 一定時間操作しなかくても自動再生を続行
       lastLeftTab: 'videoInfo',
       lastRightTab: 'w_comment',
       enableSortTypeMemory: true, // 検索のソート順を記憶する
@@ -1282,7 +1285,7 @@
       #watchItLaterConfigPanelShadow {\
         position: fixed; bottom: 16px; right: 16px; z-index: 10000;\
         width: 446px; height: 559px; padding: 0;\
-        background: #000; /*box-shadow: 0 0 2px black; border-radius: 8px;*/ -webkit-filter: opacity(80%);\
+        background: #000; /*box-shadow: 0 0 2px black; border-radius: 8px;*/ -webkit-filter: opacity(70%);\
         transition: transform 0.4s ease-in-out; -webkit-transition: -webkit-transform 0.4s ease-in-out;\
         transform-origin: 50% 0; -webkit-transform-origin: 50% 0;\
         transform: scaleY(0); -webkit-transform: scaleY(0);\
@@ -1306,11 +1309,17 @@
         font-size: 135%;\
       }\
       #watchItLaterConfigPanel .inner{\
-        max-height: 500px;overflow-y: auto;border-width: 4px 16px 16px 16px; border-radius: 0 0 16px 16px;\
+        height: 500px; overflow-y: auto;border-width: 4px 16px 16px 16px; border-radius: 0 0 16px 16px;\
         border-style: solid;border-color: #ccc;\
       }\
       #watchItLaterConfigPanel ul{\
-        border: 1px inset #ccc;\
+        border-style: inset; border-color: #ccc; border-width: 0 1px 0;\
+      }\
+      #watchItLaterConfigPanel ul.shortcutContainer{\
+        border-width: 0 1px 1px;\
+      }\
+      #watchItLaterConfigPanel ul.videoStart{\
+        border-width: 1px 1px 0;\
       }\
       #watchItLaterConfigPanel li{\
       }\
@@ -1349,8 +1358,24 @@
         display: block; background: #888;\
       }\
       #watchItLaterConfigPanel .section {\
-        border-style: solid;border-width: 20px 12px 12px 12px;color: white;font-size: 135%;\
-        font-weight: bolder; /*text-shadow: 2px 2px 1px #000000;*/\
+        border-style: solid;border-width: 10px 12px 10px 12px;color: white; font-size: 135%; position: relative;\
+        font-weight: bolder; cursor: pointer; /*text-shadow: 2px 2px 1px #000000;*/\
+        transition: border-width 0.2s ease-in-out 0.4s, color 0.3s; -webkit-transition: border-width 0.2s ease-in-out 0.4s, color 0.4s;\
+      }\
+      #watchItLaterConfigPanel .open .section {\
+        border-width: 20px 12px 12px 12px;\
+        transition: border-width 0.2s ease-in-out     ; -webkit-transition: border-width 0.2s ease-in-out     ;\
+      }\
+      #watchItLaterConfigPanel .section:hover:after {\
+        content: \'▼\';\
+        position: absolute; top: 0px; right: 10px; font-size: 150%;\
+        transition: transform 0.2s ease-in-out 0.4s; -webkit-transition: -webkit-transform 0.2s ease-in-out 0.4s;\
+      }\
+      #watchItLaterConfigPanel .open .section:after {\
+        content: \'▼\';\
+        position: absolute; top: 0px; right: 10px; font-size: 150%;\
+        transform: rotate(180deg); -webkit-transform: rotate(180deg);\
+        transition: transform 0.2s ease-in-out     ; -webkit-transition: -webkit-transform 0.2s ease-in-out;\
       }\
       #watchItLaterConfigPanel .section > div {\
         padding: 8px 0 8px 12px; box-shadow: 0 0 4px black;\
@@ -1359,7 +1384,13 @@
         /*background: #333;*/\
       }\
       #watchItLaterConfigPanel li:not(.section) {\
-        background: #fff; border-width: 4px 0px 4px 24px; border-style: solid; border-color: #fff;\
+        background: #fff; border-width: 0px 0px 0px 24px; border-style: solid; border-color: #fff;\
+        max-height: 0px; overflow: hidden;\
+        transition: max-height 0.4s ease-in-out     , border-width 0.4s ease-in-out;\
+      }\
+       #watchItLaterConfigPanel .open li:not(.section) {\
+        max-height: 100px; border-width: 4px 0px 4px 24px; \
+        transition: max-height 0.4s ease-in-out 0.2s, border-width 0.4s ease-in-out 0.2s;\
       }\
       #watchItLaterConfigPanel .section .description{\
         display: block; font-size: 80%;;\
@@ -1381,6 +1412,9 @@
       }\
       #watchItLaterConfigPanel .shortcutSetting.ctrl .ctrl, #watchItLaterConfigPanel .shortcutSetting.alt .alt, #watchItLaterConfigPanel .shortcutSetting.shift .shift {\
         border: 2px inset; color: blue;\
+      }\
+      #watchItLaterConfigPanel .hoverMenuDelay input {\
+        width: 50px; ime-mode: disabled; text-align: center;\
       }\
 \
 \
@@ -2040,16 +2074,16 @@
     var pt = function(){};
     var $panel = null, $shadow = null;
     var menus = [
-      {title: '動画再生開始・終了時の設定', className: 'videoStart'},
-      {title: 'プレイヤーを自動で全画面化', varName: 'autoBrowserFull',
+      {title: '再生開始・終了時の設定', className: 'videoStart'},
+      {title: '自動で全画面モードにする', varName: 'autoBrowserFull',
         values: {'する': true, 'しない': false}, addClass: true},
       {title: '自動全画面化オンでも、ユーザーニコ割のある動画は', varName: 'disableAutoBrowserFullIfNicowari',
         values: {'全画面化しない': true, '全画面化する': false}},
-      {title: 'プレイヤーを自動で検索画面にする(自動全画面化オフ時)', varName: 'autoOpenSearch',
+      {title: '自動で検索画面にする(自動全画面化オフ時)', varName: 'autoOpenSearch',
         values: {'する': true, 'しない': false}},
-      {title: 'プレイヤー位置に自動スクロール(自動全画面化オフ時)', varName: 'autoScrollToPlayer',
+      {title: '動画の位置に自動スクロール(自動全画面化オフ時)', varName: 'autoScrollToPlayer',
         values: {'する': true, 'しない': false}},
-      {title: '動画終了時に全画面化を解除(原宿と同じにする)', varName: 'autoNotFull',
+      {title: '終了時に全画面モードを解除(原宿と同じにする)', varName: 'autoNotFull',
         values: {'する': true, 'しない': false},
         description: '連続再生中は解除しません'},
       {title: 'ウィンドウがアクティブの時だけ自動再生する', varName: 'autoPlayIfWindowActive',
@@ -2058,14 +2092,14 @@
       {title: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
         description: '全画面状態だと再生数がわからなくて不便、という時に',
         values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
-      {title: '動画のコメント表示', varName: 'commentVisibility',
-        values: {'オフ': 'hidden', '最後の状態を記憶': 'lastState', 'オン': 'visible'}},
 
       {title: '動画プレイヤーの設定', className: 'playerSetting'},
       {title: 'コメントパネルを広くする', varName: 'wideCommentPanel',
         values: {'する': true, 'しない': false}},
       {title: 'コメントパネルにNG共有設定を表示', varName: 'enableSharedNgSetting',
         values: {'する': true, 'しない': false}, addClass: true},
+      {title: 'コメントの表示', varName: 'commentVisibility',
+        values: {'オフ': 'hidden', '最後の状態を記憶': 'lastState', 'オン': 'visible'}},
       {title: '左のパネルを消滅させる', varName: 'removeLeftPanel',
         values: {'する': true, 'しない': false}, addClass: true},
       {title: '左のパネルに動画情報・市場を表示', varName: 'leftPanelJack', reload: true,
@@ -2074,11 +2108,11 @@
         values: {'する': true, 'しない': false}},
       {title: 'ページのヘッダに再生数表示', varName: 'headerViewCounter', reload: true,
         values: {'する': true, 'しない': false}},
-      {title: 'てれびちゃんメニュー内にニコニコ動画のロゴを復活', varName: 'hidariue', reload: true,
-        values: {'させる': true, 'させない': false}},
+//      {title: 'てれびちゃんメニュー内にニコニコ動画のロゴ', varName: 'hidariue', reload: true,
+//        values: {'出す': true, 'させない': false}},
       {title: 'ニコニコニュースの履歴を保持する', varName: 'enableNewsHistory', reload: true,
         values: {'する': true, 'しない': false}},
-      {title: '画面からニコニコニュースを消す', varName: 'hideNicoNews',
+      {title: 'ニコニコニュースを消す', varName: 'hideNicoNews',
         values: {'消す': true, '消さない': false}},
       {title: 'プレイリスト消えないモード(実験中)', varName: 'storagePlaylistMode', reload: true,
         description: '有効にすると、リロードしてもプレイリストが消えなくなります。',
@@ -2088,18 +2122,18 @@
             {'有効(ウィンドウを閉じるまで)': 'sessionStorage', '無効': ''})
       },
 
-      {title: '動画プレイヤー下の設定', className: 'playerBottom'},
-      {title: 'ニコメンドの表示', varName: 'nicommendVisibility',
+      {title: 'ページ下半分の設定', className: 'playerBottom'},
+      {title: 'ニコメンドの位置', varName: 'nicommendVisibility',
         values: {'非表示': 'hidden', '市場の下': 'underIchiba', '市場の上(標準)': 'visible'}},
-      {title: '市場の位置', varName: 'ichibaVisibility',
+      {title: 'ニコニコ市場の表示', varName: 'ichibaVisibility',
         values: {'非表示': 'hidden', '表示': 'visible'}},
-      {title: 'レビューの位置', varName: 'reviewVisibility',
+      {title: 'レビューの表示', varName: 'reviewVisibility',
         values: {'非表示': 'hidden', '表示': 'visible'}},
 //      {title: 'プレイヤー下の要素をまとめて消す', varName: 'bottomContentsVisibility',
 //        description: 'ニコメンド・市場・レビューをまとめて消します',
 //        values: {'消す': 'hidden', '消さない': 'visible'}},
 
-      {title: '動画検索画面の設定', className: 'videoExplorer'},
+      {title: '動画検索モードの設定', className: 'videoExplorer'},
       {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack', reload: true,
         description: '便利ですがちょっと重いです。\n大きめのモニターだと快適ですが、小さいといまいちかも',
         values: {'する': true, 'しない': false}},
@@ -2116,40 +2150,40 @@
         values: {'する': true, 'しない': false}},
 
       {title: '全画面モードの設定', className: 'fullScreen'},
-      {title: '全画面時に操作パネルとコメント入力欄を隠す', varName: 'controllerVisibilityInFull',
+      {title: '操作パネルとコメント入力欄を隠す', varName: 'controllerVisibilityInFull',
         description: '全画面の時は少しでも動画を大きくしたい場合に便利',
         values: {'隠す': 'hidden', '隠さない': ''}},
 //      {title: 'フチなし全画面モード (黒枠がなくなる)', varName: 'enableTrueBrowserFull',
 //        description: 'F11でブラウザを最大化した状態だと、モニター全画面表示より大きくなります。 \nただし、操作パネルが若干はみ出します。',
 //        values: {'有効': true, '無効': false}},
       {title: '右下のマイリストメニュー', varName: 'hideMenuInFull',
-        values: {'消す': 'hideAll', '色だけ変える': '', '目立たなくする': 'hide'}},
-      {title: 'マウスホイールでコメントパネル/メニューを表示', varName: 'enableFullScreenMenu',
+        values: {'完全に消す': 'hideAll', '色だけ変える': '', '目立たなくする': 'hide'}},
+      {title: 'ホイールを回したら動画情報を出す', varName: 'enableFullScreenMenu',
         description: 'ホイールを大きく下に回すとメニューが出ます。タッチパネルも対応',
         values: {'する': true, 'しない': false}},
 
-      {title: '省スペース化の設定', className: 'compact'},
-      {title: 'タグが2行以内の時に縦幅を縮める(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight', reload: true,
-        values: {'する': true, 'しない': false}},
-      {title: '「動画をもっと見る」ボタンを小さく', varName: 'hideVideoExplorerExpand',
-        values: {'する': true, 'しない': false}},
-      {title: '動画情報欄の空きスペースを詰める', varName: 'compactVideoInfo',
+      {title: '省スペース設定', className: 'compact'},
+      {title: 'タグが2行以内の時に高さを詰める(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight', reload: true,
+        values: {'詰める': true, '詰めない': false}},
+//      {title: '「動画をもっと見る」ボタンを小さく', varName: 'hideVideoExplorerExpand',
+//        values: {'する': true, 'しない': false}},
+      {title: '動画情報の空きスペースを詰める', varName: 'compactVideoInfo',
         description: '原宿ぐらいの密度になります。ちょっと窮屈かも',
         values: {'詰める': true, '詰めない': false}},
       {title: 'グラデーションや角の丸みをなくす', varName: 'flatDesignMode',
         description: '軽い表示になります',
         values: {'なくす': 'on', 'なくさない': ''}},
-      {title: '「ニコる」ボタンをなくす', varName: 'noNicoru',
+      {title: '「ニコる」をなくす', varName: 'noNicoru',
         description: '画面上から見えなくなります。',
         values: {'なくす': true, 'なくさない': false}},
 
-      {title: 'その他の設定', className: 'other'},
+      {title: 'その他の設定', className: 'otherSetting'},
       {title: '動画リンクにカーソルを重ねたらメニューを表示', varName: 'enableHoverPopup', reload: true,
         description: 'マウスカーソルを重ねた時に出るのが邪魔な人はオフにしてください',
         values: {'する': true, 'しない': false}},
       {title: '動画リンクにカーソルを重ねてからメニューが出るまでの時間(秒)', varName: 'hoverMenuDelay',
        type: 'text', description: '単位は秒。 標準は0.4です'},
-      {title: 'ゆっくり再生(スロー再生)ボタンを表示する', varName: 'enableYukkuriPlayButton',
+      {title: 'ゆっくり再生(スロー再生)ボタンを表示', varName: 'enableYukkuriPlayButton',
         values: {'する': true, 'しない': false}},
       {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
        description: '常に指定したいパラメータ指定するのに便利です\n例: 「-グロ -例のアレ」とすると、その言葉が含まれる動画が除外されます'},
@@ -2168,7 +2202,7 @@
       {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
         description: 'なにもない場所をダブルクリックすると、動画の位置にスクロールします。\n 市場を見てからプレイヤーに戻りたい時などに便利',
         values: {'する': true, 'しない': false}},
-      {title: 'マウスのボタン＋ホイールで音量調整機能', varName: 'mouseClickWheelVolume',
+      {title: 'マウスのボタン＋ホイールでどこでも音量調整', varName: 'mouseClickWheelVolume',
         description: 'とっさに音量を変えたい時に便利',
         values: {'左ボタン＋ホイール': 1, '右ボタン＋ホイール': 2, '使わない': 0}},
       {title: 'とりあえずマイリスト登録',       varName: 'shortcutDefMylist',          type: 'keyInput'},
@@ -2197,28 +2231,43 @@
         (listener[i])(name, value, lastValue);
       }
     }
-
     pt.createPanelDom = function() {
       if ($panel === null) {
         $panel = w.jQuery([
           '<div id="watchItLaterConfigPanel">',
           '<div class="head"><button class="closeButton" title="閉じる">▲</button><h2>WatchItLaterの設定</h2>(※)のつく項目は、リロード後に反映されます</div>',
-          '<div class="inner"><ul></ul></div></div>'
+          '<div class="inner"></div></div>'
         ].join(''));
 
-        var $ul = $panel.find('ul'), $item;
+        var scrollTo = function() {
+          var $target = this;
+          var isOpen = $target.parent().toggleClass('open').hasClass('open');
+          if (isOpen) {
+            setTimeout(function() {
+              var $inner = $('#watchItLaterConfigPanel .inner');
+              $inner.animate({
+                scrollTop: $inner.scrollTop() + $target.parent().position().top - 50
+              }, 400);
+            }, 200);
+          }
+        };
+
+        var $ul = null, $inner = $panel.find('.inner'), $item; //$panel.find('ul'), $item;
         for (var i = 0, len = menus.length; i < len; i++) {
           if (menus[i].varName) {
             $item = this.createMenuItem(menus[i]);
           } else {
             if (menus[i].description) {
-              $item = $('<li class="section ' +menus[i].className + '" title="' + menus[i].title + '"><div><span>'+ menus[i].title + '</span><span class="description">'+ menus[i].description + '</span></div></li>');
+             $item = $('<li class="section ' +menus[i].className + '"><div><span>'+ menus[i].title + '</span><span class="description">'+ menus[i].description + '</span></div></li>');
             } else {
-              $item = $('<li class="section ' +menus[i].className + '" title="' + menus[i].title + '"><div><span>'+ menus[i].title + '</span></div></li>');
+              $item = $('<li class="section ' +menus[i].className + '"><div><span>'+ menus[i].title + '</span></div></li>');
             }
+            if ($ul) $inner.append($ul);
+            $ul =$('<ul class="sectionContainer"/>').addClass(menus[i].className + 'Container');
+            $item.click($.proxy(scrollTo, $item));
           }
           $item.toggleClass('debugOnly', menus[i].debugOnly === true).toggleClass('reload', menus[i].reload === true);
-          $ul.append($item);
+          if ($ul) $ul.append($item);
         }
         $panel.toggleClass('debugMode', conf.debugMode);
         var $bottom = w.jQuery('<div class="foot"></div>'), self = this;
@@ -2292,6 +2341,8 @@
       if (menu.description) { $menu.attr('title', menu.description); }
       var currentValue = conf.getValue(varName);
       var $input = w.jQuery('<input type="text" />');
+      $menu.addClass(menu.varName);
+      if (menu.addClass) { $panel.addClass(menu.varName + '_' + currentValue);}
       $input.val(currentValue);
       $input.change(function() {
         var newValue = $input.val(), oldValue = conf.getValue(varName);
@@ -2348,6 +2399,10 @@
       return $menu;
     };
 
+    pt.toggleOpenSection = function(sectionName, toggle) {
+      $('#watchItLaterConfigPanel .'+ sectionName + 'Container').toggleClass('open', toggle);
+      $('#watchItLaterConfigPanel .inner').scrollTop($('#watchItLaterConfigPanel .' + sectionName).position().top - 50);
+    };
 
     pt.addChangeEventListener = function(callback) {
       listener.push(callback);
@@ -2359,7 +2414,7 @@
       }, 50);
       setTimeout(function() {
         if (WatchController.isFullScreen()) {
-         $('#watchItLaterConfigPanel .inner').scrollTop($('#watchItLaterConfigPanel .fullScreen').position().top - 50);
+          pt.toggleOpenSection('fullScreen', true);
         }
       }, 1000);
     };
@@ -6877,14 +6932,9 @@
         ].join('')).attr('title', 'ハードウェアアクセラレーションのON/OFF').click(function() {WatchController.toggleStageVideo()});
         var $toggleSetting = $([
             '<button class="toggleSetting button">',
-              '設定',
             '</button>'
-        ].join('')).attr('title', '設定パネルを開閉します').click(function() { ConfigPanel.toggle();});
-        if (conf.debugMode) {
-          $fullScreenMenuContainer.append($fullScreenModeSwitch).append($toggleStageVideo).append($toggleSetting);
-        } else {
-          $fullScreenMenuContainer.append($fullScreenModeSwitch).append($toggleSetting);
-        }
+        ].join('')).text('⛭設定').attr('title', '設定パネルを開閉します').click(function() { ConfigPanel.toggle();});
+        $fullScreenMenuContainer.append($fullScreenModeSwitch).append($toggleStageVideo).append($toggleSetting);
         $('#nicoplayerContainerInner').append($fullScreenMenuContainer);
 
     }
@@ -7014,7 +7064,7 @@
             id = c[0],
             thumbnailId = parseInt(c[4], 36);
 
-          if (uniq[id]) { continue; }
+          if (uniq[id] || typeof id !== 'string') { continue; }
           uniq[id] = true;
           if (id == watchInfoModel.v) {
             currentIndex = i;
@@ -8181,7 +8231,7 @@ body.videoSelection .sidePanel .commentUserProfile {
         }
 
         #fullScreenMenuContainer .button {
-          padding: 8px; cursor: pointer;
+          cursor: pointer;
           transition: color 0.4s ease-out;
         }
         #fullScreenMenuContainer .modeStatus { display: none; font-weight: bolder;}
