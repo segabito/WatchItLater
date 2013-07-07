@@ -15,7 +15,7 @@
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130704
+// @version        1.130708
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130708
+// - コメントの盛り上がり状態をグラフ表示する機能を追加
 
 // * ver 1.130704
 // - 設定パネルが長くなったので折りたたむようにした
@@ -499,6 +502,7 @@
       compactVideoInfo: true, //
       hoverMenuDelay: 0.4, // リンクをホバーした時のメニューが出るまでの時間(秒)
       enableFullScreenMenu: true, // 全画面時にホイールでメニューを出す
+      enableHeatMap: false, //
 
       hideVideoExplorerExpand: true, // 「動画をもっと見る」ボタンを小さくする
       nicommendVisibility: 'visible', // ニコメンドの表示 'visible', 'underIchiba', 'hidden'
@@ -596,7 +600,7 @@
         margin: 0; padding: 0; \
         white-space: nowrap;\
       }\
-      .tagItemsPopup li a{\
+     .tagItemsPopup li a{\
       }\
       .tagItemsPopup .nicodic {\
         margin-right: 4px; \
@@ -727,6 +731,7 @@
       .mylistPopupPanel.fixed .newTabLink, .mylistPopupPanel.fixed .closeButton {\
         display: none;\
       }\
+      .w_fullScreenMenu .mylistPopupPanel.fixed { bottom: 2px; }\
     ';
     addStyle(style, 'watchItLaterCommonStyle');
   })();
@@ -1284,7 +1289,7 @@
       }\
       #watchItLaterConfigPanelShadow {\
         position: fixed; bottom: 16px; right: 16px; z-index: 10000;\
-        width: 446px; height: 559px; padding: 0;\
+        width: 460px; height: 559px; padding: 0;\
         background: #000; /*box-shadow: 0 0 2px black; border-radius: 8px;*/ -webkit-filter: opacity(70%);\
         transition: transform 0.4s ease-in-out; -webkit-transition: -webkit-transform 0.4s ease-in-out;\
         transform-origin: 50% 0; -webkit-transform-origin: 50% 0;\
@@ -2114,6 +2119,9 @@
         values: {'する': true, 'しない': false}},
       {title: 'ニコニコニュースを消す', varName: 'hideNicoNews',
         values: {'消す': true, '消さない': false}},
+      {title: 'コメントの盛り上がりをグラフ表示', varName: 'enableHeatMap', reload: true,
+        description: '動画のどのあたりが盛り上がっているのか、わかりやすくなります',
+        values: {'する': true, 'しない': false}},
       {title: 'プレイリスト消えないモード(実験中)', varName: 'storagePlaylistMode', reload: true,
         description: '有効にすると、リロードしてもプレイリストが消えなくなります。',
         values:
@@ -6499,6 +6507,13 @@
         'body.videoSelection #content.w_adjusted #playlist { margin-left: ', xdiff, 'px; }\n',
         'body.videoSelection #searchResultExplorer.w_adjusted { min-height: ', (windowHeight + 200) ,'px !important; }\n',
 
+        'body.videoSelection #content.w_adjusted #nicoHeatMap {',
+          '-webkit-transform: scaleX(', availableWidth / 100, ');',
+          'transform: scaleX(', availableWidth / 100, ');',
+        '}\n',
+        'body.videoSelection #content.w_adjusted #nicoHeatMapContainer {',
+          'width: ', availableWidth, 'px;',
+        '}\n',
         'body.videoSelection #content.w_adjusted #smart_music_kiosk {',
           '-webkit-transform: scaleX(', scaleX, ');',
           'left: ', ((availableWidth - seekbarWidth) / 2) ,'px !important;',
@@ -6890,7 +6905,7 @@
             wheelCounter = 0;
             wheelTimer = setTimeout(function() {//
               wheelTimer = null;
-              if (Math.abs(wheelCounter) > 5) {
+              if (Math.abs(wheelCounter) > 3) {
                 EventDispatcher
                   .dispatch('onToggleFullScreenMenu',
                     $('body').toggleClass('w_fullScreenMenu', wheelCounter < 0).hasClass('w_fullScreenMenu')
@@ -7214,8 +7229,8 @@
           var $saver = $('<li>リストを保存(実験中)</li>').click(function() {
             openSaveDialog();
           });
-          $ul.append($saver);
 
+          $ul.append($saver);
           $popup.append($ul);
           $('body').append($popup);
         }
@@ -8247,10 +8262,50 @@ body.videoSelection .sidePanel .commentUserProfile {
         body.full_with_browser.w_fullScreenMenu .videoHeaderOuter {
           position: absolute; z-index: 1000; width: 100%;
         }
+        #nicoHeatMapContainer {
+          position: absolute; z-index: 200;
+          bottom: 0px; left: 0;
+          width: 672px;
+          background: #000; height: 8px;
+          overflow: hidden;
+        }
+        .size_normal #nicoHeatMapContainer {
+          width: 898px;
+        }
+        .oldTypeCommentInput #nicoHeatMapContainer {
+          bottom: 32px;
+        }
+        #nicoHeatMap {
+          position: absolute; top: 0; left: 0;
+          transform-origin: 0 0 0;-webkit-transform-origin: 0 0 0;
+          transform: scaleX(6.72);-webkit-transform: scaleX(6.72);
+          display: none;
+        }
+        #content:hover #nicoHeatMap {
+          display: block;
+        }
+        .size_normal #nicoHeatMap {
+          transform: scaleX(8.98);-webkit-transform: scaleX(8.98);
+        }
+        .setting_panel #nicoHeatMap {
+          display: none;
+        }
+        .full_with_browser #nicoHeatMapContainer, .videoSelection #content:not(.w_adjusted) #nicoHeatMapContainer {
+          display: none;
+        }
+        body.full_with_browser.w_fullScreenMenu.trueBrowserFull #nicoHeatMapContainer {
+          bottom: 0; position: fixed;
+        }
+        .full_with_browser.w_fullScreenMenu #nicoHeatMapContainer {
+          display: block;
+        }
+        .full_with_browser.w_fullScreenMenu .oldTypeCommentInput #nicoHeatMapContainer {
+          bottom: 34px; height: 10px;
+        }
 
      */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1];
         /*
-       body.full_with_browser.w_fullScreenMenu:not(.w_fullWithPlaylist) #playlist {
+        body.full_with_browser.w_fullScreenMenu:not(.w_fullWithPlaylist) #playlist {
           position: absolute; z-index: 1000; bottom: -130px;
           transition: bottom 0.2s ease-in-out;
         }
@@ -8261,7 +8316,33 @@ body.videoSelection .sidePanel .commentUserProfile {
           overflow: hidden !important;
         }
         */
-      addStyle(__css__, 'videoReviewCss');
+      addStyle(__css__, 'watchItLaterCss2');
+      var __expression__ = (function() {/*
+        .full_with_browser.w_fullScreenMenu #nicoHeatMapContainer {
+          width: 100%;
+        }
+        .full_with_browser.w_fullScreenMenu #nicoHeatMap {
+          transform: scaleX($scale); -webkit-transform: scaleX($scale); display: block;
+        }
+      */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1];
+      var exStyle = null;
+      var updateExpression = function() {
+        var css = __expression__;
+        var innerWidth = $('body').innerWidth();
+        css = css.split('$scale').join($('body').innerWidth() / 100);
+        //console.log(css);
+        if (exStyle) {
+          exStyle.innerHTML = css;
+          return exStyle;
+        } else {
+          return addStyle(css, 'expressionCss');
+        }
+      };
+      exStyle = updateExpression();
+
+      EventDispatcher.addEventListener('onWindowResize', function() {
+        updateExpression();
+      });
     }
 
     function initStageVideo($, conf, w) {
@@ -8286,6 +8367,124 @@ body.videoSelection .sidePanel .commentUserProfile {
 
     }
 
+    function initHeatMap($, conf, w) {
+      if (!conf.enableHeatMap) return;
+      //if (!w.Worker) return;
+      //
+      // TODO: Web Workers
+      var canvasWidth = 100, canvasHeight = 12;
+      var comments = [], duration = 0, canvas = null, context = null;
+      var commentReady = false, videoReady = false, updated = false;
+      watch.PlayerInitializer.playerAreaConnector.addEventListener('onCommentListInitialized', function() {
+        setTimeout(function() {
+          commentReady = true;
+          update();
+        }, 1000);
+      });
+      EventDispatcher.addEventListener('onVideoInitialized', function() {
+        videoReady = true;
+        update();
+      });
+      EventDispatcher.addEventListener('onVideoChangeStatusUpdated', function() {
+        clearCanvas();
+        commentReady = videoReady = updated = false;
+      });
+      var update = function() {
+        if (!commentReady || !videoReady || updated) return;
+        updated = true;
+        initCanvas();
+        getCommentsAndDuration();
+        if (comments.length < 1 || duration < 1) {
+          //console.log('comment not found', comments.length, duration);
+          return;
+        }
+        getHeatMap(function(map) {
+          //console.log('callbacked!', map);
+          var scale = duration >= canvasWidth ? 1 : (canvasWidth / duration);
+          var blockWidth = (canvasWidth / map.length) * scale;
+          for (i = map.length - 1; i >= 0; i--) {
+            //if (map[i] < 5) continue;
+            var
+              c = map[i],
+              r = Math.floor((c > 127) ? (c / 2 + 128) : 0),
+              g = Math.floor((c > 127) ? (255 - (c - 128) * 2) : (c * 2)),
+              b = Math.floor((c > 127) ? 0 : (255  - c * 2));
+            var color = 'rgb(' + r + ', ' + g + ', ' + b + ')';
+            //var color = 'rgb(0, 0, ' + map[i] + ')';
+            context.fillStyle = color;
+            context.beginPath();
+            context.fillRect(i * scale, 0, blockWidth, canvasHeight);
+          }
+        });
+      };
+      var getCommentsAndDuration = function() {
+        comments = [], duration = 0;
+        var exp = $('#external_nicoplayer')[0];
+        //for (var i = 0; i < 9; i++) {
+        //  try {var ct = exp.ext_getComments(i);} catch(e) { console.log(e); continue;}
+        //   comments = (comments.length < ct.length) ? ct : comments;
+        //}
+        var list = watch.PlayerInitializer.commentPanelViewController.commentLists;
+        for (var i = 0; i < list.length; i++) {
+          if (conf.debugMode) console.log(list[i].listName, list[i].comments.length);
+          if (list[i].listName === 'commentlist:main' && list[i].comments.length > 0) {
+            comments = list[i].comments;
+            break;
+          }
+          var ct = list[i].comments;
+          comments = (comments.length < ct.length) ? ct : comments;
+        }
+        //duration = watchInfoModel.length; // exp.ext_getTotalTime();
+        duration = exp.ext_getTotalTime(); //
+      };
+
+      var initCanvas = function() {
+        if (!canvas) {
+          var $container = $('<div id="nicoHeatMapContainer" />');
+          canvas = document.createElement('canvas');//$('<canvas id="nicoHeatMap" width="100" height="4" />')
+          canvas.id = 'nicoHeatMap';
+          canvas.width  = canvasWidth;
+          canvas.height = canvasHeight;
+          $container.append(canvas);
+          $('#nicoplayerContainerInner').append($container);
+          context = canvas.getContext('2d');
+        }
+        context.fillStyle = '#000080';
+        context.beginPath();
+        context.fillRect(0, 0, canvasWidth, canvasHeight);
+      };
+      var clearCanvas = function() {
+        context.fillStyle = '#000080';
+        context.beginPath();
+        context.fillRect(0, 0, canvasWidth, canvasHeight);
+      };
+
+      var getHeatMap = function(callback) {
+        var map = new Array(100), i = map.length; while(i > 0) map[--i] = 0;
+        var exp = $('#external_nicoplayer')[0];
+        var ratio = duration > map.length ? (map.length / duration) : 1;
+        //console.log(map.join(','));
+
+        for (i = comments.length - 1; i >= 0; i--) {
+          var pos = comments[i].vpos , mpos = Math.min(Math.floor(pos * ratio / 1000), map.length -1);
+          map[mpos]++;
+        }
+
+        //console.log(map.join(','));
+        var max = 0;
+        for (i = map.length - 4; i >= 0; i--) max = Math.max(map[i], max); // 末尾は固まってる事があるので参考にしない
+        if (max > 0) {
+          var rate = 255 / max;
+          for (i = map.length - 1; i >= 0; i--) {
+            map[i] = Math.min(255, Math.floor(map[i] * rate));
+          }
+        }
+        //console.log(map.join(','));
+        if (typeof callback === 'function') {
+          callback(map);
+        }
+      }
+    } //
 
     function initOther() {
       if (conf.leftPanelJack) {
@@ -8389,6 +8588,7 @@ body.videoSelection .sidePanel .commentUserProfile {
     initNicoS($, conf, w);
     initCss();
     initStageVideo($, conf, w);
+    initHeatMap($, conf, w);
     initOther();
 
     onWindowResize();
