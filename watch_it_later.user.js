@@ -15,7 +15,7 @@
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130708
+// @version        1.130709
 // ==/UserScript==
 
 // TODO:
@@ -23,6 +23,9 @@
 // 最後まで再生したら自動でとりマイから外す機能with連続再生
 // お気に入りユーザーの時は「@ジャンプ」許可
 // 軽量化
+
+// * ver 1.130709
+// - プレイリストの内部仕様変更に対応
 
 // * ver 1.130708
 // - コメントの盛り上がり状態をグラフ表示する機能を追加
@@ -532,6 +535,7 @@
       enableAutoPlaybackContinue: false, // 一定時間操作しなかくても自動再生を続行
       lastLeftTab: 'videoInfo',
       lastRightTab: 'w_comment',
+      lastControlPanelPosition: '',
       enableSortTypeMemory: true, // 検索のソート順を記憶する
       searchSortType: 'n', //
       searchSortOrder: 'd', // 'd'=desc 'a' = asc
@@ -1254,7 +1258,8 @@
       }\
       #content #playlist .playlistInformation  .generationMessage{\
         /* 「連続再生ボタンとリスト名は左右逆のほうが安定するんじゃね？ 名前の長さによってボタンの位置がコロコロ変わらなくなるし」という対応。*/ \
-        position: absolute; margin-left: 90px;\
+        /* ついに本家のほうもボタンが左になったよ！ */ \
+        /* position: absolute; margin-left: 90px; */\
       }\
       body.videoSelection #content #playlist .playlistInformation  .generationMessage{\
         max-width: 380px;\
@@ -3467,6 +3472,7 @@
     function Popup() {
     }
     Popup.show = function(text) {
+      console.log('%c' + text, 'background: cyan;');
       if (w.WatchApp) {
         text = text.replace(/[\n]/, '<br />');
         w.WatchApp.namespace.init.PopupMarqueeInitializer.popupMarqueeViewController.onData(
@@ -3475,6 +3481,7 @@
       }
     };
     Popup.alert = function(text) {
+      console.log('%c' + text, 'background: yellow;');
       if (w.WatchApp) {
         text = text.replace(/[\n]/, '<br />');
         w.WatchApp.namespace.init.PopupMarqueeInitializer.popupMarqueeViewController.onData(
@@ -3998,8 +4005,21 @@
       getMyUserId: function() {
         return watch.CommonModelInitializer.viewerInfoModel.userId;
       },
+      getPlaylistItems: function() {
+         return watch.PlaylistInitializer.playlist.items || watch.PlaylistInitializer.playlist.currentItems;
+      },
+      setPlaylistItems: function(items, currentItem) {
+        var playlist = watch.PlaylistInitializer.playlist;
+        playlist.reset(
+          items,
+          playlist.type,
+          playlist.option
+        );
+        if (currentItem) { playlist.playingItem = currentItem; }
+        else { playlist.playingItem = items[0]; }
+      },
       shufflePlaylist: function(target) {
-        var x = watch.PlaylistInitializer.playlist.items, items = [], i, currentIndex = -1, currentItem = null;
+        var x = this.getPlaylistItems(), items = [], i, currentIndex = -1, currentItem = null;
           if (target === 'right') {
           for (i = 0; i < x.length;) {
             if (x[0]._isPlaying) {
@@ -4025,19 +4045,11 @@
         }
         var pm = WatchApp.ns.view.playlist.PlaylistManager, pv = watch.PlaylistInitializer.playlistView;
         var left = pm.getLeftSideIndex();
-        var playlist = watch.PlaylistInitializer.playlist;
-        playlist.reset(
-          items,
-          playlist.type,
-          playlist.option
-        );
-        if (currentItem) { playlist.playingItem = currentItem; }
-        else { playlist.playingItem = items[0]; }
-
+        this.setPlaylistItems(items, currentItem);
         pv.scroll(left);
       },
       clearPlaylist: function(target) {
-        var x = watch.PlaylistInitializer.playlist.items, items = [], i, currentItem = null;
+        var x = this.getPlaylistItems(), items = [], i, currentItem = null;
         if (target === 'left') {
           for (i = x.length - 1; i >= 0; i--) {
             items.unshift(x[i]);
@@ -4064,17 +4076,11 @@
             }
           }
         }
-        var playlist = watch.PlaylistInitializer.playlist;
-        playlist.reset(
-          items,
-          playlist.type,
-          playlist.option
-        );
-        if (currentItem) { playlist.playingItem = currentItem; }
-      },
+        this.setPlaylistItems(items, currentItem);
+     },
       appendSearchResultToPlaylist: function(mode) {
         var
-          items = watch.PlaylistInitializer.playlist.items, lr = watch.ComponentInitializer.videoSelection.lastLoadResponse,
+          items = this.getPlaylistItems(), lr = watch.ComponentInitializer.videoSelection.lastLoadResponse,
           searchItems = lr.sortedRawData ? lr.sortedRawData : lr.rawData.list,
           uniq = {}, i, f = WatchApp.ns.model.playlist.PlaylistItem, playingIndex = 0, c, len, currentItem = null;
         if (!searchItems || searchItems.length < 1) {
@@ -4095,14 +4101,8 @@
             ("undefined" === typeof c.type || "video" === c.type) && uniq[c.id] === undefined && items.push(new f(c));
           }
         }
-        var playlist = watch.PlaylistInitializer.playlist;
-        playlist.reset(
-          items,
-          playlist.type,
-          playlist.option
-        );
-        if (currentItem) { playlist.playingItem = currentItem; }
-      },
+        this.setPlaylistItems(items, currentItem);
+     },
       addDefMylist: function(description) {
         var watchId = watchInfoModel.id;
         setTimeout(function() {
@@ -6805,7 +6805,7 @@
               // ユーザーニコ割があるときは自動全画面にしない
               return;
             }
-            if (WatchController.isSearchMode()) {
+            if (WatchController.isSearchMode()) { // TODO: 直接アクセスすんな
               var settingSize = (localStorage["PLAYER_SETTINGS.LAST_PLAYER_SIZE"] === '"normal"') ? 'normal' : 'medium';
               WatchController.changeScreenMode(settingSize);
             }
@@ -6833,7 +6833,6 @@
       });
 
       var lastPlayerConfig = null, lastScreenMode = '';
-//      if (conf.controllerVisibilityInFull === 'hidden' || conf.controllerVisibilityInFull === 'auto') {
 
         function hideIfNeed() {
           if (conf.controllerVisibilityInFull === 'hidden') {
@@ -6882,17 +6881,20 @@
           $('body').removeClass('w_fullScreenMenu');
           if (mode === 'browserFull' && lastScreenMode !== mode) {
             lastPlayerConfig = watch.PlayerInitializer.nicoPlayerConnector.playerConfig.get();
+            conf.setValue('lastControlPanelPosition', lastPlayerConfig.oldTypeControlPanel ? 'bottom' : 'over');
             //$('body').toggleClass('w_fullWithPlaylist', WatchController.isFullScreenContentAll());
             hideIfNeed();
             toggleTrueBrowserFull(conf.enableTrueBrowserFull);
           } else
           if (lastScreenMode === 'browserFull' && mode !== 'browserFull') {
+            conf.setValue('lastControlPanelPosition', '');
             restoreVisibility();
           }
           lastScreenMode = mode;
         });
 
         $(window).on('beforeunload.watchItLater', function(e) {
+          conf.setValue('lastControlPanelPosition', '');
           restoreVisibility();
         });
         var wheelCounter = 0, wheelTimer = null;
@@ -6952,7 +6954,17 @@
         $fullScreenMenuContainer.append($fullScreenModeSwitch).append($toggleStageVideo).append($toggleSetting);
         $('#nicoplayerContainerInner').append($fullScreenMenuContainer);
 
-    }
+
+        if (conf.lastControlPanelPosition === 'bottom' || conf.lastControlPanelPosition === 'over') {
+          EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
+            if (conf.debugMode) console.log('restore oldTypeControlPanel ? ', conf.lastControlPanelPosition === 'bottom');
+            watch.PlayerInitializer.nicoPlayerConnector.playerConfig.set(
+              {oldTypeControlPanel: conf.lastControlPanelPosition === 'bottom'}
+            );
+          });
+        }
+
+    } // end initScreenMode()
 
 
 
@@ -7032,7 +7044,7 @@
       }
 
       function exportPlaylist(option, type, continuous, shuffle) {
-        var items = playlist.items, list = [];
+        var items = playlist.currentItems, list = [];
         for (var i = 0, len = Math.min(300, items.length); i < len; i++) {
           var item = items[i];
           list.push([
@@ -7057,7 +7069,7 @@
         var PlaylistItem = WatchApp.ns.model.playlist.PlaylistItem, newItems = [], uniq = {}, currentIndex = -1;
 
         WatchController.clearPlaylist();
-        var currentItem = playlist.items[0];
+        var currentItem = playlist.currentItems[0];
         if (!currentItem) {
           var wm = watchInfoModel;
           currentItem = new PlaylistItem({
@@ -8274,23 +8286,27 @@ body.videoSelection .sidePanel .commentUserProfile {
         }
         .oldTypeCommentInput #nicoHeatMapContainer {
           bottom: 32px;
+          display: none;
         }
         #nicoHeatMap {
           position: absolute; top: 0; left: 0;
           transform-origin: 0 0 0;-webkit-transform-origin: 0 0 0;
           transform: scaleX(6.72);-webkit-transform: scaleX(6.72);
-          display: none;
         }
-        #content:hover #nicoHeatMap {
+        {* パズルみたいになってきた *}
+        body.size_normal:not(.full_with_browser) #content:hover #nicoHeatMapContainer,
+        body.size_medium:not(.full_with_browser) #content:hover #nicoHeatMapContainer,
+        body.videoSelection #content.w_adjusted:hover #nicoHeatMapContainer,
+        body:not(.full_with_browser) #nicoHeatMapContainer.displayAlways {
           display: block;
         }
+        #nicoHeatMapContainer.displayAlways {
+          cursor: pointer;
+        }
         .size_normal #nicoHeatMap {
-          transform: scaleX(8.98);-webkit-transform: scaleX(8.98);
+          transform: scaleX(8.98); -webkit-transform: scaleX(8.98);
         }
-        .setting_panel #nicoHeatMap {
-          display: none;
-        }
-        .full_with_browser #nicoHeatMapContainer, .videoSelection #content:not(.w_adjusted) #nicoHeatMapContainer {
+        .setting_panel #nicoHeatMapContainer, .full_with_browser #nicoHeatMapContainer, .size_small #content:not(.w_adjusted) #nicoHeatMapContainer {
           display: none;
         }
         body.full_with_browser.w_fullScreenMenu.trueBrowserFull #nicoHeatMapContainer {
@@ -8302,8 +8318,10 @@ body.videoSelection .sidePanel .commentUserProfile {
         .full_with_browser.w_fullScreenMenu .oldTypeCommentInput #nicoHeatMapContainer {
           bottom: 34px; height: 10px;
         }
-
-     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1];
+        .full_with_browser.w_fullScreenMenu #nicoHeatMapContainer {
+          width: 100%;
+        }
+     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/, '/*').replace(/\*\}/, '*/');
         /*
         body.full_with_browser.w_fullScreenMenu:not(.w_fullWithPlaylist) #playlist {
           position: absolute; z-index: 1000; bottom: -130px;
@@ -8316,12 +8334,9 @@ body.videoSelection .sidePanel .commentUserProfile {
           overflow: hidden !important;
         }
         */
-      addStyle(__css__, 'watchItLaterCss2');
+      addStyle(__css__, 'watchItLaterStyle2');
       var __expression__ = (function() {/*
-        .full_with_browser.w_fullScreenMenu #nicoHeatMapContainer {
-          width: 100%;
-        }
-        .full_with_browser.w_fullScreenMenu #nicoHeatMap {
+       .full_with_browser.w_fullScreenMenu #nicoHeatMap {
           transform: scaleX($scale); -webkit-transform: scaleX($scale); display: block;
         }
       */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1];
@@ -8335,7 +8350,7 @@ body.videoSelection .sidePanel .commentUserProfile {
           exStyle.innerHTML = css;
           return exStyle;
         } else {
-          return addStyle(css, 'expressionCss');
+          return addStyle(css, 'expression');
         }
       };
       exStyle = updateExpression();
@@ -8441,7 +8456,12 @@ body.videoSelection .sidePanel .commentUserProfile {
       var initCanvas = function() {
         if (!canvas) {
           var $container = $('<div id="nicoHeatMapContainer" />');
-          canvas = document.createElement('canvas');//$('<canvas id="nicoHeatMap" width="100" height="4" />')
+          $container.on('dblclick', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            $(this).toggleClass('displayAlways')
+          });
+          canvas = document.createElement('canvas');
           canvas.id = 'nicoHeatMap';
           canvas.width  = canvasWidth;
           canvas.height = canvasHeight;
