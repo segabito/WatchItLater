@@ -10,8 +10,9 @@ FirefoxとChromeに対応しています。
 
 紹介ページ
 http://userscripts.org/scripts/show/151269
-開発版のデモ動画(ちょっと古い)
-http://www.nicovideo.jp/watch/sm18845030
+更新情報などはこちら
+http://ch.nicovideo.jp/segabito/
+
 
 ランキングや検索結果を見て「これは面白そうだなあ」「あとで見よう」という動画があった時、
 とりあえずマイリストにどんどん登録しておいて、あとからZeroWatchやVitaやiPadで
@@ -47,8 +48,6 @@ http://www.nicovideo.jp/watch/sm18845030
 ・コメントパネルを広くする機能
 　コメントパネル内を横スクロールさせなくても
 　動画の何秒目にコメントされたのか何月何日にコメントされたのかがわかる幅になる
-
-・左のパネルにサムネと説明文を表示
 
 ・プレイリスト部分の開閉機能
 
