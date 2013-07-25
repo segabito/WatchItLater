@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name           WatchItLater-test
+// @name           WatchItLater
 // @namespace      https://github.com/segabito/
 // @description    動画を見る前にマイリストに登録したいGreasemonkey (Chrome/Fx用)
 // @include        http://www.nicovideo.jp/*
@@ -8835,4 +8835,30 @@
 
 
   }); // end of monkey();
+
+
+  // Chromeに対応させるための処理
+  // いったん<script>として追加してから実行する
+  try {
+    if (location.host.indexOf('localhost.') === 0 || location.host.indexOf('www.') === 0 || !this.GM_getValue || this.GM_getValue.toString().indexOf("not supported")>-1) {
+      isNativeGM = false;
+      var inject = document.createElement("script");
+      inject.id = "monkey";
+      inject.setAttribute("type", "text/javascript");
+      inject.setAttribute("charset", "UTF-8");
+
+      inject.appendChild(document.createTextNode("(" + monkey + ")(false)"));
+//      inject.appendChild(document.createTextNode("try {(" + monkey + ")(false) } catch(e) { console.log(e); }"));
+
+      document.body.appendChild(inject);
+    } else {
+      // やや古いFirefoxはここらしい
+      monkey(true);
+    }
+
+  } catch(e) {
+    // 最近のFirefoxはここに飛んでくる
+    monkey(true);
+  }
+})();
 
