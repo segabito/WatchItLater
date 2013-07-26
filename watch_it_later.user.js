@@ -16,7 +16,7 @@
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130726
+// @version        1.130727
 // ==/UserScript==
 
 /**
@@ -24,12 +24,10 @@
  *
  * ・まだ細かい動作が不安定な感じ  なんかしっくりこない
  * ・コメントパネルを広くする(廃止するかも)
- * ・ダミーマイリスト系(ニコレポ・視聴履歴・ランキング)のソートが怪しい
  * ・フラットになったデザインに合わせる
  *
  * やりたい事・アイデア
  * ・左パネル消滅で不要になったコードをいろいろ整理する
- * ・チャンネルアイコンをクリックしたら検索画面にチャンネル動画一覧を表示   (近々やる)
  * ・検索画面にコミュニティ動画一覧を表示 (チャンネルより難しい。力技でなんとかする)
  * ・シークバーのサムネイルを並べて表示するやつ   (単体スクリプトのほうがよさそう)
  * ・キーワード検索/タグ検索履歴の改修
@@ -38,13 +36,19 @@
  * ・ユーザーの投稿動画一覧に「xxさんのニコレポ」という架空のマイリストフォルダを出す
  * ・動画ランキングを「ニコニコ動画さん」という架空ユーザーの公開マイリストにする
  * ・「ニコニコチャンネルさん」という架空ユーザーを作って各ジャンルの新着を架空マイリストにする
- * ・ランキング・マイリストは50件ずつ表示
  * ・横スクロールを賢くする
  * ・マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
  * ・お気に入りユーザーの時は「@ジャンプ」許可
  * ・軽量化
  * ・綺麗なコード
  */
+
+
+
+// * ver 1.130727
+// - ダミーマイリスト系のソートがおかしい問題を解決
+// - マイリスト・とりあえずマイリストを100件ずつ表示にしてみた
+// - 検索画面から「次に再生」した時に動画時間が入るようにした
 
 
 // * ver 1.130726
@@ -4225,7 +4229,7 @@
         user_id: '',
         sort: '1'
       };
-      this._baseCreateTime = new Date();
+      this._baseCreateTime = Date.now();//new Date();
       this.rawData.user_nickname = param.user_nickname || WatchController.getMyNick();
       this.rawData.user_id       = param.user_id       || WatchController.getMyUserId();
       this.rawData.name          = param.name          || this.rawData.name;
@@ -4257,8 +4261,8 @@
     },
     push: function(item) {
       if (!item.create_time) {
-        var tm = this._baseCreateTime.getTime() - 60000 * this.itemCount;
-        item.create_time = WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date(tm));
+        var tm = this._baseCreateTime - 60000 * this.itemCount;
+        item.create_time = tm;//WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date(tm));
       }
       //console.log(item.create_time, item.first_retrieve, item.title);
       this.rawData.list.push(item);
@@ -4267,8 +4271,8 @@
     },
     unshift: function(item) {
       if (!item.create_time) {
-        var tm = this._baseCreateTime.getTime() + 60000 * this.itemCount;
-        item.create_time = WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date(tm));
+        var tm = this._baseCreateTime + 60000 * this.itemCount;
+        item.create_time = tm;//WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date(tm));
       }
       //console.log(item.create_time);
       this.rawData.list.unshift(item);
@@ -4592,6 +4596,7 @@
         result = new SearchResult({
           id: '-10',
           sort: '1',
+          default_sort: '1',
           name: getNicorepoTitle(type),
           user_id:       type === 'owner' ? WatchController.getOwnerId()   : myId,
           user_nickname: type === 'owner' ? WatchController.getOwnerName() :'ニコニコ動画'
@@ -6189,6 +6194,9 @@
 
       var content = explorer.getContentList().getContent(ContentType.MYLIST_VIDEO);
       var loader  = content._mylistVideoAPILoader;
+      var pager   = content._pager;
+
+      pager._pageItemCount = 100;
 
       // マイリストデータ取得時の処理フック。 viewでやる物はいずれ分けたい
       content.refresh_org = content.refresh;
@@ -6880,6 +6888,29 @@
 
       EventDispatcher.addEventListener('onWindowResize',     adjustSmallVideoSize);
       EventDispatcher.addEventListener('onVideoInitialized', adjustSmallVideoSize);
+
+
+      var duration_match = /^([0-9]+):([0-9]+)/;
+      controller._item2playlistItem = function (item) {
+        // 動画長が入るようにする
+        var len = item.getLength(), length_seconds = 0, m;
+        if (typeof len === 'string' && (m = duration_match.exec(len)) !== null) {
+          length_seconds = m[1] * 60 + m[2] * 1;
+        }
+        return new WatchApp.ns.model.playlist.PlaylistItem({
+          id            : item.getId(),
+          title         : item.getTitle(),
+          thumbnail_url : item.getThumbnailUrl(),
+          view_counter  : item.getViewCounter(),
+          num_res       : item.getNumRes(),
+          mylist_counter: item.getMylistCounter(),
+          mylist_comment: item.getMylistComment(),
+          first_retrieve: item.getFirstRetrieve(),
+          ads_counter   : item.getUadCounter(),
+          length_seconds: length_seconds
+        });
+      }
+
 
       if (!conf.videoExplorerHack) { return; }
 
@@ -8070,6 +8101,9 @@
       var vec         = watch.VideoExplorerInitializer.videoExplorerController;
       var explorer    = vec.getVideoExplorer();
       var content     = explorer.getContentList().getContent(ContentType.DEFLIST_VIDEO);
+      var pager       = content._pager;
+
+      pager._pageItemCount = 100;
 
       content.refresh_org = content.refresh;
       content.refresh = $.proxy(function(params, callback) {
