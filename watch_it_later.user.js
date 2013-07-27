@@ -15,8 +15,9 @@
 // @match          http://ch.nicovideo.jp/*
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
+// @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130727
+// @version        1.130728
 // ==/UserScript==
 
 /**
@@ -43,13 +44,16 @@
  * ・綺麗なコード
  */
 
-
+// * ver 1.130728
+// - プレイリストメニューが一部機能しなくなっていたのを対応
+// - ニコレポなどが出るポップアップをいじった。クリックですぐ消えるように ＆ Firefoxでもプレイヤーの上に表示できるように(まだデフォルトではオフ)
+// - ニコメンドが空かどうかクリックするまでもなくわかるよう、グレーにする
+// - タグ表示のポップアップからniconico新検索(http://search.nicovideo.jp/)に飛べるようにした
 
 // * ver 1.130727
 // - ダミーマイリスト系のソートがおかしい問題を解決
 // - マイリスト・とりあえずマイリストを100件ずつ表示にしてみた
 // - 検索画面から「次に再生」した時に動画時間が入るようにした
-
 
 // * ver 1.130726
 // - 本家の更新に暫定対応。まだ不安定だったり動かない機能もあります。
@@ -221,6 +225,7 @@
       enableFullScreenMenu: true, // 全画面時にホイールでメニューを出す
       enableHeatMap: false, //
       heatMapDisplayMode: 'hover', // 'always' 'hover'
+      replacePopupMarquee: false, // 'always' 'hover'
 
       hideVideoExplorerExpand: true, // 「動画をもっと見る」ボタンを小さくする
       nicommendVisibility: 'visible', // ニコメンドの表示 'visible', 'underIchiba', 'hidden'
@@ -303,1476 +308,1550 @@
     }
 
   (function() { // 各ページ共通
-    var style = '\
-      .tagItemsPopup {\
-        background: #eef; \
-      }\
-      .tagItemsPopup, .playlistMenuPopup {\
-        position: absolute; \
-        min-width: 200px; \
-        font-Size: 10pt; \
-        z-index: 2000000; \
-        box-shadow: 2px 2px 2px #888;\
-      }\
-      .tagItemsPopup ul,.tagItemsPopup ul li, .playlistMenuPopup ul, .playlistMenuPopup ul li  {\
-        position: relative; \
-        list-style-type: none; \
-        margin: 0; padding: 0; \
-        white-space: nowrap;\
-      }\
-     .tagItemsPopup li a{\
-      }\
-      .tagItemsPopup .nicodic {\
-        margin-right: 4px; \
-      }\
-      .tagItemsPopup .icon{\
-        width: 17px; \
-        height: 15px; \
-        \
-      }\
-    /* マイリスト登録パネル */\
-      .mylistPopupPanel {\
-        height: 24px; \
-        z-index: 10000; \
-        /*border: 1px solid silver;\
-        border-radius: 3px; */\
-        padding: 0;\
-        margin: 0;\
-        overflow: hidden; \
-        display: inline-block; \
-        background: #eee; \
-      }\
-      .mylistPopupPanel.fixed {\
-        position: fixed; right: 0; bottom: 0;\
-        transition: right 0.1s ease-out;\
-      }\
-      .mylistPopupPanel.fixed>* {\
-        transition: opacity 0.1s ease-out;\
-      }\
-      .mylistPopupPanel>*>* {\
-        transition: background 0.5s ease 0.5s, color 0.5s ease 0.5s;\
-      }\
-        .full_with_browser .mylistPopupPanel{\
-          background: #000; border: 0;\
-        }\
-        body.full_with_browser .mylistPopupPanel *{\
-          background: #000; color: #888; border-color: #333;\
-        }\
-        .full_with_browser .mylistPopupPanel.hideAllInFull{\
-          display: none;\
-        }\
-        .full_with_browser .mylistPopupPanel.hideInFull.fixed:not(:hover) {\
-          right: -100px;\
-          transition: right 0.8s ease-in-out 0.5s;\
-        }\
-        .full_with_browser .mylistPopupPanel.hideInFull:not(:hover)>*{\
-          opacity: 0;\
-          transition: opacity 0.3s ease-out 1s;\
-        }\
-      .mylistPopupPanel.w_touch {\
-        height: 40px;\
-      }\
-      iframe.popup {\
-        position: absolute;\
-      }\
-    /* マウスホバーで出るほうのマイリスト登録パネル */\
-      .mylistPopupPanel.popup {\
-        position: absolute; \
-        z-index: 1000000;\
-        box-shadow: 2px 2px 2px #888;\
-      }\
-    /* マイリスト登録パネルの中の各要素 */\
-      .mylistPopupPanel .mylistSelect {\
-        width: 64px; \
-        margin: 0;\
-        padding: 0;\
-        font-size: 80%; \
-        white-space: nowrap; \
-        background: #eee; \
-        border: 1px solid silver;\
-      }\
-        .mylistSelect:focus {\
-          border-style: outset;\
-        }\
-    /* 誤操作を減らすため、とりマイの時だけスタイルを変える用 */\
-      .mylistPopupPanel.w_touch button {\
-        padding: 8px 18px;\
-      }\
-      .mylistPopupPanel.w_touch .mylistSelect {\
-        font-size: 170%; width: 130px; border: none;\
-      }\
-      .mylistPopupPanel.w_touch .mylistSelect:focus {\
-        border: 1px dotted;\
-      }\
-      .mylistPopupPanel.deflistSelected button {\
-      }\
-      .mylistPopupPanel.mylistSelected  button {\
-        color: #ccf; \
-      }\
-      .mylistPopupPanel button {\
-        margin: 0; \
-        font-weight: bolder; \
-        cursor: pointer;  \
-      }\
-      .mylistPopupPanel button:active, #outline .playlistToggle:active, #outline .openVideoExplorer:active, #content .openConfButton:active {\
-        border:1px inset !important\
-      }\
-      .mylistPopupPanel button:hover, #outline .playlistToggle:hover, #outline .openVideoExplorer:hover, #outline .openConfButton:hover, #yukkuriPanel .yukkuriButton:hover {\
-        border:1px outset\
-      }\
-      .mylistPopupPanel .mylistAdd, .mylistPopupPanel .tagGet, #yukkuriPanel .yukkuriButton {\
-        border:1px solid #777; cursor: pointer; font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #eee; background-color: #888; margin: 0;\
-      }\
-      .mylistPopupPanel .mylistAdd:focus, .mylistPopupPanel .tagGet:focus, #yukkuriPanel .yukkuriButton:focus {\
-        border-style: outset; color: orange;\
-      }\
-      .mylistPopupPanel.deflistSelected {\
-        color: #ff9;\
-      }\
-      .mylistPopupPanel .deflistRemove, #yukkuriPanel .yukkuriButton.active{\
-        border:1px solid #ebb7b7; font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f7e3e3;\
-      }\
-      .mylistPopupPanel.deflistSelected {\
-        color: #ff9;\
-      }\
-      .mylistPopupPanel .deflistRemove, #yukkuriPanel .yukkuriButton.active{\
-        border:1px solid #ebb7b7; font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3); text-align: center; color: #FFFFFF; background-color: #f7e3e3;\
-      }\
-      .mylistPopupPanel.mylistSelected .deflistRemove {\
-        display: none; \
-      }\
-      .mylistPopupPanel .closeButton{\
-        color: #339; \
-        padding: 0;\
-        margin: 0;\
-        font-size: 80%;\
-        text-decoration: none;\
-      }\
-      .mylistPopupPanel .newTabLink{\
-        padding: 0 2px; text-decoration: underline; text-shadow: -1px -1px 0px #442B2B;\
-      }\
-      .mylistPopupPanel.fixed .newTabLink, .mylistPopupPanel.fixed .closeButton {\
-        display: none;\
-      }\
-      .w_fullScreenMenu .mylistPopupPanel.fixed { bottom: 2px; }\
-      \
-   ';
-    addStyle(style, 'watchItLaterCommonStyle');
+    var __css__ = (function() {/*
+      .tagItemsPopup {
+        background: #eef;
+      }
+      .tagItemsPopup, .playlistMenuPopup {
+        position: absolute;
+        min-width: 200px;
+        font-Size: 12pt;
+        z-index: 2000000;
+        box-shadow: 2px 2px 2px #888;
+      }
+      .tagItemsPopup ul,.tagItemsPopup ul li, .playlistMenuPopup ul, .playlistMenuPopup ul li  {
+        position: relative;
+        list-style-type: none;
+        margin: 0; padding: 0;
+        white-space: nowrap;
+      }
+      .tagItemsPopup li a{
+      }
+      .tagItemsPopup .nicodic, .tagItemsPopup .newsearch {
+        margin: 1px 4px 1px 1px;
+      }
+      .tagItemsPopup .nicodic:hover, .tagItemsPopup .newsearch:hover {
+        margin: 0px 3px 0px 0px;
+        border: 1px outset;
+      }
+      .tagItemsPopup .icon{
+        width: 17px;
+        height: 15px;
+      }
+    {* マイリスト登録パネル *}
+      .mylistPopupPanel {
+        height: 24px;
+        z-index: 10000;
+        {*border: 1px solid silver;
+        border-radius: 3px; *}
+        padding: 0;
+        margin: 0;
+        overflow: hidden;
+        display: inline-block;
+        background: #eee;
+      }
+      .mylistPopupPanel.fixed {
+        position: fixed; right: 0; bottom: 0;
+        transition: right 0.1s ease-out;
+      }
+      .mylistPopupPanel.fixed>* {
+        transition: opacity 0.1s ease-out;
+      }
+      .mylistPopupPanel>*>* {
+        transition: background 0.5s ease 0.5s, color 0.5s ease 0.5s;
+      }
+        .full_with_browser .mylistPopupPanel{
+          background: #000; border: 0;
+        }
+        body.full_with_browser .mylistPopupPanel *{
+          background: #000; color: #888; border-color: #333;
+        }
+        .full_with_browser .mylistPopupPanel.hideAllInFull{
+          display: none;
+        }
+        .full_with_browser .mylistPopupPanel.hideInFull.fixed:not(:hover) {
+          right: -100px;
+          transition: right 0.8s ease-in-out 0.5s;
+        }
+        .full_with_browser .mylistPopupPanel.hideInFull:not(:hover)>*{
+          opacity: 0;
+          transition: opacity 0.3s ease-out 1s;
+        }
+      .mylistPopupPanel.w_touch {
+        height: 40px;
+      }
+      iframe.popup {
+        position: absolute;
+      }
+    {* マウスホバーで出るほうのマイリスト登録パネル *}
+      .mylistPopupPanel.popup {
+        position: absolute;
+        z-index: 1000000;
+        box-shadow: 2px 2px 2px #888;
+      }
+    {* マイリスト登録パネルの中の各要素 *}
+      .mylistPopupPanel .mylistSelect {
+        width: 64px;
+        margin: 0;
+        padding: 0;
+        font-size: 80%;
+        white-space: nowrap;
+        background: #eee;
+        border: 1px solid silver;
+      }
+        .mylistSelect:focus {
+          border-style: outset;
+        }
+    {* 誤操作を減らすため、とりマイの時だけスタイルを変える用 *}
+      .mylistPopupPanel.w_touch button {
+        padding: 8px 18px;
+      }
+      .mylistPopupPanel.w_touch .mylistSelect {
+        font-size: 170%; width: 130px; border: none;
+      }
+      .mylistPopupPanel.w_touch .mylistSelect:focus {
+        border: 1px dotted;
+      }
+      .mylistPopupPanel.deflistSelected button {
+      }
+      .mylistPopupPanel.mylistSelected  button {
+        color: #ccf;
+      }
+      .mylistPopupPanel button {
+        margin: 0;
+        font-weight: bolder;
+        cursor: pointer;
+      }
+      .mylistPopupPanel button:active, #outline .playlistToggle:active, #outline .openVideoExplorer:active, #content .openConfButton:active {
+        border:1px inset !important
+      }
+      .mylistPopupPanel button:hover, #outline .playlistToggle:hover, #outline .openVideoExplorer:hover, #outline .openConfButton:hover, #yukkuriPanel .yukkuriButton:hover {
+        border:1px outset
+      }
+      .mylistPopupPanel .mylistAdd, .mylistPopupPanel .tagGet, #yukkuriPanel .yukkuriButton {
+        border:1px solid #777; cursor: pointer; font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #eee; background-color: #888; margin: 0;
+      }
+      .mylistPopupPanel .mylistAdd:focus, .mylistPopupPanel .tagGet:focus, #yukkuriPanel .yukkuriButton:focus {
+        border-style: outset; color: orange;
+      }
+      .mylistPopupPanel.deflistSelected {
+        color: #ff9;
+      }
+      .mylistPopupPanel .deflistRemove, #yukkuriPanel .yukkuriButton.active{
+        border:1px solid #ebb7b7; font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3);font-weight:bold; text-align: center; color: #FFFFFF; background-color: #f7e3e3;
+      }
+      .mylistPopupPanel.deflistSelected {
+        color: #ff9;
+      }
+      .mylistPopupPanel .deflistRemove, #yukkuriPanel .yukkuriButton.active{
+        border:1px solid #ebb7b7; font-family:arial, helvetica, sans-serif; padding: 0px 6px 0px 6px; text-shadow: -1px -1px 0 rgba(0,0,0,0.3); text-align: center; color: #FFFFFF; background-color: #f7e3e3;
+      }
+      .mylistPopupPanel.mylistSelected .deflistRemove {
+        display: none;
+      }
+      .mylistPopupPanel .closeButton{
+        color: #339;
+        padding: 0;
+        margin: 0;
+        font-size: 80%;
+        text-decoration: none;
+      }
+      .mylistPopupPanel .newTabLink{
+        padding: 0 2px; text-decoration: underline; text-shadow: -1px -1px 0px #442B2B;
+      }
+      .mylistPopupPanel.fixed .newTabLink, .mylistPopupPanel.fixed .closeButton {
+        display: none;
+      }
+      .w_fullScreenMenu .mylistPopupPanel.fixed { bottom: 2px; }
+    */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
+        .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
+     addStyle(__css__, 'watchItLaterCommonStyle');
+ })(); // end of commoncss
 
- })();
+
+
 
   (function() { // watchページだけのstyle
     if (!w.WatchApp) { return; }
-    var style = [
-    '\
-    /* 動画タグとプレイリストのポップアップ */\
-      #videoTagPopupContainer {\
-      }\
-      #videoTagPopupContainer.w_touch {\
-        line-height: 200%; font-size: 130%;\
-      }\
-      #videoTagPopupContainer.w_touch .nicodic{\
-        margin: 4px 14px;\
-      }\
-      .playlistMenuPopup {\
-        background: #666; color: white; padding: 4px 8px;\
-      }\
-      .playlistMenuPopup.w_touch {\
-        line-height: 250%;\
-      }\
-      #playlistSaveDialog {\
-        display: none;\
-      }\
-      #playlistSaveDialog.show {\
-        display: block;\
-      }\
-      #playlistSaveDialog.show .shadow{\
-        position: fixed;\
-        top: 0; left: 0; width: 100%; height: 100%;\
-        background: #000; opacity: 0.5;\
-        z-index: 30000;\
-      }\
-      #playlistSaveDialog.show .formWindow{\
-        position: fixed;\
-        margin: 0 auto;\
-        text-align: center;\
-        width: 100%;\
-        top: 45%;\
-        z-index: 30001;\
-      }\
-      #playlistSaveDialog      .formWindow .formWindowInner{\
-        -webkit-transition: opacity 1s ease-out;\
-        transition: opacity 1s ease-out;\
-        opacity: 0;\
-      }\
-      #playlistSaveDialog.show .formWindow .formWindowInner{\
-        text-align: left;\
-        opacity: 1;\
-        margin: 0 auto;\
-        background: #f4f4f4;\
-        width: 500px;\
-        padding: 8px;\
-        border: 1px solid;\
-      }\
-      #playlistSaveDialog.show .formWindow .formWindowInner a{\
-        font-weight: bolder;\
-      }\
-      #playlistSaveDialog.show .formWindow .formWindowInner a:hover{\
-        text-decoration: underline; background: white;\
-      }\
-      #playlistSaveDialog.show .formWindow .formWindowInner label{\
-        margin: 8px;\
-      }\
-      #playlistSaveDialog.show .formWindow .formWindowInner input{\
-        \
-      }\
-      #playlistSaveDialog.show .formWindow .formWindowInner .desc{\
-        font-size: 80%;\
-      }\
-      .playlistMenuPopup ul li {\
-        cursor: pointer;\
-      }\
-      .playlistMenuPopup ul li.savelist {\
-        color: #aaa;\
-      }\
-      .playlistMenuPopup ul li:hover {\
-        text-decoration: underline; background: #888;\
-      }\
-      #yukkuriPanel .yukkuriButton.active {\
-        border:1px inset\
-      }\
-\
-      #content .openConfButton {\
-        border:1px solid #bbb; cursor: pointer; font-family:arial, helvetica, sans-serif; padding: 4px; text-shadow: 1px 1px 0 rgba(0,0,0,0.3); text-align: center; color: #444; background-color: #ccc; margin: 0;\
-      }\
-      #outline .playlistToggle, #outline .openVideoExplorer, #outline .openConfButton {\
-        border:1px solid #444; cursor: pointer; font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; box-shadow: 1px 1px 0 rgba(0,0,0,0.3); text-align: center; color: #444; background-color: #ccc; margin: 0;\
-        height: 24px; border-radius: 0 0 8px 8px;\
-      }\
-      #outline .openConfButton { padding: 0 8px; letter-spacing: 4px; width: 60px; }\
-\
-      /* 全画面時にタグとプレイリストを表示しない時*/\
-      body.full_and_mini.full_with_browser #playerAlignmentArea{\
-        margin-bottom: 0 !important;\
-      }\
-      body.full_and_mini.full_with_browser #playlist{\
-        z-index: auto;\
-      }\
-      body.full_and_mini.full_with_browser .generationMessage{\
-        display: inline-block;\
-      }\
-      /* 全画面時にタグとプレイリストを表示する時 */\
-      body.full_with_browser #playlist{\
-        z-index: 100;\
-      }\
-      body.full_with_browser .generationMessage{\
-        display: none;\
-      }\
-      body.full_with_browser .browserFullOption{\
-        padding-right: 200px;\
-      }\
-      /* 全画面時にニュースを隠す時 */\
-      body.full_with_browser.hideNewsInFull #playerAlignmentArea{\
-        margin-bottom: -37px;\
-      }\
-      /* 少しでも縦スクロールを減らすため、動画情報を近づける。人によっては窮屈に感じるかも */\
-      #outline {\
-        margin-top: -16px;\
-      }\
-      #outline #feedbackLink{\
-        \
-      }\
-      #outline .videoEditMenuExpand{\
-        position: absolute;right: 0;top: 26px; z-index: 1;\
-      }\
-      /* ヘッダに表示する再生数 */\
-      #videoCounter {\
-        color: #ff9; font-size: 70%;\
-      }\
-      /* 右に表示する動画情報 */\
-      .sidePanel .sideVideoInfo, .sidePanel .sideIchibaPanel, .sidePanel .sideReviewPanel  {\
-        padding: 0px 0px 0 0px; width: 196px; height: 100%; z-index: 10;\
-        position:absolute; top:0; right:0;\
-        display:none; overflow-x: visible; overflow-y: auto;\
-      }\
-      /* 右に表示する動画情報 */\
-      #playerTabWrapper.sidePanel .sideVideoInfo, #playerTabWrapper.sidePanel .sideIchibaPanel, #playerTabWrapper.sidePanel .sideReviewPanel  {\
-        padding: 0px 0px 0 0px; width: 280px; height: 100%;\
-        position: absolute; top: 0; right:0;\
-      }\
-      /*#playerTabWrapper.w_wide .sideVideoInfo, #playerTabWrapper.w_wide .sideIchibaPanel, #playerTabWrapper.w_wide .sideReviewPanel,*/\
-      .videoExplorer #playerTabWrapper .sideVideoInfo, .videoExplorer #playerTabWrapper .sideIchibaPanel, .videoExplorer #playerTabWrapper .sideReviewPanel {\
-        width: 420px; z-index: 10030;\
-      }\
-      #playerTabWrapper.w_videoInfo #appliPanel, #playerTabWrapper.w_ichiba #appliPanel, #playerTabWrapper.w_review #appliPanel  {\
-        top: -9999px;\
-      }\
-      #content:not(.w_flat) .sidePanel .sideVideoInfo, #content:not(.w_flat) .sidePanel .sideIchibaPanel, #content:not(.w_flat) .sidePanel .sideReviewPanel  {\
-        border-radius: 4px;\
-      }\
-      .sidePanel .sideVideoInfo {\
-        background: #bbb; text-Align:   left; overflow-x: hidden; overflow-Y: auto; box-shadow: none; font-size: 90%;\
-      }\
-      .sidePanel .sideIchibaPanel, .sidePanel .sideReviewPanel  {\
-        background: #f4f4f4; text-Align: center; overflow-x: hidden; overflow-Y: auto; box-shadow: none; font-size: 90%;\
-      }\
-      .sidePanel .sideVideoInfo .sideVideoInfoInner {\
-        padding: 0 4px; position: relative;\
-      }\
-      .sidePanel .sideVideoInfo .videoTitleContainer {\
-        background: #ccc; text-align: center;  color: #000; margin: 6px 0 0;\
-      }\
-      #content:not(.w_flat) .sidePanel .sideVideoInfo .videoTitleContainer {\
-        border-radius: 4px 4px 0 0;\
-      }\
-      .sidePanel .sideVideoInfo .videoThumbnailContainer {\
-        background: #ccc; text-align: center; color: #000; margin: 0;\
-      }\
-      .sidePanel .sideVideoInfo .videoThumbnailContainer img {\
-        cursor: pointer;\
-      }\
-      .sidePanel .sideVideoInfo .videoTitle {\
-        \
-      }\
-      .sidePanel .sideVideoInfo .videoPostedAt {\
-        color: #333;\
-      }\
-      .sidePanel .sideVideoInfo .videoStats{\
-        font-size:90%;\
-      }\
-      .sidePanel .sideVideoInfo .videoStats li{\
-        display: inline-block; margin: 0 2px;\
-      }\
-      .sidePanel .sideVideoInfo .videoStats li span{\
-        font-weight: bolder;\
-      }\
-      .sidePanel .sideVideoInfo .videoStats .ranking{\
-        display: none !important;\
-      }\
-      .sidePanel .sideVideoInfo .videoInfo{\
-        background: #ccc; text-align: center; padding: 4px;\
-      }\
-      .sideVideoInfo .sideVideoInfoInner{\
-        -webkit-transition: opacity 1s ease-out, color 3s ease-out;\
-        transition: opacity 1s ease-out, color 3s ease-out;\
-        opacity: 0;\
-      }\
-      .sideVideoInfo.show .sideVideoInfoInner{\
-        opacity: 1;\
-      }\
-      .videoCount.blink {\
-        color: #ccc;\
-      }\
-      .sidePanel .videoCountDiff {\
-        position: absolute; color: white; right: 0; opacity: 0; z-index: 100; text-shadow: 1px 1px 0 orange;\
-      }\
-      .sidePanel .videoCountDiff.blink {\
-        opacity: 1; color: white;\
-      }\
-      #siteHeader .videoCount, #siteHeader .videoCountDiff {\
-        min-width: 32px; text-align: right; display: inline-block;\
-      }\
-      #siteHeader .videoCountDiff, #trueBrowserFullShield .videoCountDiff {\
-        position: absolute; color: yellow; opacity: 0; font-weight: bolder; text-shadow: 1px 1px 0 red;\
-      }\
-      #siteHeader .videoCountDiff.blink, #trueBrowserFullShield .videoCountDiff.blink {\
-        opacity: 1; color: yellow;\
-      }\
-      #trueBrowserFullShield .blink, #videoCounter .blink {\
-        color: #000;\
-      }\
-      .videoCountDiff:before      {content: \'+\';}\
-      .videoCountDiff.down:before {content: \'\'; }\
-      #popupMarquee .videoCountDiff {display: none;}\
-      .sidePanel .sideVideoInfo .videoDescription{\
-        overflow-x: hidden; text-align: left;\
-      }\
-      .sidePanel .sideVideoInfo .videoDescriptionInner{\
-        margin: 0 4px;\
-      }\
-      .sidePanel .sideVideoInfo .videoDetails{\
-        min-width: 150px;\
-      }\
-      .sidePanel .sideVideoInfo .videoDetails a{\
-        margin: auto 4px;\
-      }\
-      .sideVideoInfo .userName, .sideVideoInfo .channelName{\
-        display: block;\
-      }\
-      .sideVideoInfo .userIconContainer, .sideVideoInfo .channelIconContainer {\
-        background: #ccc; width: 100%; text-align: center; float: none;\
-      }\
-      #content:not(.w_flat) .sideVideoInfo .userIconContainer, #content:not(.w_flat) .sideVideoInfo .channelIconContainer{\
-        border-radius: 0 0 4px 4px;\
-      }\
-      .sidePanel .userIcon, .sidePanel .channelIcon{\
-        min-width: 128px; max-width: 150px; width: auto; height: auto; border: 0;\
-      }\
-      .sidePanel .sideVideoInfo .descriptionThumbnail {\
-        text-align: left; font-size: 90%; padding: 4px; background: #ccc;/*box-shadow: 2px 2px 2px #666;*/\
-        min-height: 60px; margin-bottom: 4px; font-weight: normal; color: black;\
-      }\
-      #content:not(.w_flat) .sidePanel .sideVideoInfo .descriptionThumbnail {\
-        border-radius: 4px;\
-      }\
-      .sidePanel .sideVideoInfo .descriptionThumbnail.video img{\
-        height: 50px; cursor: pointer; float: left;\
-      }\
-      .sidePanel .sideVideoInfo .descriptionThumbnail.mylist img{\
-        height: 40px; cursor: pointer;\
-      }\
-      .sidePanel .sideVideoInfo .descriptionThumbnail.illust img{\
-        height: 60px; cursor: pointer; float: left;\
-      }\
-      .sidePanel .sideVideoInfo a.otherSite {\
-        font-weight: bolder; text-decoration: underline; \
-      }\
-      body:not(.videoExplorer) #leftPanel.removed {\
-        display: none; left: 0px;\
-      }\
-      body:not(.videoExplorer) #leftPanel.removed .sideVideoInfo {\
-        display: none; width: 0px !important; border: none; margin: 0; padding: 0; right: auto;\
-      }\
-      .sideVideoInfo .userIconContainer.isUserVideoPublic .notPublic { display: none; }\
-      .sideVideoInfo .userIconContainer                    .isPublic { display: none; }\
-      .sideVideoInfo .userIconContainer.isUserVideoPublic  .isPublic { display: inline; }\
-      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem, \
-      .sidePanel .sideIchibaPanel .ichiba_mainitem {\
-        width: 180px; display:inline-block; vertical-align: top;\
-        margin: 4px 3px; border 1px solid silver;\
-      }\
-      body.videoExplorer #content.w_adjusted:not(.w_flat) .sideIchibaPanel .ichiba_mainitem {\
-        border-radius: 8px\
-      }\
-      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem .thumbnail span {\
-        font-size: 60px;\
-      }\
-      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem>div>dt {\
-        height: 50px;position: relative;\
-      }\
-      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem .balloonUe {\
-        position: absolute;width: 100%;\
-      }\
-      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem .balloonUe {\
-        position: absolute;\
-      }\
-      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem .balloonShita {\
-        position: absolute;\
-      }\
-\
-      .sidePanel.videoInfo, .sidePanel.ichiba{\
-        background: none;\
-      }\
-\
-      .sideVideoInfo.isFavorite .userName:after, .sideVideoInfo.isFavorite.isChannel .videoOwnerInfoContainer .channelName:after{\
-        content: \' ★ \'; color: gold; text-shadow: 1px 1px 1px black; \
-      }\
-\
-      .sidePanel.videoInfo  #leftPanelContent, .sidePanel.ichiba  #leftPanelContent {\
-        display: none;\
-      }\
-      .sidePanel.videoInfo    .sideVideoInfo, \
-      .sidePanel.ichiba       .sideIchibaPanel, \
-      .sidePanel.w_videoInfo  .sideVideoInfo, \
-      .sidePanel.w_ichiba     .sideIchibaPanel, \
-      .sidePanel.w_review     .sideReviewPanel {\
-        display: block;\
-      }\
-\
-      #leftPanelTabContainer {\
-        display:none; background: #666; position: absolute; right: 4px; top: -27px; list-style-type: none; padding: 4px 6px 3px 60px; height: 20px;\
-      }\
-      #sidePanelTabContainer {\
-        display: none;\
-        position: absolute; list-style-type: none;\
-        padding: 10px 6px 3px 0; right: -402px; top: 0; width: 350px; height: 50px;\
-                transform: rotate(90deg);         transform-origin: 0 0 0;\
-        -webkit-transform: rotate(90deg); -webkit-transform-origin: 0 0 0;\
-      }\
-      .full_with_browser #sidePanelTabContainer { background: #000; }\
-      body:not(.videoExplorer) #sidePanelTabContainer.left {\
-        background: #000 /* firefoxはこれがないと欠ける */; right: auto; left: -375px; padding: 0; height: 25px;\
-                transform: rotate(-90deg);         transform-origin: 100% 0 0;\
-        -webkit-transform: rotate(-90deg); -webkit-transform-origin: 100% 0 0;\
-      }\
-      body:not(.videoExplorer) #sidePanelTabContainer.left .tab{\
-        padding: 5px 10px 0px;\
-      }\
-      #content:not(.w_flat) #leftPanelTabContainer {\
-        border-radius: 4px 4px 0px 0px;\
-      }\
-      #leftPanelTabContainer.w_touch {\
-        top: -40px; height: 33px;\
-      }\
-      .sidePanel:hover #sidePanelTabContainer, .sidePanel:hover #leftPanelTabContainer {\
-        display:block;\
-      }\
-      #leftPanelTabContainer .tab{\
-        display: inline-block; cursor: pointer; background: #999; padding: 2px 4px 0px; border-width: 1px 1px 0px; \
-      }\
-        #leftPanelTabContainer.w_touch .tab, #sidePanelTabContainer.w_touch .tab {\
-          padding: 8px 12px 8px;\
-        }\
-        #content:not(.w_flat) #leftPanelTabContainer .tab, #sidePanelTabContainer .tab {\
-          border-radius: 8px 8px 0px 0px;\
-        }\
-      #sidePanelTabContainer .tab {\
-        background: none repeat scroll 0 0 #999999; border-width: 1px 1px 0; cursor: pointer;\
-        display: inline-block; font-size: 13px; padding: 5px 10px 10px;\
-      }\
-      #leftPanel.videoInfo .tab.videoInfo {\
-        background: #bbb;    border-style: outset;\
-      }\
-      #leftPanel.ichiba .tab.ichiba {\
-        background: #eee;    border-style: outset;\
-      }\
-      #playerTabWrapper.w_comment   .tab.comment,\
-      #playerTabWrapper.w_videoInfo .tab.videoInfo,\
-      #playerTabWrapper.w_ichiba    .tab.ichiba,\
-      #playerTabWrapper.w_review    .tab.review\
-      {\
-        background: #dfdfdf; border-style: outset;\
-      }\
-      body.videoExplorer .sidePanel:not(:hover) .sidePanelInner {\
-        overflow: hidden;\
-      }\
-      #playerTabWrapper.w_videoInfo #playerCommentPanel, #playerTabWrapper.w_ichiba #playerCommentPanel, #playerTabWrapper.w_review #playerCommentPanel {\
-        /*display: none;*/ top: -9999px;\
-      }\
-      /*body.videoExplorer #sidePanelTabContainer { display: none; }*/\
-      .sidePanel.ichibaEmpty  .tab.ichiba, .sidePanel.reviewEmpty .tab.review {\
-        color: #ccc;\
-      }\
-\
-      .sideIchibaPanel .ichibaPanelInner {\
-        margin:0; color: #666;\
-      }\
-      .sideIchibaPanel .ichibaPanelHeader .logo{\
-        text-shadow: 1px 1px 1px #666; cursor: pointer; padding: 4px 0px 4px; font-size: 125%;\
-      }\
-      .sideIchibaPanel .ichibaPanelFooter{\
-        text-align: center;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem {\
-        margin: 0 0 8px 0; background: white; border-bottom : 1px dotted #ccc;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem a:hover{\
-        background: #eef;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem>div {\
-        max-width: 266px; margin: auto; text-align: center;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .blomagaArticleNP {\
-        background: url("http://ichiba.dev.nicovideo.jp/embed/zero/img/bgMainBlomagaArticleNP.png") no-repeat scroll 0 0 transparent;\
-        height: 170px;\
-        margin: 0 auto;\
-        width: 180px;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .blomagaLogo {\
-        color: #FFFFFF;font-size: 9px;font-weight: bold;padding-left: 10px;padding-top: 8px;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .blomagaLogo span{\
-        background: none repeat scroll 0 0 #AAAAAA;padding: 0 3px;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .blomagaText {\
-        color: #666666;font-family: \'HGS明朝E\',\'ＭＳ 明朝\';font-size: 16px;height: 100px;padding: 7px 25px 0 15px;text-align: center;white-space: normal;word-break: break-all;word-wrap: break-word;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .blomagaAuthor {\
-        color: #666666; font-size: 11px;padding: 0 20px 0 10px;text-align: right;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .balloonUe{\
-        bottom: 12px; display: block; max-width: 266px; \
-      }\
-      .sideIchibaPanel .ichiba_mainitem .balloonUe a{\
-        background: url("/img/watch_zero/ichiba/imgMainBalloonUe.png") no-repeat scroll center top transparent;\
-        color: #666666 !important;\
-        display: block;\
-        font-size: 108%;\
-        line-height: 1.2em;\
-        margin: 0 auto;\
-        padding: 8px 15px 3px;\
-        text-align: center;\
-        text-decoration: none;\
-        word-wrap: break-word;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .balloonShita{\
-        height: 12px; bottom: 0; left: 0;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .balloonShita img{\
-        vertical-align: top !important; \
-      }\
-      .sideIchibaPanel .ichiba_mainitem .ichibaMarquee {\
-        display: none;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .thumbnail span {\
-        font-size: 22px; color: #0066CC;\
-        font-family: \'ヒラギノ明朝 Pro W3\',\'Hiragino Mincho Pro\',\'ＭＳ Ｐ明朝\',\'MS PMincho\',serif;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .action {\
-        font-size: 85%;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .action .buy {\
-        font-weight: bolder; color: #f60;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .itemname {\
-        font-weight: bolder;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .maker {\
-        font-size: 77%; margin-bottom: 2px;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .price {\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .action .click {\
-        font-weight: bolder;\
-      }\
-      .sideIchibaPanel .ichiba_mainitem .goIchiba {\
-        font-size: 77%; margin: 5px 0;\
-      }\
-      .sideIchibaPanel .addIchiba, .sideIchibaPanel .reloadIchiba {\
-        cursor: pointer;\
-      }\
-      .sideIchibaPanel .noitem {\
-        cursor: pointer;\
-      }\
-\
-      #outline .bottomAccessContainer {\
-        position: absolute; top: 12px;\
-      }\
-      #outline .bottomConfButtonContainer {\
-        position: absolute; top: 12px; right: 0px;\
-      }\
-      body.videoExplorer .bottomAccessContainer{\
-        display: none;\
-      }\
-      #outline.under960 .bottomAccessContainer{\
-        right: 60px;\
-      }\
-      #outline .sidebar {\
-        -webkit-transition: margin-top 0.3s ease-out;\
-        transition:         margin-top 0.3s ease-out;\
-      }\
-      #outline.under960 .sidebar {\
-        margin-top: 24px;\
-      }\
-      #videoHeader.menuClosed .watchItLaterMenu, #videoHeader.menuClosed .hidariue { display: none; }\
-      #videoHeader .watchItLaterMenu {\
-        position: absolute; width: 100px; left: -55px; top: 32px;\
-      }\
-      /* プレイリスト出したり隠したり */\
-      #playlist>* {\
-        -webkit-transition: opacity 0.6s; transition: opacity 0.6s;\
-      }\
-      body:not(.full_with_browser):not(.videoExplorer) #playlist.w_closing>* {\
-        opacity: 0;\
-      }\
-      body:not(.full_with_browser):not(.videoExplorer) #playlist:not(.w_show){\
-        position: absolute; top: -9999px;\
-      }\
-      #playlist.w_show{\
-        /*max-height: 180px;*/\
-      }\
-      .playlistToggle:after {\
-        content: "▼";\
-      }\
-      .playlistToggle.w_show:after {\
-        content: "▲";\
-      }\
-      #content #playlist .playlistInformation  .generationMessage{\
-        /* 「連続再生ボタンとリスト名は左右逆のほうが安定するんじゃね？ 名前の長さによってボタンの位置がコロコロ変わらなくなるし」という対応。*/ \
-        /* ついに本家のほうもボタンが左になったよ！ */ \
-        /* position: absolute; margin-left: 90px; */\
-      }\
-      body.videoExplorer #content #playlist .playlistInformation  .generationMessage{\
-        max-width: 350px;\
-      }\
-      #playlistContainerInner .thumbContainer, #playlistContainerInner .balloon{\
-        cursor: move;\
-      }\
-\
-\
-      /* ページャーの字が小さくてクリックしにくいよね */\
-      #resultPagination {\
-        padding: 5px; font-weight: bolder; border: 1px dotted silter; font-size: 130%;\
-      }\
-\
-      #playlistContainer #playlistContainerInner .playlistItem .balloon {\
-        bottom: auto; top: -2px; padding: auto;\
-      }\
-\
-      body.w_channel #leftPanel .userIconContainer{\
-        display: none;\
-      }\
-      /* WatchItLater設定パネル */\
-      #watchItLaterConfigPanel {\
-        position: fixed; bottom: 0px; right: 16px; z-index: 10001;\
-        width: 460px; padding: 0;\
-        transition: transform 0.4s ease-in-out; -webkit-transition: -webkit-transform 0.4s ease-in-out;\
-        transform-origin: 50% 0; -webkit-transform-origin: 50% 0;\
-        transform: scaleY(0);  -webkit-transform: scaleY(0);\
-      }\
-      #watchItLaterConfigPanel.open {\
-        transform: scaleY(1); -webkit-transform: scaleY(1);\
-      }\
-      #watchItLaterConfigPanelShadow {\
-        position: fixed; bottom: 16px; right: 16px; z-index: 10000;\
-        width: 460px; height: 559px; padding: 0;\
-        background: #000; /*box-shadow: 0 0 2px black; border-radius: 8px;*/ -webkit-filter: opacity(70%);\
-        transition: transform 0.4s ease-in-out; -webkit-transition: -webkit-transform 0.4s ease-in-out;\
-        transform-origin: 50% 0; -webkit-transform-origin: 50% 0;\
-        transform: scaleY(0); -webkit-transform: scaleY(0);\
-      }\
-      #watchItLaterConfigPanelShadow.open {\
-        transform: scaleY(1); -webkit-transform: scaleY(1);\
-      }\
-      #watchItLaterConfigPanelShadowTop {\
-        position: fixed; bottom: 563px; right:0px; z-index: 10000; background: #333;\
-        width: 492px; height: 20px; padding: 0; border-radius: 32px; -webkit-filter: opacity(90%); display: none;\
-      }\
-      #watchItLaterConfigPanelOverShadow {\
-        position: fixed; bottom: 575px; right: 0px; width: 488px; height: 8px;\
-        box-shadow: 0 4px 16px #333;z-index: 10002; display: none;\
-      }\
-      #watchItLaterConfigPanel .head {\
-        background-color: #CCCCCC;border-radius: 0;color: black;height: 50px;\
-        overflow: hidden;padding: 5px 0 0 16px;position: relative;\
-      }\
-      #watchItLaterConfigPanel .head h2 {\
-        font-size: 135%;\
-      }\
-      #watchItLaterConfigPanel .inner{\
-        height: 500px; overflow-y: auto;border-width: 4px 16px 16px 16px; border-radius: 0 0 16px 16px;\
-        border-style: solid;border-color: #ccc;\
-      }\
-      #watchItLaterConfigPanel ul{\
-        border-style: inset; border-color: #ccc; border-width: 0 1px 0;\
-      }\
-      #watchItLaterConfigPanel ul.shortcutContainer{\
-        border-width: 0 1px 1px;\
-      }\
-      #watchItLaterConfigPanel ul.videoStart{\
-        border-width: 1px 1px 0;\
-      }\
-      #watchItLaterConfigPanel li{\
-      }\
-      #watchItLaterConfigPanel li:hover{\
-        /*background: #ddd;*/\
-      }\
-      #watchItLaterConfigPanel li.buggy{\
-        color: #888;\
-      }\
-      #watchItLaterConfigPanel label{\
-        margin: 0 5px;\
-      }\
-      #watchItLaterConfigPanel label:hover{\
-      }\
-      #watchItLaterConfigPanel .foot {\
-        text-align: right; padding: 0 12px; \
-      }\
-      #watchItLaterConfigPanel .closeButton{\
-        border: 0 none;border-radius: 0 0 4px 4px;box-shadow: 0 1px 2px white;color: #666; border: 1px solid #999;\
-        cursor: pointer;float: right;margin-top: 8px;position: absolute;right: 16px;\
-        text-shadow: 0 1px 0 white;top: -10px; width: 60px;\
-      }\
-      #watchItLaterConfigPanel.autoBrowserFull_false .disableAutoBrowserFullIfNicowari,\
-      #watchItLaterConfigPanel.autoBrowserFull_true .autoScrollToPlayer,\
-      #watchItLaterConfigPanel.autoBrowserFull_true .autoOpenSearch,\
-      #watchItLaterConfigPanel.removeLeftPanel_true .leftPanelJack  {\
-        color: #ccc; text-shadow: -1px -1px 0 #888; \
-      }\
-      #watchItLaterConfigPanel .reload .title:after {\
-        content: \' (※)\'; font-size: 80%; color: #900;\
-      }\
-      #watchItLaterConfigPanel .debugOnly {\
-        display: none;\
-      }\
-      #watchItLaterConfigPanel.debugMode .debugOnly {\
-        display: block; background: #888;\
-      }\
-      #watchItLaterConfigPanel .section {\
-        border-style: solid;border-width: 10px 12px 10px 12px;color: white; font-size: 135%; position: relative;\
-        font-weight: bolder; cursor: pointer; /*text-shadow: 2px 2px 1px #000000;*/\
-        transition: border-width 0.2s ease-in-out 0.4s, color 0.3s; -webkit-transition: border-width 0.2s ease-in-out 0.4s, color 0.4s;\
-      }\
-      #watchItLaterConfigPanel .open .section {\
-        border-width: 20px 12px 12px 12px;\
-        transition: border-width 0.2s ease-in-out     ; -webkit-transition: border-width 0.2s ease-in-out     ;\
-      }\
-      #watchItLaterConfigPanel .section:hover:after {\
-        content: \'▼\';\
-        position: absolute; top: 0px; right: 10px; font-size: 150%;\
-        transition: transform 0.2s ease-in-out 0.4s; -webkit-transition: -webkit-transform 0.2s ease-in-out 0.4s;\
-      }\
-      #watchItLaterConfigPanel .open .section:after {\
-        content: \'▼\';\
-        position: absolute; top: 0px; right: 10px; font-size: 150%;\
-        transform: rotate(180deg); -webkit-transform: rotate(180deg);\
-        transition: transform 0.2s ease-in-out     ; -webkit-transition: -webkit-transform 0.2s ease-in-out;\
-      }\
-      #watchItLaterConfigPanel .section > div {\
-        padding: 8px 0 8px 12px; box-shadow: 0 0 4px black;\
-      }\
-      #watchItLaterConfigPanel .section > div > span {\
-        /*background: #333;*/\
-      }\
-      #watchItLaterConfigPanel li:not(.section) {\
-        background: #fff; border-width: 0px 0px 0px 24px; border-style: solid; border-color: #fff;\
-        max-height: 0px; overflow: hidden;\
-        transition: max-height 0.4s ease-in-out     , border-width 0.4s ease-in-out;\
-      }\
-       #watchItLaterConfigPanel .open li:not(.section) {\
-        max-height: 100px; border-width: 4px 0px 4px 24px; \
-        transition: max-height 0.4s ease-in-out 0.2s, border-width 0.4s ease-in-out 0.2s;\
-      }\
-      #watchItLaterConfigPanel .section .description{\
-        display: block; font-size: 80%;;\
-      }\
-      #watchItLaterConfigPanel .shortcutSetting:not(.enable) span :not(.enable){\
-        color: #silver; \
-      }\
-      #watchItLaterConfigPanel .shortcutSetting .enable {\
-        cursor: pointer; margin: auto 10px;\
-      }\
-      #watchItLaterConfigPanel .shortcutSetting        .enable:before {\
-        content: \'○ \';\
-      }\
-      #watchItLaterConfigPanel .shortcutSetting.enable .enable:before {\
-        content: \'㋹ \'; color: blue;\
-      }\
-      #watchItLaterConfigPanel .shortcutSetting      .ctrl, #watchItLaterConfigPanel .shortcutSetting     .alt, #watchItLaterConfigPanel .shortcutSetting       .shift {\
-        cursor: pointer; border: 2px outset; margin: 4px 4px; padding: 2px 4px; width: 180px; border-radius: 4px;background: #eee;\
-      }\
-      #watchItLaterConfigPanel .shortcutSetting.ctrl .ctrl, #watchItLaterConfigPanel .shortcutSetting.alt .alt, #watchItLaterConfigPanel .shortcutSetting.shift .shift {\
-        border: 2px inset; color: blue;\
-      }\
-      #watchItLaterConfigPanel .hoverMenuDelay input {\
-        width: 50px; ime-mode: disabled; text-align: center;\
-      }\
-\
-\
-      /* 動画検索画面に出るお気に入りタグ・お気に入りマイリスト */\
-      .videoExplorerMenu .watchItLaterMenu.open, \
-      .videoExplorerMenu .watchItLaterMenu.opening {\
-        background: -moz-linear-gradient(center top , #D1D1D1, #FDFDFD) repeat scroll 0 0 transparent !important;\
-        background: -webkit-gradient(linear, left top, left bottom, from(#D1D1D1), to(#FDFDFD)) !important;\
-        border-bottom: 0 !important;\
-      }\
-      .videoExplorerMenu .watchItLaterMenu {\
-        position: relative;\
-        /*background: -moz-linear-gradient(center top , whitesmoke 0%, #E1E1E1 100%) repeat scroll 0 0 transparent;*/\
-        /*box-shadow: 0 -1px 1px rgba(0, 0, 0, 0.1) inset;*/\
-        /*background: #f5f5f5;*/\
-        border-bottom: 1px solid #CCCCCC;\
-      }\
-      .videoExplorerMenu .watchItLaterMenu:hover{\
-        background: #dbdbdb;\
-      }\
-      .videoExplorerMenu .watchItLaterMenu {\
-        padding: 0 12px; display: block; color: black;\
-      }\
-      .videoExplorerMenu .slideMenu{\
-        width: 100%; height: auto !important;\
-        overflow-x: hidden;\
-        overflow-y: auto;\
-        padding: 0;\
-        background: #fdfdfd;\
-        border-top: 0 !important;\
-        display: block;\
-        max-height: 0;\
-        transition: max-height 0.5s ease-in-out;\
-      }\
-      .videoExplorerMenu .slideMenu.open {\
-        max-height: 2000px;\
-        transition: max-height   1s ease-in-out;\
-      }\
-      .videoExplorerMenu #favoriteTagsMenu a,             .videoExplorerMenu #favoriteMylistsMenu a,\
-      .videoExplorerMenu #mylistListMenu   a,             .videoExplorerMenu #videoRankingMenu a{\
-        color: black; display: block;\
-      }\
-      .videoExplorerMenu #favoriteTagsMenu a:after,       .videoExplorerMenu #favoriteMylistsMenu a:after,\
-      .videoExplorerMenu #mylistListMenu   a:after,       .videoExplorerMenu #videoRankingMenu a:after{\
-        content: "▼"; position: absolute; background: none; top: 0px; right: 10px; color: #ccc;\
-      }\
-      .videoExplorerMenu #favoriteTagsMenu.open a:after,  .videoExplorerMenu #favoriteMylistsMenu.open a:after,\
-      .videoExplorerMenu #mylistListMenu.open   a:after,  .videoExplorerMenu #videoRankingMenu.open a:after{\
-        content: "▲";\
-      }\
-      .videoExplorerMenu .slideMenu ul{\
-      }\
-      .videoExplorerMenu .slideMenu ul li{\
-        background: #fdfdfd; padding: 0; border: 0;font-size: 90%; height: auto !important;\
-      }\
-      .videoExplorerMenu .slideMenu ul li a{\
-        line-height: 165%; background: none; display: block;\
-      }\
-      .videoExplorerMenu.w_touch .slideMenu ul li a{\
-        line-height: 300%; font-size: 120%; color: black;\
-      }\
-        .videoExplorerMenu .slideMenu ul li a:before{\
-          background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;\
-          display: inline-block; height: 14px; margin: -4px 4px 0 0; vertical-align: middle; width: 18px; content: ""\
-        }\
-        .videoExplorerMenu .slideMenu ul li          a.defMylist:before{ background-position: 0 -253px;}\
-        .videoExplorerMenu .slideMenu ul li.folder0  a:before{ background-position: 0 0;}\
-        .videoExplorerMenu .slideMenu ul li.folder1  a:before{ background-position: 0 -23px;}\
-        .videoExplorerMenu .slideMenu ul li.folder2  a:before{ background-position: 0 -46px;}\
-        .videoExplorerMenu .slideMenu ul li.folder3  a:before{ background-position: 0 -69px;}\
-        .videoExplorerMenu .slideMenu ul li.folder4  a:before{ background-position: 0 -92px;}\
-        .videoExplorerMenu .slideMenu ul li.folder5  a:before{ background-position: 0 -115px;}\
-        .videoExplorerMenu .slideMenu ul li.folder6  a:before{ background-position: 0 -138px;}\
-        .videoExplorerMenu .slideMenu ul li.folder7  a:before{ background-position: 0 -161px;}\
-        .videoExplorerMenu .slideMenu ul li.folder8  a:before{ background-position: 0 -184px;}\
-        .videoExplorerMenu .slideMenu ul li.folder9  a:before{ background-position: 0 -207px;}\
-\
-        .videoExplorerMenu .slideMenu ul li.g_ent2 a:before     {  background-position: 0 -23px;}\
-        .videoExplorerMenu .slideMenu ul li.g_life2 a:before    {  background-position: 0 -46px;}\
-        .videoExplorerMenu .slideMenu ul li.g_politics a:before {  background-position: 0 -69px;}\
-        .videoExplorerMenu .slideMenu ul li.g_tech a:before     {  background-position: 0 -92px;}\
-        .videoExplorerMenu .slideMenu ul li.g_culture2 a:before {  background-position: 0 -115px;}\
-        .videoExplorerMenu .slideMenu ul li.g_other a:before    {  background-position: 0 -138px;}\
-        .videoExplorerMenu .slideMenu ul li.r18 a:before        {  background-position: 0 -207px;}\
-        .videoExplorerMenu .slideMenu ul li.all        a.all,\
-        .videoExplorerMenu .slideMenu ul li.g_ent2     a.g_ent2,\
-        .videoExplorerMenu .slideMenu ul li.g_life2    a.g_life2,\
-        .videoExplorerMenu .slideMenu ul li.g_politics a.g_politics,\
-        .videoExplorerMenu .slideMenu ul li.g_tech     a.g_tech,\
-        .videoExplorerMenu .slideMenu ul li.g_culture2 a.g_culture2,\
-        .videoExplorerMenu .slideMenu ul li.g_other    a.g_other,\
-        .videoExplorerMenu .slideMenu ul li.r18        a.r18 \
-        { font-weight: bolder; border-top: 1px dotted #ccc; }\
-\
-\
-      .videoExplorerMenu .slideMenu ul li a:after{\
-        background: none !important;\
-      }\
-      .videoExplorerMenu .slideMenu ul li a:hover{\
-        background: #f0f0ff;\
-      }\
-      .videoExplorerMenu .slideMenu ul .reload{\
-        cursor: pointer; border: 1px solid; padding: 0;\
-      }\
-\
-      .videoExplorerMenu .tagSearchHistory {\
-        border-radius: 0px; margin-top: 2px; padding: 4px; background: #ccc;\
-      }\
-      .videoExplorerMenu .itemList > li, #videoExplorerExpand {\
-        background: #f5f5f5;\
-      }\
-      .videoExplorerMenu .itemList ul > li:hover {\
-        background: #e7e7e7;\
-      }\
-      .videoExplorerMenu .itemList ul > li.active {\
-        background: #343434;\
-      }\
-\
-\
-      /* 動画タグが1行以下の時 */\
-      body:not(.full_with_browser) .tag1Line  #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit {\
-        height: 12px; padding: 6px 4px 2px;\
-      }\
-      body:not(.full_with_browser) .tag1Line  #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit .toggleText{\
-        display: none;\
-      }\
-      /* 動画タグが2行以下の時 */\
-      body:not(.full_with_browser) .tag2Lines #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit {\
-        height: 36px;\
-      }\
-      /* タグ領域とプレイヤーの隙間をなくす */\
-      body:not(.full_with_browser) #videoTagContainer, body:not(.full_with_browser) #videoHeader .videoMenuToggle {\
-        margin-bottom: -10px;\
-      }\
-      #videoHeaderMenu .searchContainer .searchText {\
-        margin-top: -8px;\
-      }\
-\
-      body.size_small #playerContainerWrapper {\
-        padding: 0;\
-      }\
-\
-      /* ニュース履歴 */\
-      body.videoExplorer #textMarquee .openNewsHistory, body.videoExplorer #textMarquee .newsHistory {\
-        display: none;\
-      }\
-      #textMarquee .openNewsHistory {\
-        position: absolute; width: 30px;\
-        font-size: 13px; padding: 0; margin: 0; height: 28px;\
-        cursor: pointer;\
-        bottom: 0;\
-        background: none repeat scroll 0 0 transparent;\
-        border: 1px none;\
-        border-radius: 2px 2px 2px 2px;\
-        cursor: pointer;\
-        right: 18px;\
-        z-index: 200;\
-      }\
-      #textMarquee .newsHistory {\
-        position: absolute;\
-        bottom: 0px; right: 0px; width: 100%;\
-        max-height: 132px;\
-        min-height: 40px;\
-        overflow-y: auto;\
-        overflow-x: hidden;\
-        z-index: 1;\
-        padding: 4px;\
-        display: none;\
-        background: #333;\
-        text-align: left;\
-        font-size: 14px;\
-        padding: 0;\
-      }\
-      #textMarquee .newsHistory li{\
-        padding: 0 2px;\
-      }\
-      #textMarquee .newsHistory li:nth-child(odd){\
-        background: #444;\
-      }\
-      #textMarquee .newsHistory li:nth-child(even){\
-        background: #333;\
-      }\
-      body.full_with_browser.hideNewsInFull #textMarquee .newsHistory {\
-        display: none !important;\
-      }\
-      body #popupMarquee {\
-        width: 360px;\
-      }\
-      /* 半透明だとflashの上に来ると描画されないので強制的に黒にする(Chromeは平気) */\
-      body.full_with_browser #popupMarquee.popupMarqueeBottomLeft {\
-        background: #000 !important;left: 8px; bottom: 8px; width: 400px; opacity: 1;\
-      }\
-      body.full_with_browser #playerContainer {\
-        margin-left: 0 !important;\
-      }\
-      body:not(.full_with_browser) #playerContainer {\
-        /*top: -8px;*/\
-      }\
-      body:not(.full_with_browser) #playerContainerWrapper {\
-        padding: 0px;\
-      }\
-      body.full_with_browser #playerContainer, body.size_small #playerContainer {\
-        top: auto;\
-      }\
-      body.full_with_browser.no_setting_panel .videoExplorerMenu {\
-        display:none;\
-      }\
-\
-\
-      body:not(.videoExplorer) #content.w_hideSearchExpand #videoExplorerExpand {\
-        display: none;\
-      }\
-      #outline .openVideoExplorer {\
-        display: none;\
-      }\
-      #outline.w_hideSearchExpand .openVideoExplorer {\
-        display: inline-block;\
-      }\
-\
-      /* 1列表示の時、動画タイトルの横の空白部分にまでクリック判定があるのはVistaのエクスプローラみたいで嫌なので、文字部分だけにしたい */\
-      #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .contentItemList .video .column1 .videoInformationOuter .title,\
-      #videoExplorer .videoExplorerBody .videoExplorerContent .suggestVideo .video .column1 .videoInformationOuter .title {\
-        display: inline;\
-      }\
-      .videoExplorerMenu .quickSearchInput {\
-        background: none repeat scroll 0 0 #F4F4F4;\
-        border: 1px inset silver;\
-        left: 60px;\
-        padding-left: 4px;\
-        position: absolute;\
-        top: 2px;\
-        width: 200px;\
-      }\
-      .videoExplorerMenu.w_touch .quickSearchInput {\
-        top: 4px; font-size: 20px;\
-      }\
-\
-      .videoExplorerContent .contentItemList                 .column4 .balloon {\
-        bottom: auto; top: 10px;\
-      }\
-      #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .thumbnailContainer .balloon {\
-        top: -20px; /* 一列の時に「再生リストに追加しました」が上の動画に被るのを防ぐ */\
-      }\
-      .videoExplorerContent .contentItemList                 .column1 .itemMylistComment {\
-        font-size: 85%; color: #666; border: 1px solid silver; border-radius: 8px; padding: 4px; margin: 0 2px; display: none;\
-      }\
-      .videoExplorerContent .contentItemList                 .column1 .nicorepoOwnerIconContainer {\
-        display: none;\
-      }\
-      .videoExplorerContent .contentItemList .nicorepoResult .column1 .nicorepoOwnerIconContainer {\
-        float: right; display: block;\
-        padding: 3px; border: 1px solid silver;\
-      }\
-      .videoExplorerContent .contentItemList                 .column1 .nicorepoOwnerIconContainer img {\
-        height: 48px;\
-      }\
-\
-      .videoExplorerBody.dummyMylist #searchResultContainer .favMylistEditContainer,\
-      .videoExplorerBody.dummyMylist:not(.ranking) #searchResultMylistSortOptions,\
-      .videoExplorerBody.dummyMylist .favMylistEditContainer,\
-      .videoExplorerBody.dummyMylist:not(.ownerNicorepo) #searchResultHeader {\
-        display: none !important;\
-      }\
-\
-      .videoExplorerContent .contentItemList .thumbnailHoverMenu {\
-        position: absolute; padding: 0; box-shadow: 1px 1px 2px black;\
-        display: none;\
-      }\
-      .videoExplorerContent .contentItemList .column1 .thumbnailHoverMenu {\
-        bottom:  4px; left: 4px;\
-      }\
-      .videoExplorerContent .contentItemList .column4 .thumbnailHoverMenu {\
-        bottom: 75px; left: 5px;\
-      }\
-      .videoExplorerContent .contentItemList .deleteFromMyMylist {\
-        cursor: pointer; font-size: 70%; border: 1px solid #ccc; padding: 0;\
-        display: none;\
-      }\
-      .videoExplorerContent .contentItemList .showLargeThumbnail {\
-        cursor: pointer; font-size: 70%; border: 1px solid #ccc;; \
-      }\
-      .videoExplorerContent .contentItemList .showLargeThumbnail {\
-        padding: 0 4px;\
-      }\
-      .videoExplorerContent .contentItemList .item:hover .thumbnailHoverMenu {\
-        display: block;\
-      }\
-      .videoExplorerContent .contentItemList .log-user-video-upload {\
-        background: #ffe; border-radius: 4px;\
-      }\
-      .videoExplorerContent .contentItemList .nicorepoResult .itemVideoDescription, .videoExplorerContent .contentItemList .nicorepoResult .videoTitle{\
-      }\
-      .videoExplorerBody.enableMylistDeleteButton.mylist.isMine .videoExplorerContent .contentItemList .item:hover .deleteFromMyMylist {\
-        display: inline-block;\
-      }\
-\
-      #playlist .generationMessage {\
-        cursor: pointer;\
-      }\
-      #playlist .generationMessage:hover {\
-        text-decoration: underline;\
-      }\
-      #playlist .generationMessage:after {\
-        content: "▼";\
-      }\
-\
-      #yukkuriPanel {\
-        position: fixed; z-index: 1500; bottom: 0; left: 0; display: inline-block;\
-      }\
-      body.w_noNicoru .nicoru-button{\
-        left: -9999; display: none !important;\
-      }\
-      body.w_noNicoru .menuOpened #videoMenuTopList li.videoMenuListNicoru{\
-        display: none;\
-      }\
-      body.w_noNicoru #videoTagContainer .tagInner #videoHeaderTagList li {\
-        margin: 0 18px 4px 0;\
-      }\
-      body.w_noNicoru #videoTagContainer .tagInner #videoHeaderTagList li .tagControlContainer, body.w_noNicoru #videoTagContainer .tagInner #videoHeaderTagList li .tagControlEditContainer {\
-        padding: 1px 0;\
-      }\
-\
-      .userProfile.w_touch {\
-        font-size: 150%; line-height: 120%;\
-      }\
-      .resultPagination.w_touch {\
-        font-size: 200%;\
-      }\
-      .resultPagination.w_touch li{\
-        padding: 4px 16px;\
-      }\
-      select.w_touch {\
-        font-size: 200%;\
-      }\
-      /* 真・browserFullモード */\
-      body.full_with_browser.hideCommentInput #nicoplayerContainerInner {\
-        /* コメント入力欄は動画上表示にするのではなく、画面外に押し出す事によって見えなくする */\
-        margin-top: -10px; margin-bottom: -36px; \
-      }\
-      body.full_with_browser.trueBrowserFull #nicoplayerContainerInner:not(.stageVideo) {\
-        margin-left: -2.5%; width: 105% !important;\
-      }\
-      body.full_with_browser.trueBrowserFull #playerContainerWrapper {\
-        margin: 0 !important;\
-      }\
-      body.full_with_browser.trueBrowserFull #playlist {\
-        display: none;\
-      }\
-      body.full_with_browser.trueBrowserFull:not(.w_fullScreenMenu) .mylistPopupPanel.fixed,body.full_with_browser.trueBrowserFull .yukkuriButton { display:none; }\
-      #trueBrowserFullShield {\
-        -webkit-transition: opacity 0.2s ease-out;\
-        position:absolute; \
-        display: none;\
-      }\
-      body.full_with_browser #trueBrowserFullShield {\
-        background: black;\
-        display: block;\
-        bottom: 100px; \
-        right:  50px;\
-        z-index: 10000; \
-        min-width: 400px;\
-        cursor: nw-resize;\
-        opacity: 0;\
-        color: white;\
-        box-shadow: 2px 2px 2px silver;\
-        border-radius: 4px;\
-      }\
-      body.full_with_browser #trueBrowserFullShield .title {\
-        color: #ffc; font-size: 120%;\
-      }\
-      body.full_with_browser #trueBrowserFullShield .ownerIcon {\
-        float: left; height: 55px; padding: 8px;\
-      }\
-      body.full_with_browser #trueBrowserFullShield:hover, body.full_with_browser #trueBrowserFullShield.active, body.w_fullScreenMenu #trueBrowserFullShield { \
-        opacity: 1;\
-      }\
-      body:not(.full_with_browser) #trueBrowserFullShield { display: none; }\
-      \
-      #sharedNgSettingContainer {\
-        display: inline-block; font-size: 80%; position: absolute; top: 0; left: 85px;\
-      }\
-      #sharedNgSetting {\
-        background: #ddd; border: 1px solid silver;\
-      }\
-      /* ニュース消す */\
-      #content.noNews #textMarquee {\
-        display: none !important;\
-      }\
-      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerTabWrapper {\
-        height: auto !important; position: absolute; bottom: 18px;\
-      }\
-      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews              #playerTabContainer {\
-        bottom: -17px;\
-      }\
-      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews .appli_panel #playerTabContainer {\
-        bottom:  20px;\
-      }\
-      #playerTabWrapper.w_videoInfo #playerTabContainer, #playerTabWrapper.w_ichiba #playerTabContainer, #playerTabWrapper.w_review #playerTabContainer {\
-        bottom: 0px !important;\
-      }\
-      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerTabWrapper.w_videoInfo, \
-      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerTabWrapper.w_ichiba, \
-      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerTabWrapper.w_review\
-      {\
-        height: auto !important; position: absolute; bottom: 2px;\
-      }\
-     /* body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #leftPanel {\
-        height: auto !important; position: absolute; bottom: 2px;\
-      }*/\
-      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerCommentPanel {\
-        height: 100% !important;\
-      }\
-      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerContainer.appli_panel #appliPanel {\
-        bottom: -18px !important;\
-      }\
-      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerContainer {\
-        height: auto;\
-      }\
-      #outline.noNicommend #nicommendContainer, #outline.noIchiba  #nicoIchiba, #outline.noReview  #videoReviewPanel{\
-        display: none;\
-      }\
-      #bottomContentTabContainer.noBottom .outer, #bottomContentTabContainer.noBottom #pageFooter {\
-        display: none;\
-      }\
-      #bottomContentTabContainer.noBottom #outline {\
-        background: #141414; padding-top: 0; padding-bottom: 35px;\
-      }\
-      \
-      #content.w_flat #playerContainerWrapper, #content.w_flat #playlist .playlistInformation {\
-        background: #444;\
-      }\
-      #content.w_flat #leftPanel, #content.w_flat #playerCommentPanel {\
-        background: #ddd; border-radius: 0;\
-      }\
-      #content.w_flat .sideVideoInfo {\
-        border-radius: 0;\
-      }\
-     #content.w_flat #videoExplorerExpand a {\
-        text-shadow: none;\
-      }\
-      #content.w_flat #playerCommentPanel .section .commentTable .commentTableHeaderWrapper {\
-        background: gray;\
-      }\
-      \
-      body:not(.full_with_browser) #content.w_compact #videoHeader {\
-        width: 960px;\
-      }\
-      body:not(.full_with_browser).size_normal #content.w_compact #videoHeader {\
-        width: 1186px;\
-      }\
-      .videoMenuToggle {\
-        -webkit-transform-origin: 100% 100%; -webkit-transition: -webkit-transform 0.4s;\
-        transform-origin: 100% 100%; transition: transform 0.4s;\
-        z-index: 1000;\
-      }\
-      #content.w_compact .videoHeaderTitle {\
-        letter-spacing: -1px;\
-      }\
-      #content.w_compact .videoDetailExpand .arrow {\
-        position: absolute; top: 8px; right: -24px;\
-      }\
-      #content.w_compact .tag1Line  .videoMenuToggle {\
-        transform: scale(0.8, 0.41); -webkit-transform: scale(0.8, 0.41);\
-      }\
-      #content.w_compact .tag2Lines .videoMenuToggle {\
-        transform: scale(0.8); -webkit-transform: scale(0.8);\
-      }\
-      #content.w_compact #topVideoInfo .parentVideoInfo {\
-        margin-top: -9px; margin-bottom: 9x;\
-      }\
-      #content.w_compact #topVideoInfo .parentVideoInfo .cct{\
-        margin-bottom: 0;\
-      }\
-      #content.w_compact #topVideoInfo .parentVideoInfo .videoThumb{\
-        margin-top: 4px;\
-      }\
-      #content.w_compact #topVideoInfo .ch_prof, #content.w_compact #topVideoInfo .userProfile {\
-        min-width: 297px; margin-top: -1px; border: 1px solid #e7e7e7;\
-      }\
-      #content.w_compact #videoHeaderDetail .videoDetailExpand{\
-        height: auto; padding: 0;\
-      }\
-      #content.w_compact #topVideoInfo .videoDescription.description {\
-        background: #fff; margin: 10px 0 0;padding: 4px ;width: 952px; /*font-size: 90%;*/\
-      }\
-      .size_normal #content.w_compact #videoDetailInformation .description {\
-        width: 1178px\
-      }\
-      #content.w_compact #topVideoInfo .videoMainInfoContainer{\
-        padding: 0; \
-      }\
-      #content.w_compact #videoDetailInformation{\
-        border-top: 0;\
-      }\
-      #content.w_compact #videoHeaderMenu .searchContainer {\
-        top: -16px;\
-      }\
-      #content.w_compact .videoInformation{\
-        margin: -4px 0 ;\
-      }\
-      #content.w_compact #topVideoInfo .videoStats {\
-        margin-bottom: 2px;\
-      }\
-      body:not(.full_with_browser) #content.w_compact #videoTagContainer{\
-        width: 900px;\
-      }\
-      body:not(.full_with_browser).size_normal #content.w_compact #videoTagContainer{\
-        width: 1123px;\
-      }\
-      body:not(.full_with_browser) #content.w_compact #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit {\
-        width: 72px;\
-      }\
-      body:not(.full_with_browser) #content.w_compact #videoTagContainer .tagInner #videoHeaderTagList {\
-        padding-left: 85px;\
-      }\
-      body.full_with_browser #videoHeaderTagList { background: #fafafa; }\
-      #content.w_compact #topVideoInfo {\
-        margin: 4px 0 4px;\
-      }\
-      #content.w_compact #topVideoInfo .videoShareLinks .socialLinks {\
-        margin-top: -6px; \
-      }\
-      #outline.w_compact  #videoInfoHead{\
-        margin: 0 ;\
-      }\
-      #outline.w_compact .videoInformation #videoTitle {\
-        margin: -4px 0 0;\
-      }\
-      #outline.w_compact .videoInformation #videoStats  {\
-        margin-top: -4px;\
-      }\
-      #outline.w_compact .videoInformation #videoStats .ranking {\
-        margin: 0 0 4px;\
-      }\
-      #outline.w_compact #videoShareLinks {\
-        margin: 0; \
-      }\
-      #outline.w_compact #bottomVideoDetailInformation {\
-        margin: -18px 0 0;\
-      }\
-      #outline.w_compact .infoHeadOuter .videoEditMenuExpand {\
-        position: absolute; top: 0;\
-      }\
-      #outline.w_compact .videoEditMenu {\
-        margin: 0;\
-      }\
-      #outline.w_compact .videoDescription {\
-        font-size: 90%; margin-top: -8px; padding: 0 0 4px 4px;\
-      }\
-      #outline.w_compact #videoComment {\
-        margin: 0px; border: 1px solid silver; border-radius: 4px 4px 4px 4px; padding: 0 4px;\
-      }\
-      #outline.w_compact #videoComment h4{\
-        padding-left: 4px;\
-      }\
-      #outline.w_compact .videoMainInfoContainer {\
-        border-bottom: 0; margin-bottom: 0;\
-      }\
-      #outline.w_compact {\
-        border-bottom: 0; margin-bottom: 0;\
-      }\
-      #outline.w_compact #nicommendList {\
-        margin-top: 4px;\
-      }\
-      #outline.w_compact .sidebar { width: 300px; }\
-      \
-      #outline.w_compact .outer {\
-        /* 左パネルを隠した標準サイズのプレイヤーに合わせる */\
-        width: 960px;\
-      }\
-      #outline.w_compact #ichibaMain dl.ichiba_mainitem {\
-        margin: 0 22px 30px 0;\
-      }\
-      #footer     { z-index: 1; }\
-      \
-      body.en-us #playerAlignmentArea, body.zh-tw #playerAlignmentArea {\
-        /*padding-right: 0;*/\
-      }\
-      #footer .toggleBottom {\
-        cursor: pointer; text-align: center; width: 200px; padding: 0px 12px; margin: auto; border-radius: 16px 16px 0 0;\
-        border: 1px solid #333; background: #666; transition: background 0.4s ease-out, box-shadow 0.4s;\
-      }\
-      #footer:hover .toggleBottom {\
-        border: 1px outset; background: #ccc;\
-      }\
-      #footer .toggleBottom:hover {\
-        box-shadow: 0px 0px 8px #fff;\
-      }\
-     #footer.noBottom .toggleBottom {\
-        border-radius: 0 0 16px 16px;\
-      }\
-      #footer .toggleBottom .openBottom, #footer.noBottom .toggleBottom .closeBottom  {\
-        display: none;\
-      }\
-      #footer.noBottom .toggleBottom .openBottom {\
-        display: block;\
-      }\
-      #footer .toggleBottom>div {\
-        -webkit-transform: scaleX(3); transform: scaleX(3);\
-      }\
-      #footer .toggleBottom {\
-        cursor: pointer; text-align: center; width: 200px; padding: 0px 12px; margin: auto; border-radius: 16px 16px 0 0;\
-        border: 1px solid #333; background: #666; transition: background 0.4s ease-out, box-shadow 0.4s;\
-      }\
-      #footer:hover .toggleBottom {\
-        border: 1px outset; background: #ccc;\
-      }\
-      #footer .toggleBottom:hover {\
-        box-shadow: 0px 0px 8px #fff;\
-      }\
-     #footer.noBottom .toggleBottom {\
-        border-radius: 0 0 16px 16px;\
-      }\
-      #footer .toggleBottom .openBottom, #footer.noBottom .toggleBottom .closeBottom  {\
-        display: none;\
-      }\
-      #footer.noBottom .toggleBottom .openBottom {\
-        display: block;\
-      }\
-      #footer .toggleBottom>div {\
-        -webkit-transform: scaleX(3); transform: scaleX(3);\
-      }\
-      \
+    var __css__ = (function() { /*
     '
-    ].join(''); //
-    addStyle(style, 'watchItLaterStyle');
-  })();
+    {* 動画タグとプレイリストのポップアップ *}
+      #videoTagPopupContainer {
+      }
+      #videoTagPopupContainer.w_touch {
+        line-height: 200%; font-size: 130%;
+      }
+      #videoTagPopupContainer.w_touch .nicodic{
+        margin: 4px 14px;
+      }
+      .playlistMenuPopup {
+        background: #666; color: white; padding: 4px 8px;
+      }
+      .playlistMenuPopup.w_touch {
+        line-height: 250%;
+      }
+      #playlistSaveDialog {
+        display: none;
+      }
+      #playlistSaveDialog.show {
+        display: block;
+      }
+      #playlistSaveDialog.show .shadow{
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: #000; opacity: 0.5;
+        z-index: 30000;
+      }
+      #playlistSaveDialog.show .formWindow{
+        position: fixed;
+        margin: 0 auto;
+        text-align: center;
+        width: 100%;
+        top: 45%;
+        z-index: 30001;
+      }
+      #playlistSaveDialog      .formWindow .formWindowInner{
+        -webkit-transition: opacity 1s ease-out;
+        transition: opacity 1s ease-out;
+        opacity: 0;
+      }
+      #playlistSaveDialog.show .formWindow .formWindowInner{
+        text-align: left;
+        opacity: 1;
+        margin: 0 auto;
+        background: #f4f4f4;
+        width: 500px;
+        padding: 8px;
+        border: 1px solid;
+      }
+      #playlistSaveDialog.show .formWindow .formWindowInner a{
+        font-weight: bolder;
+      }
+      #playlistSaveDialog.show .formWindow .formWindowInner a:hover{
+        text-decoration: underline; background: white;
+      }
+      #playlistSaveDialog.show .formWindow .formWindowInner label{
+        margin: 8px;
+      }
+      #playlistSaveDialog.show .formWindow .formWindowInner input{
+
+      }
+      #playlistSaveDialog.show .formWindow .formWindowInner .desc{
+        font-size: 80%;
+      }
+      .playlistMenuPopup ul li {
+        cursor: pointer;
+      }
+      .playlistMenuPopup ul li.savelist {
+        color: #aaa;
+      }
+      .playlistMenuPopup ul li:hover {
+        text-decoration: underline; background: #888;
+      }
+      #yukkuriPanel .yukkuriButton.active {
+        border:1px inset
+      }
+
+      #content .openConfButton {
+        border:1px solid #bbb; cursor: pointer; font-family:arial, helvetica, sans-serif; padding: 4px; text-shadow: 1px 1px 0 rgba(0,0,0,0.3); text-align: center; color: #444; background-color: #ccc; margin: 0;
+      }
+      #outline .playlistToggle, #outline .openVideoExplorer, #outline .openConfButton {
+        border:1px solid #444; cursor: pointer; font-family:arial, helvetica, sans-serif; padding: 0px 4px 0px 4px; box-shadow: 1px 1px 0 rgba(0,0,0,0.3); text-align: center; color: #444; background-color: #ccc; margin: 0;
+        height: 24px; border-radius: 0 0 8px 8px;
+      }
+      #outline .openConfButton { padding: 0 8px; letter-spacing: 4px; width: 60px; }
+
+      {* 全画面時にタグとプレイリストを表示しない時*}
+      body.full_and_mini.full_with_browser #playerAlignmentArea{
+        margin-bottom: 0 !important;
+      }
+      body.full_and_mini.full_with_browser #playlist{
+        z-index: auto;
+      }
+      body.full_and_mini.full_with_browser .generationMessage{
+        display: inline-block;
+      }
+      {* 全画面時にタグとプレイリストを表示する時 *}
+      body.full_with_browser #playlist{
+        z-index: 100;
+      }
+      body.full_with_browser .generationMessage{
+        display: none;
+      }
+      body.full_with_browser .browserFullOption{
+        padding-right: 200px;
+      }
+      {* 全画面時にニュースを隠す時 *}
+      body.full_with_browser.hideNewsInFull #playerAlignmentArea{
+        margin-bottom: -37px;
+      }
+      {* 少しでも縦スクロールを減らすため、動画情報を近づける。人によっては窮屈に感じるかも *}
+      #outline {
+        margin-top: -16px;
+      }
+      #outline #feedbackLink{
+
+      }
+      #outline .videoEditMenuExpand{
+        position: absolute;right: 0;top: 26px; z-index: 1;
+      }
+      {* ヘッダに表示する再生数 *}
+      #videoCounter {
+        color: #ff9; font-size: 70%;
+      }
+      {* 右に表示する動画情報 *}
+      .sidePanel .sideVideoInfo, .sidePanel .sideIchibaPanel, .sidePanel .sideReviewPanel  {
+        padding: 0px 0px 0 0px; width: 196px; height: 100%; z-index: 10;
+        position:absolute; top:0; right:0;
+        display:none; overflow-x: visible; overflow-y: auto;
+      }
+      {* 右に表示する動画情報 *}
+      #playerTabWrapper.sidePanel .sideVideoInfo, #playerTabWrapper.sidePanel .sideIchibaPanel, #playerTabWrapper.sidePanel .sideReviewPanel  {
+        padding: 0px 0px 0 0px; width: 280px; height: 100%;
+        position: absolute; top: 0; right:0;
+      }
+      {*#playerTabWrapper.w_wide .sideVideoInfo, #playerTabWrapper.w_wide .sideIchibaPanel, #playerTabWrapper.w_wide .sideReviewPanel,*}
+      .videoExplorer #playerTabWrapper .sideVideoInfo, .videoExplorer #playerTabWrapper .sideIchibaPanel, .videoExplorer #playerTabWrapper .sideReviewPanel {
+        width: 420px; z-index: 10030;
+      }
+      #playerTabWrapper.w_videoInfo #appliPanel, #playerTabWrapper.w_ichiba #appliPanel, #playerTabWrapper.w_review #appliPanel  {
+        top: -9999px;
+      }
+      #content:not(.w_flat) .sidePanel .sideVideoInfo, #content:not(.w_flat) .sidePanel .sideIchibaPanel, #content:not(.w_flat) .sidePanel .sideReviewPanel  {
+        border-radius: 4px;
+      }
+      .sidePanel .sideVideoInfo {
+        background: #bbb; text-Align:   left; overflow-x: hidden; overflow-Y: auto; box-shadow: none; font-size: 90%;
+      }
+      .sidePanel .sideIchibaPanel, .sidePanel .sideReviewPanel  {
+        background: #f4f4f4; text-Align: center; overflow-x: hidden; overflow-Y: auto; box-shadow: none; font-size: 90%;
+      }
+      .sidePanel .sideVideoInfo .sideVideoInfoInner {
+        padding: 0 4px; position: relative;
+      }
+      .sidePanel .sideVideoInfo .videoTitleContainer {
+        background: #ccc; text-align: center;  color: #000; margin: 6px 0 0;
+      }
+      #content:not(.w_flat) .sidePanel .sideVideoInfo .videoTitleContainer {
+        border-radius: 4px 4px 0 0;
+      }
+      .sidePanel .sideVideoInfo .videoThumbnailContainer {
+        background: #ccc; text-align: center; color: #000; margin: 0;
+      }
+      .sidePanel .sideVideoInfo .videoThumbnailContainer img {
+        cursor: pointer;
+      }
+      .sidePanel .sideVideoInfo .videoTitle {
+
+      }
+      .sidePanel .sideVideoInfo .videoPostedAt {
+        color: #333;
+      }
+      .sidePanel .sideVideoInfo .videoStats{
+        font-size:90%;
+      }
+      .sidePanel .sideVideoInfo .videoStats li{
+        display: inline-block; margin: 0 2px;
+      }
+      .sidePanel .sideVideoInfo .videoStats li span{
+        font-weight: bolder;
+      }
+      .sidePanel .sideVideoInfo .videoStats .ranking{
+        display: none !important;
+      }
+      .sidePanel .sideVideoInfo .videoInfo{
+        background: #ccc; text-align: center; padding: 4px;
+      }
+      .sideVideoInfo .sideVideoInfoInner{
+        -webkit-transition: opacity 1s ease-out, color 3s ease-out;
+        transition: opacity 1s ease-out, color 3s ease-out;
+        opacity: 0;
+      }
+      .sideVideoInfo.show .sideVideoInfoInner{
+        opacity: 1;
+      }
+      .videoCount.blink {
+        color: #ccc;
+      }
+      .sidePanel .videoCountDiff {
+        position: absolute; color: white; right: 0; opacity: 0; z-index: 100; text-shadow: 1px 1px 0 orange;
+      }
+      .sidePanel .videoCountDiff.blink {
+        opacity: 1; color: white;
+      }
+      #siteHeader .videoCount, #siteHeader .videoCountDiff {
+        min-width: 32px; text-align: right; display: inline-block;
+      }
+      #siteHeader .videoCountDiff, #trueBrowserFullShield .videoCountDiff {
+        position: absolute; color: yellow; opacity: 0; font-weight: bolder; text-shadow: 1px 1px 0 red;
+      }
+      #siteHeader .videoCountDiff.blink, #trueBrowserFullShield .videoCountDiff.blink {
+        opacity: 1; color: yellow;
+      }
+      #trueBrowserFullShield .blink, #videoCounter .blink {
+        color: #000;
+      }
+      .videoCountDiff:before      {content: \'+\';}
+      .videoCountDiff.down:before {content: \'\'; }
+      #popupMarquee .videoCountDiff {display: none;}
+      .sidePanel .sideVideoInfo .videoDescription{
+        overflow-x: hidden; text-align: left;
+      }
+      .sidePanel .sideVideoInfo .videoDescriptionInner{
+        margin: 0 4px;
+      }
+      .sidePanel .sideVideoInfo .videoDetails{
+        min-width: 150px;
+      }
+      .sidePanel .sideVideoInfo .videoDetails a{
+        margin: auto 4px;
+      }
+      .sideVideoInfo .userName, .sideVideoInfo .channelName{
+        display: block;
+      }
+      .sideVideoInfo .userIconContainer, .sideVideoInfo .channelIconContainer {
+        background: #ccc; width: 100%; text-align: center; float: none;
+      }
+      #content:not(.w_flat) .sideVideoInfo .userIconContainer, #content:not(.w_flat) .sideVideoInfo .channelIconContainer{
+        border-radius: 0 0 4px 4px;
+      }
+      .sidePanel .userIcon, .sidePanel .channelIcon{
+        min-width: 128px; max-width: 150px; width: auto; height: auto; border: 0;
+      }
+      .sidePanel .sideVideoInfo .descriptionThumbnail {
+        text-align: left; font-size: 90%; padding: 4px; background: #ccc;{*box-shadow: 2px 2px 2px #666;*}
+        min-height: 60px; margin-bottom: 4px; font-weight: normal; color: black;
+      }
+      #content:not(.w_flat) .sidePanel .sideVideoInfo .descriptionThumbnail {
+        border-radius: 4px;
+      }
+      .sidePanel .sideVideoInfo .descriptionThumbnail.video img{
+        height: 50px; cursor: pointer; float: left;
+      }
+      .sidePanel .sideVideoInfo .descriptionThumbnail.mylist img{
+        height: 40px; cursor: pointer;
+      }
+      .sidePanel .sideVideoInfo .descriptionThumbnail.illust img{
+        height: 60px; cursor: pointer; float: left;
+      }
+      .sidePanel .sideVideoInfo a.otherSite {
+        font-weight: bolder; text-decoration: underline;
+      }
+      body:not(.videoExplorer) #leftPanel.removed {
+        display: none; left: 0px;
+      }
+      body:not(.videoExplorer) #leftPanel.removed .sideVideoInfo {
+        display: none; width: 0px !important; border: none; margin: 0; padding: 0; right: auto;
+      }
+      .sideVideoInfo .userIconContainer.isUserVideoPublic .notPublic { display: none; }
+      .sideVideoInfo .userIconContainer                    .isPublic { display: none; }
+      .sideVideoInfo .userIconContainer.isUserVideoPublic  .isPublic { display: inline; }
+      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem,
+      .sidePanel .sideIchibaPanel .ichiba_mainitem {
+        width: 180px; display:inline-block; vertical-align: top;
+        margin: 4px 3px; border 1px solid silver;
+      }
+      body.videoExplorer #content.w_adjusted:not(.w_flat) .sideIchibaPanel .ichiba_mainitem {
+        border-radius: 8px
+      }
+      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem .thumbnail span {
+        font-size: 60px;
+      }
+      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem>div>dt {
+        height: 50px;position: relative;
+      }
+      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem .balloonUe {
+        position: absolute;width: 100%;
+      }
+      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem .balloonUe {
+        position: absolute;
+      }
+      body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem .balloonShita {
+        position: absolute;
+      }
+
+      .sidePanel.videoInfo, .sidePanel.ichiba{
+        background: none;
+      }
+
+      .sideVideoInfo.isFavorite .userName:after, .sideVideoInfo.isFavorite.isChannel .videoOwnerInfoContainer .channelName:after{
+        content: \' ★ \'; color: gold; text-shadow: 1px 1px 1px black;
+      }
+
+      .sidePanel.videoInfo  #leftPanelContent, .sidePanel.ichiba  #leftPanelContent {
+        display: none;
+      }
+      .sidePanel.videoInfo    .sideVideoInfo,
+      .sidePanel.ichiba       .sideIchibaPanel,
+      .sidePanel.w_videoInfo  .sideVideoInfo,
+      .sidePanel.w_ichiba     .sideIchibaPanel,
+      .sidePanel.w_review     .sideReviewPanel {
+        display: block;
+      }
+
+      #leftPanelTabContainer {
+        display:none; background: #666; position: absolute; right: 4px; top: -27px; list-style-type: none; padding: 4px 6px 3px 60px; height: 20px;
+      }
+      #sidePanelTabContainer {
+        display: none;
+        position: absolute; list-style-type: none;
+        padding: 5px 10px 0; right: -408px; top: 0; width: 350px; height: 34px;
+                transform: rotate(90deg);         transform-origin: 0 0 0;
+        -webkit-transform: rotate(90deg); -webkit-transform-origin: 0 0 0;
+      }
+      .full_with_browser #sidePanelTabContainer { background: #000; }
+      body:not(.videoExplorer) #sidePanelTabContainer.left {
+        background: #000 {* firefoxはこれがないと欠ける *}; right: auto; left: -375px; padding: 0; height: 25px;
+                transform: rotate(-90deg);         transform-origin: 100% 0 0;
+        -webkit-transform: rotate(-90deg); -webkit-transform-origin: 100% 0 0;
+      }
+      #content:not(.w_flat) #leftPanelTabContainer {
+        border-radius: 4px 4px 0px 0px;
+      }
+      #leftPanelTabContainer.w_touch {
+        top: -40px; height: 33px;
+      }
+      .sidePanel:hover #sidePanelTabContainer, .sidePanel:hover #leftPanelTabContainer {
+        display:block;
+      }
+      #leftPanelTabContainer .tab{
+        display: inline-block; cursor: pointer; background: #999; padding: 2px 4px 0px; border-width: 1px 1px 0px;
+      }
+        #leftPanelTabContainer.w_touch .tab, #sidePanelTabContainer.w_touch .tab {
+          padding: 8px 12px 8px;
+        }
+      #sidePanelTabContainer .tab {
+        background: none repeat scroll 0 0 #999999; border-width: 1px 1px 0; cursor: pointer;
+        display: inline-block; font-size: 13px; padding: 5px 10px 8px;
+        border-radius: 8px 8px 0px 0px;
+      }
+      #sidePanelTabContainer.left .tab {
+        display: inline-block; font-size: 13px; padding: 5px 10px 0px;
+      }
+      #leftPanel.videoInfo .tab.videoInfo {
+        background: #bbb;    border-style: outset;
+      }
+      #leftPanel.ichiba .tab.ichiba {
+        background: #eee;    border-style: outset;
+      }
+      #playerTabWrapper.w_comment   .tab.comment,
+      #playerTabWrapper.w_videoInfo .tab.videoInfo,
+      #playerTabWrapper.w_ichiba    .tab.ichiba,
+      #playerTabWrapper.w_review    .tab.review
+      {
+        background: #dfdfdf; border-style: outset;
+      }
+      body.videoExplorer .sidePanel:not(:hover) .sidePanelInner {
+        overflow: hidden;
+      }
+      #playerTabWrapper.w_videoInfo #playerCommentPanel,
+      #playerTabWrapper.w_ichiba #playerCommentPanel,
+      #playerTabWrapper.w_review #playerCommentPanel {
+        {*display: none;*} top: -9999px;
+      }
+      {*body.videoExplorer #sidePanelTabContainer { display: none; }*}
+      .sidePanel.ichibaEmpty  .tab.ichiba, .sidePanel.reviewEmpty .tab.review {
+        color: #ccc;
+      }
+      #playerTabWrapper.nicommendEmpty .playerTabHeader .playerTabItem.nicommend {
+        opacity: 0.5;
+      }
+
+      .sideIchibaPanel .ichibaPanelInner {
+        margin:0; color: #666;
+      }
+      .sideIchibaPanel .ichibaPanelHeader .logo{
+        text-shadow: 1px 1px 1px #666; cursor: pointer; padding: 4px 0px 4px; font-size: 125%;
+      }
+      .sideIchibaPanel .ichibaPanelFooter{
+        text-align: center;
+      }
+      .sideIchibaPanel .ichiba_mainitem {
+        margin: 0 0 8px 0; background: white; border-bottom : 1px dotted #ccc;
+      }
+      .sideIchibaPanel .ichiba_mainitem a:hover{
+        background: #eef;
+      }
+      .sideIchibaPanel .ichiba_mainitem>div {
+        max-width: 266px; margin: auto; text-align: center;
+      }
+      .sideIchibaPanel .ichiba_mainitem .blomagaArticleNP {
+        background: url("http://ichiba.dev.nicovideo.jp/embed/zero/img/bgMainBlomagaArticleNP.png") no-repeat scroll 0 0 transparent;
+        height: 170px;
+        margin: 0 auto;
+        width: 180px;
+      }
+      .sideIchibaPanel .ichiba_mainitem .blomagaLogo {
+        color: #FFFFFF;font-size: 9px;font-weight: bold;padding-left: 10px;padding-top: 8px;
+      }
+      .sideIchibaPanel .ichiba_mainitem .blomagaLogo span{
+        background: none repeat scroll 0 0 #AAAAAA;padding: 0 3px;
+      }
+      .sideIchibaPanel .ichiba_mainitem .blomagaText {
+        color: #666666;font-family: \'HGS明朝E\',\'ＭＳ 明朝\';font-size: 16px;height: 100px;
+        padding: 7px 25px 0 15px;text-align: center;white-space: normal;word-break: break-all;word-wrap: break-word;
+      }
+      .sideIchibaPanel .ichiba_mainitem .blomagaAuthor {
+        color: #666666; font-size: 11px;padding: 0 20px 0 10px;text-align: right;
+      }
+      .sideIchibaPanel .ichiba_mainitem .balloonUe{
+        bottom: 12px; display: block; max-width: 266px;
+      }
+      .sideIchibaPanel .ichiba_mainitem .balloonUe a{
+        background: url("/img/watch_zero/ichiba/imgMainBalloonUe.png") no-repeat scroll center top transparent;
+        color: #666666 !important;
+        display: block;
+        font-size: 108%;
+        line-height: 1.2em;
+        margin: 0 auto;
+        padding: 8px 15px 3px;
+        text-align: center;
+        text-decoration: none;
+        word-wrap: break-word;
+      }
+      .sideIchibaPanel .ichiba_mainitem .balloonShita{
+        height: 12px; bottom: 0; left: 0;
+      }
+      .sideIchibaPanel .ichiba_mainitem .balloonShita img{
+        vertical-align: top !important;
+      }
+      .sideIchibaPanel .ichiba_mainitem .ichibaMarquee {
+        display: none;
+      }
+      .sideIchibaPanel .ichiba_mainitem .thumbnail span {
+        font-size: 22px; color: #0066CC;
+        font-family: \'ヒラギノ明朝 Pro W3\',\'Hiragino Mincho Pro\',\'ＭＳ Ｐ明朝\',\'MS PMincho\',serif;
+      }
+      .sideIchibaPanel .ichiba_mainitem .action {
+        font-size: 85%;
+      }
+      .sideIchibaPanel .ichiba_mainitem .action .buy {
+        font-weight: bolder; color: #f60;
+      }
+      .sideIchibaPanel .ichiba_mainitem .itemname {
+        font-weight: bolder;
+      }
+      .sideIchibaPanel .ichiba_mainitem .maker {
+        font-size: 77%; margin-bottom: 2px;
+      }
+      .sideIchibaPanel .ichiba_mainitem .price {
+      }
+      .sideIchibaPanel .ichiba_mainitem .action .click {
+        font-weight: bolder;
+      }
+      .sideIchibaPanel .ichiba_mainitem .goIchiba {
+        font-size: 77%; margin: 5px 0;
+      }
+      .sideIchibaPanel .addIchiba, .sideIchibaPanel .reloadIchiba {
+        cursor: pointer;
+      }
+      .sideIchibaPanel .noitem {
+        cursor: pointer;
+      }
+
+      #outline .bottomAccessContainer {
+        position: absolute; top: 12px;
+      }
+      #outline .bottomConfButtonContainer {
+        position: absolute; top: 12px; right: 0px;
+      }
+      body.videoExplorer .bottomAccessContainer{
+        display: none;
+      }
+      #outline.under960 .bottomAccessContainer{
+        right: 60px;
+      }
+      #outline .sidebar {
+        -webkit-transition: margin-top 0.3s ease-out;
+        transition:         margin-top 0.3s ease-out;
+      }
+      #outline.under960 .sidebar {
+        margin-top: 24px;
+      }
+      #videoHeader.menuClosed .watchItLaterMenu, #videoHeader.menuClosed .hidariue { display: none; }
+      #videoHeader .watchItLaterMenu {
+        position: absolute; width: 100px; left: -55px; top: 32px;
+      }
+      {* プレイリスト出したり隠したり *}
+      #playlist>* {
+        -webkit-transition: opacity 0.6s; transition: opacity 0.6s;
+      }
+      body:not(.full_with_browser):not(.videoExplorer) #playlist.w_closing>* {
+        opacity: 0;
+      }
+      body:not(.full_with_browser):not(.videoExplorer) #playlist:not(.w_show){
+        position: absolute; top: -9999px;
+      }
+      #playlist.w_show{
+        {*max-height: 180px;*}
+      }
+      .playlistToggle:after {
+        content: "▼";
+      }
+      .playlistToggle.w_show:after {
+        content: "▲";
+      }
+      #content #playlist .playlistInformation  .generationMessage{
+        {* 「連続再生ボタンとリスト名は左右逆のほうが安定するんじゃね？ 名前の長さによってボタンの位置がコロコロ変わらなくなるし」という対応。*}
+        {* ついに本家のほうもボタンが左になったよ！ *}
+        {* position: absolute; margin-left: 90px; *}
+      }
+      body.videoExplorer #content #playlist .playlistInformation  .generationMessage{
+        max-width: 350px;
+      }
+      #playlistContainerInner .thumbContainer, #playlistContainerInner .balloon{
+        cursor: move;
+      }
+
+
+      {* ページャーの字が小さくてクリックしにくいよね *}
+      #resultPagination {
+        padding: 5px; font-weight: bolder; border: 1px dotted silter; font-size: 130%;
+      }
+
+      #playlistContainer #playlistContainerInner .playlistItem .balloon {
+        bottom: auto; top: -2px; padding: auto;
+      }
+
+      body.w_channel #leftPanel .userIconContainer{
+        display: none;
+      }
+      {* WatchItLater設定パネル *}
+      #watchItLaterConfigPanel {
+        position: fixed; bottom: 0px; right: 16px; z-index: 10001;
+        width: 460px; padding: 0;
+        transition: transform 0.4s ease-in-out; -webkit-transition: -webkit-transform 0.4s ease-in-out;
+        transform-origin: 50% 0; -webkit-transform-origin: 50% 0;
+        transform: scaleY(0);  -webkit-transform: scaleY(0);
+      }
+      #watchItLaterConfigPanel.open {
+        transform: scaleY(1); -webkit-transform: scaleY(1);
+      }
+      #watchItLaterConfigPanelShadow {
+        position: fixed; bottom: 16px; right: 16px; z-index: 10000;
+        width: 460px; height: 559px; padding: 0;
+        background: #000; {*box-shadow: 0 0 2px black; border-radius: 8px;*} -webkit-filter: opacity(70%);
+        transition: transform 0.4s ease-in-out; -webkit-transition: -webkit-transform 0.4s ease-in-out;
+        transform-origin: 50% 0; -webkit-transform-origin: 50% 0;
+        transform: scaleY(0); -webkit-transform: scaleY(0);
+      }
+      #watchItLaterConfigPanelShadow.open {
+        transform: scaleY(1); -webkit-transform: scaleY(1);
+      }
+      #watchItLaterConfigPanelShadowTop {
+        position: fixed; bottom: 563px; right:0px; z-index: 10000; background: #333;
+        width: 492px; height: 20px; padding: 0; border-radius: 32px; -webkit-filter: opacity(90%); display: none;
+      }
+      #watchItLaterConfigPanelOverShadow {
+        position: fixed; bottom: 575px; right: 0px; width: 488px; height: 8px;
+        box-shadow: 0 4px 16px #333;z-index: 10002; display: none;
+      }
+      #watchItLaterConfigPanel .head {
+        background-color: #CCCCCC;border-radius: 0;color: black;height: 50px;
+        overflow: hidden;padding: 5px 0 0 16px;position: relative;
+      }
+      #watchItLaterConfigPanel .head h2 {
+        font-size: 135%;
+      }
+      #watchItLaterConfigPanel .inner{
+        height: 500px; overflow-y: auto;border-width: 4px 16px 16px 16px; border-radius: 0 0 16px 16px;
+        border-style: solid;border-color: #ccc;
+      }
+      #watchItLaterConfigPanel ul{
+        border-style: inset; border-color: #ccc; border-width: 0 1px 0;
+      }
+      #watchItLaterConfigPanel ul.shortcutContainer{
+        border-width: 0 1px 1px;
+      }
+      #watchItLaterConfigPanel ul.videoStart{
+        border-width: 1px 1px 0;
+      }
+      #watchItLaterConfigPanel li{
+      }
+      #watchItLaterConfigPanel li:hover{
+        {*background: #ddd;*}
+      }
+      #watchItLaterConfigPanel li.buggy{
+        color: #888;
+      }
+      #watchItLaterConfigPanel label{
+        margin: 0 5px;
+      }
+      #watchItLaterConfigPanel label:hover{
+      }
+      #watchItLaterConfigPanel .foot {
+        text-align: right; padding: 0 12px;
+      }
+      #watchItLaterConfigPanel .closeButton{
+        border: 0 none;border-radius: 0 0 4px 4px;box-shadow: 0 1px 2px white;color: #666; border: 1px solid #999;
+        cursor: pointer;float: right;margin-top: 8px;position: absolute;right: 16px;
+        text-shadow: 0 1px 0 white;top: -10px; width: 60px;
+      }
+      #watchItLaterConfigPanel.autoBrowserFull_false .disableAutoBrowserFullIfNicowari,
+      #watchItLaterConfigPanel.autoBrowserFull_true .autoScrollToPlayer,
+      #watchItLaterConfigPanel.autoBrowserFull_true .autoOpenSearch,
+      #watchItLaterConfigPanel.removeLeftPanel_true .leftPanelJack  {
+        color: #ccc; text-shadow: -1px -1px 0 #888;
+      }
+      #watchItLaterConfigPanel .reload .title:after {
+        content: \' (※)\'; font-size: 80%; color: #900;
+      }
+      #watchItLaterConfigPanel .debugOnly {
+        display: none;
+      }
+      #watchItLaterConfigPanel.debugMode .debugOnly {
+        display: block; background: #888;
+      }
+      #watchItLaterConfigPanel .section {
+        border-style: solid;border-width: 10px 12px 10px 12px;color: white; font-size: 135%; position: relative;
+        font-weight: bolder; cursor: pointer; {*text-shadow: 2px 2px 1px #000000;*}
+        transition: border-width 0.2s ease-in-out 0.4s, color 0.3s; -webkit-transition: border-width 0.2s ease-in-out 0.4s, color 0.4s;
+      }
+      #watchItLaterConfigPanel .open .section {
+        border-width: 20px 12px 12px 12px;
+        transition: border-width 0.2s ease-in-out     ; -webkit-transition: border-width 0.2s ease-in-out     ;
+      }
+      #watchItLaterConfigPanel .section:hover:after {
+        content: \'▼\';
+        position: absolute; top: 0px; right: 10px; font-size: 150%;
+        transition: transform 0.2s ease-in-out 0.4s; -webkit-transition: -webkit-transform 0.2s ease-in-out 0.4s;
+      }
+      #watchItLaterConfigPanel .open .section:after {
+        content: \'▼\';
+        position: absolute; top: 0px; right: 10px; font-size: 150%;
+        transform: rotate(180deg); -webkit-transform: rotate(180deg);
+        transition: transform 0.2s ease-in-out     ; -webkit-transition: -webkit-transform 0.2s ease-in-out;
+      }
+      #watchItLaterConfigPanel .section > div {
+        padding: 8px 0 8px 12px; box-shadow: 0 0 4px black;
+      }
+      #watchItLaterConfigPanel .section > div > span {
+        {*background: #333;*}
+      }
+      #watchItLaterConfigPanel li:not(.section) {
+        background: #fff; border-width: 0px 0px 0px 24px; border-style: solid; border-color: #fff;
+        max-height: 0px; overflow: hidden;
+        transition: max-height 0.4s ease-in-out     , border-width 0.4s ease-in-out;
+      }
+       #watchItLaterConfigPanel .open li:not(.section) {
+        max-height: 100px; border-width: 4px 0px 4px 24px;
+        transition: max-height 0.4s ease-in-out 0.2s, border-width 0.4s ease-in-out 0.2s;
+      }
+      #watchItLaterConfigPanel .section .description{
+        display: block; font-size: 80%;;
+      }
+      #watchItLaterConfigPanel .shortcutSetting:not(.enable) span :not(.enable){
+        color: #silver;
+      }
+      #watchItLaterConfigPanel .shortcutSetting .enable {
+        cursor: pointer; margin: auto 10px;
+      }
+      #watchItLaterConfigPanel .shortcutSetting        .enable:before {
+        content: \'○ \';
+      }
+      #watchItLaterConfigPanel .shortcutSetting.enable .enable:before {
+        content: \'㋹ \'; color: blue;
+      }
+      #watchItLaterConfigPanel .shortcutSetting      .ctrl, #watchItLaterConfigPanel .shortcutSetting     .alt, #watchItLaterConfigPanel .shortcutSetting       .shift {
+        cursor: pointer; border: 2px outset; margin: 4px 4px; padding: 2px 4px; width: 180px; border-radius: 4px;background: #eee;
+      }
+      #watchItLaterConfigPanel .shortcutSetting.ctrl .ctrl, #watchItLaterConfigPanel .shortcutSetting.alt .alt, #watchItLaterConfigPanel .shortcutSetting.shift .shift {
+        border: 2px inset; color: blue;
+      }
+      #watchItLaterConfigPanel .hoverMenuDelay input {
+        width: 50px; ime-mode: disabled; text-align: center;
+      }
+
+
+      {* 動画検索画面に出るお気に入りタグ・お気に入りマイリスト *}
+      .videoExplorerMenu .watchItLaterMenu.open,
+      .videoExplorerMenu .watchItLaterMenu.opening {
+        background: -moz-linear-gradient(center top , #D1D1D1, #FDFDFD) repeat scroll 0 0 transparent !important;
+        background: -webkit-gradient(linear, left top, left bottom, from(#D1D1D1), to(#FDFDFD)) !important;
+        border-bottom: 0 !important;
+      }
+      .videoExplorerMenu .watchItLaterMenu {
+        position: relative;
+        {*background: -moz-linear-gradient(center top , whitesmoke 0%, #E1E1E1 100%) repeat scroll 0 0 transparent;*}
+        {*box-shadow: 0 -1px 1px rgba(0, 0, 0, 0.1) inset;*}
+        {*background: #f5f5f5;*}
+        border-bottom: 1px solid #CCCCCC;
+      }
+      .videoExplorerMenu .watchItLaterMenu:hover{
+        background: #dbdbdb;
+      }
+      .videoExplorerMenu .watchItLaterMenu {
+        padding: 0 12px; display: block; color: black;
+      }
+      .videoExplorerMenu .slideMenu{
+        width: 100%; height: auto !important;
+        overflow-x: hidden;
+        overflow-y: auto;
+        padding: 0;
+        background: #fdfdfd;
+        border-top: 0 !important;
+        display: block;
+        max-height: 0;
+        transition: max-height 0.5s ease-in-out;
+      }
+      .videoExplorerMenu .slideMenu.open {
+        max-height: 2000px;
+        transition: max-height   1s ease-in-out;
+      }
+      .videoExplorerMenu #favoriteTagsMenu a,             .videoExplorerMenu #favoriteMylistsMenu a,
+      .videoExplorerMenu #mylistListMenu   a,             .videoExplorerMenu #videoRankingMenu a{
+        color: black; display: block;
+      }
+      .videoExplorerMenu #favoriteTagsMenu a:after,       .videoExplorerMenu #favoriteMylistsMenu a:after,
+      .videoExplorerMenu #mylistListMenu   a:after,       .videoExplorerMenu #videoRankingMenu a:after{
+        content: "▼"; position: absolute; background: none; top: 0px; right: 10px; color: #ccc;
+      }
+      .videoExplorerMenu #favoriteTagsMenu.open a:after,  .videoExplorerMenu #favoriteMylistsMenu.open a:after,
+      .videoExplorerMenu #mylistListMenu.open   a:after,  .videoExplorerMenu #videoRankingMenu.open a:after{
+        content: "▲";
+      }
+      .videoExplorerMenu .slideMenu ul{
+      }
+      .videoExplorerMenu .slideMenu ul li{
+        background: #fdfdfd; padding: 0; border: 0;font-size: 90%; height: auto !important;
+      }
+      .videoExplorerMenu .slideMenu ul li a{
+        line-height: 165%; background: none; display: block;
+      }
+      .videoExplorerMenu.w_touch .slideMenu ul li a{
+        line-height: 300%; font-size: 120%; color: black;
+      }
+        .videoExplorerMenu .slideMenu ul li a:before{
+          background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;
+          display: inline-block; height: 14px; margin: -4px 4px 0 0; vertical-align: middle; width: 18px; content: ""
+        }
+        .videoExplorerMenu .slideMenu ul li          a.defMylist:before{ background-position: 0 -253px;}
+        .videoExplorerMenu .slideMenu ul li.folder0  a:before{ background-position: 0 0;}
+        .videoExplorerMenu .slideMenu ul li.folder1  a:before{ background-position: 0 -23px;}
+        .videoExplorerMenu .slideMenu ul li.folder2  a:before{ background-position: 0 -46px;}
+        .videoExplorerMenu .slideMenu ul li.folder3  a:before{ background-position: 0 -69px;}
+        .videoExplorerMenu .slideMenu ul li.folder4  a:before{ background-position: 0 -92px;}
+        .videoExplorerMenu .slideMenu ul li.folder5  a:before{ background-position: 0 -115px;}
+        .videoExplorerMenu .slideMenu ul li.folder6  a:before{ background-position: 0 -138px;}
+        .videoExplorerMenu .slideMenu ul li.folder7  a:before{ background-position: 0 -161px;}
+        .videoExplorerMenu .slideMenu ul li.folder8  a:before{ background-position: 0 -184px;}
+        .videoExplorerMenu .slideMenu ul li.folder9  a:before{ background-position: 0 -207px;}
+
+        .videoExplorerMenu .slideMenu ul li.g_ent2 a:before     {  background-position: 0 -23px;}
+        .videoExplorerMenu .slideMenu ul li.g_life2 a:before    {  background-position: 0 -46px;}
+        .videoExplorerMenu .slideMenu ul li.g_politics a:before {  background-position: 0 -69px;}
+        .videoExplorerMenu .slideMenu ul li.g_tech a:before     {  background-position: 0 -92px;}
+        .videoExplorerMenu .slideMenu ul li.g_culture2 a:before {  background-position: 0 -115px;}
+        .videoExplorerMenu .slideMenu ul li.g_other a:before    {  background-position: 0 -138px;}
+        .videoExplorerMenu .slideMenu ul li.r18 a:before        {  background-position: 0 -207px;}
+        .videoExplorerMenu .slideMenu ul li.all        a.all,
+        .videoExplorerMenu .slideMenu ul li.g_ent2     a.g_ent2,
+        .videoExplorerMenu .slideMenu ul li.g_life2    a.g_life2,
+        .videoExplorerMenu .slideMenu ul li.g_politics a.g_politics,
+        .videoExplorerMenu .slideMenu ul li.g_tech     a.g_tech,
+        .videoExplorerMenu .slideMenu ul li.g_culture2 a.g_culture2,
+        .videoExplorerMenu .slideMenu ul li.g_other    a.g_other,
+        .videoExplorerMenu .slideMenu ul li.r18        a.r18
+        { font-weight: bolder; border-top: 1px dotted #ccc; }
+
+
+      .videoExplorerMenu .slideMenu ul li a:after{
+        background: none !important;
+      }
+      .videoExplorerMenu .slideMenu ul li a:hover{
+        background: #f0f0ff;
+      }
+      .videoExplorerMenu .slideMenu ul .reload{
+        cursor: pointer; border: 1px solid; padding: 0;
+      }
+
+      .videoExplorerMenu .tagSearchHistory {
+        border-radius: 0px; margin-top: 2px; padding: 4px; background: #ccc;
+      }
+      .videoExplorerMenu .itemList > li, #videoExplorerExpand {
+        background: #f5f5f5;
+      }
+      .videoExplorerMenu .itemList ul > li:hover {
+        background: #e7e7e7;
+      }
+      .videoExplorerMenu .itemList ul > li.active {
+        background: #343434;
+      }
+
+
+      {* 動画タグが1行以下の時 *}
+      body:not(.full_with_browser) .tag1Line  #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit {
+        height: 12px; padding: 6px 4px 2px;
+      }
+      body:not(.full_with_browser) .tag1Line  #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit .toggleText{
+        display: none;
+      }
+      {* 動画タグが2行以下の時 *}
+      body:not(.full_with_browser) .tag2Lines #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit {
+        height: 36px;
+      }
+      {* タグ領域とプレイヤーの隙間をなくす *}
+      body:not(.full_with_browser) #videoTagContainer, body:not(.full_with_browser) #videoHeader .videoMenuToggle {
+        margin-bottom: -10px;
+      }
+      #videoHeaderMenu .searchContainer .searchText {
+        margin-top: -8px;
+      }
+
+      body.size_small #playerContainerWrapper {
+        padding: 0;
+      }
+
+      {* ニュース履歴 *}
+      body.videoExplorer #textMarquee .openNewsHistory, body.videoExplorer #textMarquee .newsHistory {
+        display: none;
+      }
+      #textMarquee .openNewsHistory {
+        position: absolute; width: 30px;
+        font-size: 13px; padding: 0; margin: 0; height: 28px;
+        cursor: pointer;
+        bottom: 0;
+        background: none repeat scroll 0 0 transparent;
+        border: 1px none;
+        border-radius: 2px 2px 2px 2px;
+        cursor: pointer;
+        right: 18px;
+        z-index: 200;
+      }
+      #textMarquee .newsHistory {
+        position: absolute;
+        bottom: 0px; right: 0px; width: 100%;
+        max-height: 132px;
+        min-height: 40px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        z-index: 1;
+        padding: 4px;
+        display: none;
+        background: #333;
+        text-align: left;
+        font-size: 14px;
+        padding: 0;
+      }
+      #textMarquee .newsHistory li{
+        padding: 0 2px;
+      }
+      #textMarquee .newsHistory li:nth-child(odd){
+        background: #444;
+      }
+      #textMarquee .newsHistory li:nth-child(even){
+        background: #333;
+      }
+      body.full_with_browser.hideNewsInFull #textMarquee .newsHistory {
+        display: none !important;
+      }
+      body #popupMarquee {
+        width: 360px;
+      }
+      {* 半透明だとflashの上に来ると描画されないので強制的に黒にする(Chromeは平気) *}
+      body.full_with_browser #popupMarquee.popupMarqueeBottomLeft {
+        background: #000 !important;left: 8px; bottom: 8px; width: 400px; opacity: 1;
+      }
+      body.full_with_browser #playerContainer {
+        margin-left: 0 !important;
+      }
+      body:not(.full_with_browser) #playerContainer {
+        {*top: -8px;*}
+      }
+      body:not(.full_with_browser) #playerContainerWrapper {
+        padding: 0px;
+      }
+      body.full_with_browser #playerContainer, body.size_small #playerContainer {
+        top: auto;
+      }
+      body.full_with_browser.no_setting_panel .videoExplorerMenu {
+        display:none;
+      }
+
+
+      body:not(.videoExplorer) #content.w_hideSearchExpand #videoExplorerExpand {
+        display: none;
+      }
+      #outline .openVideoExplorer {
+        display: none;
+      }
+      #outline.w_hideSearchExpand .openVideoExplorer {
+        display: inline-block;
+      }
+
+      {* 1列表示の時、動画タイトルの横の空白部分にまでクリック判定があるのはVistaのエクスプローラみたいで嫌なので、文字部分だけにしたい *}
+      #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .contentItemList .video .column1 .videoInformationOuter .title,
+      #videoExplorer .videoExplorerBody .videoExplorerContent .suggestVideo .video .column1 .videoInformationOuter .title {
+        display: inline;
+      }
+      .videoExplorerMenu .quickSearchInput {
+        background: none repeat scroll 0 0 #F4F4F4;
+        border: 1px inset silver;
+        left: 60px;
+        padding-left: 4px;
+        position: absolute;
+        top: 2px;
+        width: 200px;
+      }
+      .videoExplorerMenu.w_touch .quickSearchInput {
+        top: 4px; font-size: 20px;
+      }
+
+      .videoExplorerContent .contentItemList                 .column4 .balloon {
+        bottom: auto; top: 10px;
+      }
+      #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .thumbnailContainer .balloon {
+        top: -20px; {* 一列の時に「再生リストに追加しました」が上の動画に被るのを防ぐ *}
+      }
+      .videoExplorerContent .contentItemList                 .column1 .itemMylistComment {
+        font-size: 85%; color: #666; border: 1px solid silver; border-radius: 8px; padding: 4px; margin: 0 2px; display: none;
+      }
+      .videoExplorerContent .contentItemList                 .column1 .nicorepoOwnerIconContainer {
+        display: none;
+      }
+      .videoExplorerContent .contentItemList .nicorepoResult .column1 .nicorepoOwnerIconContainer {
+        float: right; display: block;
+        padding: 3px; border: 1px solid silver;
+      }
+      .videoExplorerContent .contentItemList                 .column1 .nicorepoOwnerIconContainer img {
+        height: 48px;
+      }
+
+      .videoExplorerBody.dummyMylist #searchResultContainer .favMylistEditContainer,
+      .videoExplorerBody.dummyMylist:not(.ranking) #searchResultMylistSortOptions,
+      .videoExplorerBody.dummyMylist .favMylistEditContainer,
+      .videoExplorerBody.dummyMylist:not(.ownerNicorepo) #searchResultHeader {
+        display: none !important;
+      }
+
+      .videoExplorerContent .contentItemList .thumbnailHoverMenu {
+        position: absolute; padding: 0; box-shadow: 1px 1px 2px black;
+        display: none;
+      }
+      .videoExplorerContent .contentItemList .column1 .thumbnailHoverMenu {
+        bottom:  4px; left: 4px;
+      }
+      .videoExplorerContent .contentItemList .column4 .thumbnailHoverMenu {
+        bottom: 75px; left: 5px;
+      }
+      .videoExplorerContent .contentItemList .deleteFromMyMylist {
+        cursor: pointer; font-size: 70%; border: 1px solid #ccc; padding: 0;
+        display: none;
+      }
+      .videoExplorerContent .contentItemList .showLargeThumbnail {
+        cursor: pointer; font-size: 70%; border: 1px solid #ccc;;
+      }
+      .videoExplorerContent .contentItemList .showLargeThumbnail {
+        padding: 0 4px;
+      }
+      .videoExplorerContent .contentItemList .item:hover .thumbnailHoverMenu {
+        display: block;
+      }
+      .videoExplorerContent .contentItemList .log-user-video-upload {
+        background: #ffe; border-radius: 4px;
+      }
+      .videoExplorerContent .contentItemList .nicorepoResult .itemVideoDescription, .videoExplorerContent .contentItemList .nicorepoResult .videoTitle{
+      }
+      .videoExplorerBody.enableMylistDeleteButton.mylist.isMine .videoExplorerContent .contentItemList .item:hover .deleteFromMyMylist {
+        display: inline-block;
+      }
+
+      #playlist .generationMessage {
+        cursor: pointer;
+      }
+      #playlist .generationMessage:hover {
+        text-decoration: underline;
+      }
+      #playlist .generationMessage:after {
+        content: "▼";
+      }
+
+      #yukkuriPanel {
+        position: fixed; z-index: 1500; bottom: 0; left: 0; display: inline-block;
+      }
+      body.w_noNicoru .nicoru-button{
+        left: -9999; display: none !important;
+      }
+      body.w_noNicoru .menuOpened #videoMenuTopList li.videoMenuListNicoru{
+        display: none;
+      }
+      body.w_noNicoru #videoTagContainer .tagInner #videoHeaderTagList li {
+        margin: 0 18px 4px 0;
+      }
+      body.w_noNicoru #videoTagContainer .tagInner #videoHeaderTagList li .tagControlContainer, body.w_noNicoru #videoTagContainer .tagInner #videoHeaderTagList li .tagControlEditContainer {
+        padding: 1px 0;
+      }
+
+      .userProfile.w_touch {
+        font-size: 150%; line-height: 120%;
+      }
+      .resultPagination.w_touch {
+        font-size: 200%;
+      }
+      .resultPagination.w_touch li{
+        padding: 4px 16px;
+      }
+      select.w_touch {
+        font-size: 200%;
+      }
+      {* 真・browserFullモード *}
+      body.full_with_browser.hideCommentInput #nicoplayerContainerInner {
+        {* コメント入力欄は動画上表示にするのではなく、画面外に押し出す事によって見えなくする *}
+        margin-top: -10px; margin-bottom: -36px;
+      }
+      body.full_with_browser.trueBrowserFull #nicoplayerContainerInner:not(.stageVideo) {
+        margin-left: -2.5%; width: 105% !important;
+      }
+      body.full_with_browser.trueBrowserFull #playerContainerWrapper {
+        margin: 0 !important;
+      }
+      body.full_with_browser.trueBrowserFull #playlist {
+        display: none;
+      }
+      body.full_with_browser.trueBrowserFull:not(.w_fullScreenMenu) .mylistPopupPanel.fixed,body.full_with_browser.trueBrowserFull .yukkuriButton { display:none; }
+      #trueBrowserFullShield {
+        -webkit-transition: opacity 0.2s ease-out;
+        position:absolute;
+        display: none;
+      }
+      body.full_with_browser #trueBrowserFullShield {
+        background: black;
+        display: block;
+        bottom: 100px;
+        right:  50px;
+        z-index: 10000;
+        min-width: 400px;
+        cursor: nw-resize;
+        opacity: 0;
+        color: white;
+        box-shadow: 2px 2px 2px silver;
+        border-radius: 4px;
+      }
+      body.full_with_browser #trueBrowserFullShield .title {
+        color: #ffc; font-size: 120%;
+      }
+      body.full_with_browser #trueBrowserFullShield .ownerIcon {
+        float: left; height: 55px; padding: 8px;
+      }
+      body.full_with_browser #trueBrowserFullShield:hover, body.full_with_browser #trueBrowserFullShield.active, body.w_fullScreenMenu #trueBrowserFullShield {
+        opacity: 1;
+      }
+      body:not(.full_with_browser) #trueBrowserFullShield { display: none; }
+
+      #sharedNgSettingContainer {
+        display: inline-block; font-size: 80%; position: absolute; top: 0; left: 85px;
+      }
+      #sharedNgSetting {
+        background: #ddd; border: 1px solid silver;
+      }
+      {* ニュース消す *}
+      #content.noNews #textMarquee {
+        display: none !important;
+      }
+      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerTabWrapper {
+        height: auto !important; position: absolute; bottom: 18px;
+      }
+      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews              #playerTabContainer {
+        bottom: -17px;
+      }
+      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews .appli_panel #playerTabContainer {
+        bottom:  20px;
+      }
+      #playerTabWrapper.w_videoInfo #playerTabContainer, #playerTabWrapper.w_ichiba #playerTabContainer, #playerTabWrapper.w_review #playerTabContainer {
+        bottom: 0px !important;
+      }
+      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerTabWrapper.w_videoInfo,
+      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerTabWrapper.w_ichiba,
+      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerTabWrapper.w_review
+      {
+        height: auto !important; position: absolute; bottom: 2px;
+      }
+     {* body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #leftPanel {
+        height: auto !important; position: absolute; bottom: 2px;
+      }*}
+      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerCommentPanel {
+        height: 100% !important;
+      }
+      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerContainer.appli_panel #appliPanel {
+        bottom: -18px !important;
+      }
+      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerContainer {
+        height: auto;
+      }
+      #outline.noNicommend #nicommendContainer, #outline.noIchiba  #nicoIchiba, #outline.noReview  #videoReviewPanel{
+        display: none;
+      }
+      #bottomContentTabContainer.noBottom .outer, #bottomContentTabContainer.noBottom #pageFooter {
+        display: none;
+      }
+      #bottomContentTabContainer.noBottom #outline {
+        background: #141414; padding-top: 0; padding-bottom: 35px;
+      }
+
+      #content.w_flat #playerContainerWrapper, #content.w_flat #playlist .playlistInformation {
+        background: #444;
+      }
+      #content.w_flat #leftPanel, #content.w_flat #playerCommentPanel {
+        background: #ddd; border-radius: 0;
+      }
+      #content.w_flat .sideVideoInfo {
+        border-radius: 0;
+      }
+     #content.w_flat #videoExplorerExpand a {
+        text-shadow: none;
+      }
+      #content.w_flat #playerCommentPanel .section .commentTable .commentTableHeaderWrapper {
+        background: gray;
+      }
+
+      body:not(.full_with_browser) #content.w_compact #videoHeader {
+        width: 960px;
+      }
+      body:not(.full_with_browser).size_normal #content.w_compact #videoHeader {
+        width: 1186px;
+      }
+      .videoMenuToggle {
+        -webkit-transform-origin: 100% 100%; -webkit-transition: -webkit-transform 0.4s;
+        transform-origin: 100% 100%; transition: transform 0.4s;
+        z-index: 1000;
+      }
+      #content.w_compact .videoHeaderTitle {
+        letter-spacing: -1px;
+      }
+      #content.w_compact .videoDetailExpand .arrow {
+        position: absolute; top: 8px; right: -24px;
+      }
+      #content.w_compact .tag1Line  .videoMenuToggle {
+        transform: scale(0.8, 0.41); -webkit-transform: scale(0.8, 0.41);
+      }
+      #content.w_compact .tag2Lines .videoMenuToggle {
+        transform: scale(0.8); -webkit-transform: scale(0.8);
+      }
+      #content.w_compact #topVideoInfo .parentVideoInfo {
+        margin-top: -9px; margin-bottom: 9x;
+      }
+      #content.w_compact #topVideoInfo .parentVideoInfo .cct{
+        margin-bottom: 0;
+      }
+      #content.w_compact #topVideoInfo .parentVideoInfo .videoThumb{
+        margin-top: 4px;
+      }
+      #content.w_compact #topVideoInfo .ch_prof, #content.w_compact #topVideoInfo .userProfile {
+        min-width: 297px; margin-top: -1px; border: 1px solid #e7e7e7;
+      }
+      #content.w_compact #videoHeaderDetail .videoDetailExpand{
+        height: auto; padding: 0;
+      }
+      #content.w_compact #topVideoInfo .videoDescription.description {
+        background: #fff; margin: 10px 0 0;padding: 4px ;width: 952px; {*font-size: 90%;*}
+      }
+      .size_normal #content.w_compact #videoDetailInformation .description {
+        width: 1178px
+      }
+      #content.w_compact #topVideoInfo .videoMainInfoContainer{
+        padding: 0;
+      }
+      #content.w_compact #videoDetailInformation{
+        border-top: 0;
+      }
+      #content.w_compact #videoHeaderMenu .searchContainer {
+        top: -16px;
+      }
+      #content.w_compact .videoInformation{
+        margin: -4px 0 ;
+      }
+      #content.w_compact #topVideoInfo .videoStats {
+        margin-bottom: 2px;
+      }
+      body:not(.full_with_browser) #content.w_compact #videoTagContainer{
+        width: 900px;
+      }
+      body:not(.full_with_browser).size_normal #content.w_compact #videoTagContainer{
+        width: 1123px;
+      }
+      body:not(.full_with_browser) #content.w_compact #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit {
+        width: 72px;
+      }
+      body:not(.full_with_browser) #content.w_compact #videoTagContainer .tagInner #videoHeaderTagList {
+        padding-left: 85px;
+      }
+      body.full_with_browser #videoHeaderTagList { background: #fafafa; }
+      #content.w_compact #topVideoInfo {
+        margin: 4px 0 4px;
+      }
+      #content.w_compact #topVideoInfo .videoShareLinks .socialLinks {
+        margin-top: -6px;
+      }
+      #outline.w_compact  #videoInfoHead{
+        margin: 0 ;
+      }
+      #outline.w_compact .videoInformation #videoTitle {
+        margin: -4px 0 0;
+      }
+      #outline.w_compact .videoInformation #videoStats  {
+        margin-top: -4px;
+      }
+      #outline.w_compact .videoInformation #videoStats .ranking {
+        margin: 0 0 4px;
+      }
+      #outline.w_compact #videoShareLinks {
+        margin: 0;
+      }
+      #outline.w_compact #bottomVideoDetailInformation {
+        margin: -18px 0 0;
+      }
+      #outline.w_compact .infoHeadOuter .videoEditMenuExpand {
+        position: absolute; top: 0;
+      }
+      #outline.w_compact .videoEditMenu {
+        margin: 0;
+      }
+      #outline.w_compact .videoDescription {
+        font-size: 90%; margin-top: -8px; padding: 0 0 4px 4px;
+      }
+      #outline.w_compact #videoComment {
+        margin: 0px; border: 1px solid silver; border-radius: 4px 4px 4px 4px; padding: 0 4px;
+      }
+      #outline.w_compact #videoComment h4{
+        padding-left: 4px;
+      }
+      #outline.w_compact .videoMainInfoContainer {
+        border-bottom: 0; margin-bottom: 0;
+      }
+      #outline.w_compact {
+        border-bottom: 0; margin-bottom: 0;
+      }
+      #outline.w_compact #nicommendList {
+        margin-top: 4px;
+      }
+      #outline.w_compact .sidebar { width: 300px; }
+
+      #outline.w_compact .outer {
+        {* 左パネルを隠した標準サイズのプレイヤーに合わせる *}
+        width: 960px;
+      }
+      #outline.w_compact #ichibaMain dl.ichiba_mainitem {
+        margin: 0 22px 30px 0;
+      }
+      #footer     { z-index: 1; }
+
+      body.en-us #playerAlignmentArea, body.zh-tw #playerAlignmentArea {
+        {*padding-right: 0;*}
+      }
+      #footer .toggleBottom {
+        cursor: pointer; text-align: center; width: 200px; padding: 0px 12px; margin: auto; border-radius: 16px 16px 0 0;
+        border: 1px solid #333; background: #666; transition: background 0.4s ease-out, box-shadow 0.4s;
+      }
+      #footer:hover .toggleBottom {
+        border: 1px outset; background: #ccc;
+      }
+      #footer .toggleBottom:hover {
+        box-shadow: 0px 0px 8px #fff;
+      }
+      #footer.noBottom .toggleBottom {
+        border-radius: 0 0 16px 16px;
+      }
+      #footer .toggleBottom .openBottom, #footer.noBottom .toggleBottom .closeBottom  {
+        display: none;
+      }
+      #footer.noBottom .toggleBottom .openBottom {
+        display: block;
+      }
+      #footer .toggleBottom>div {
+        -webkit-transform: scaleX(3); transform: scaleX(3);
+      }
+      #footer .toggleBottom {
+        cursor: pointer; text-align: center; width: 200px; padding: 0px 12px; margin: auto; border-radius: 16px 16px 0 0;
+        border: 1px solid #333; background: #666; transition: background 0.4s ease-out, box-shadow 0.4s;
+      }
+      #footer:hover .toggleBottom {
+        border: 1px outset; background: #ccc;
+      }
+      #footer .toggleBottom:hover {
+        box-shadow: 0px 0px 8px #fff;
+      }
+
+      #foot_inner { width: 960px; }
+      .size_normal #foot_inner { width: 1186px; }
+      #footer.noBottom #foot_inner { padding: 0; }
+      #footer.noBottom a:nth-of-type(3):after, #footer.noBottom a:nth-of-type(6):after  {
+        content: ' | '; color: white;
+      }
+      #footer.noBottom br { display: none; }
+       html { background: #141414; }
+      .animateBlink {
+        -webkit-transition: 1s ease-in; transition: 1s ease-in;
+      }
+
+      .w_compact .toggleDetailExpand, .w_compact .shortVideoInfo {
+        display: none;
+      }
+      .videoDetailToggleButton {
+        cursor: pointer;
+      }
+      #leftPanel {
+        {*border-radius: 4px 4px 4px 4px;*}
+        display: none; padding: 0; position: absolute; text-align: left; top: 0; z-index: 101;
+      }
+      body.ja-jp #leftPanel { display: none; }
+      body:not(.videoExplorer) #leftPanel { display: none; }
+
+
+      body.full_with_browser #playerTabWrapper, body.full_with_browser:not(.videoExplorer) #playerTabWrapper.w_wide {
+        top: auto !important; bottom: 3000px !important; right: 50px !important;
+        transition: bottom 0.2s ease-out; max-height: 500px;
+      }
+      body.full_with_browser.w_fullScreenMenu:not(.videoExplorer) #playerTabWrapper {
+        top: auto !important; bottom:  200px !important; right: 50px !important;
+      }
+
+      #fullScreenMenuContainer { display: none; }
+      body.full_with_browser #fullScreenMenuContainer {
+        display: block; position: absolute; bottom: 3000px; left: 50px; z-index: 1;
+        background: #fff; cursor: pointer; transition: bottom 0.2s ease-out;
+      }
+      body.full_with_browser.w_fullScreenMenu #fullScreenMenuContainer {
+        bottom: 100px;
+      }
+
+      #fullScreenMenuContainer .button {
+        cursor: pointer; transition: color 0.4s ease-out;
+      }
+      #fullScreenMenuContainer .modeStatus { display: none; font-weight: bolder; }
+      body.trueBrowserFull       #fullScreenMenuContainer .fullScreenModeSwitch { color: blue; }
+      body:not(.trueBrowserFull) #fullScreenMenuContainer .fullScreenModeSwitch .mode_normal,
+      body.trueBrowserFull       #fullScreenMenuContainer .fullScreenModeSwitch .mode_noborder { display: inline; }
+
+      #nicoplayerContainerInner.stageVideo       #fullScreenMenuContainer .stageVideoSwitch { color: blue; }
+      #nicoplayerContainerInner:not(.stageVideo) #fullScreenMenuContainer .stageVideoSwitch .mode_off,
+      #nicoplayerContainerInner.stageVideo       #fullScreenMenuContainer .stageVideoSwitch .mode_on { display: inline; }
+
+
+      body.full_with_browser.w_fullScreenMenu .videoHeaderOuter {
+        position: absolute; z-index: 1000; width: 100%;
+      }
+      body.full_with_browser.w_fullScreenMenu #videoTagContainer { width: 100%; }
+
+      .popupMarqueeContent {
+        background: black;
+      }
+
+      #videoExplorer, #playlist {
+        transition: margin-left 0.2s ease-in-out;
+      }
+
+      .dummyMylist .editFavorite, .dummyMylist .mylistDetail .mylistNameContainer {
+        display: none;
+      }
+
+    */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
+        .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
+    addStyle(__css__, 'watchItLaterStyle');
+  })(); // end of watchItLaterStyle
+
+
+
+
 
   conf.load = function() {
     try {
@@ -1904,6 +1983,9 @@
         values: {'する': true, 'しない': false}},
       {title: '動画リンクにカーソルを重ねてからメニューが出るまでの時間(秒)', varName: 'hoverMenuDelay',
        type: 'text', description: '単位は秒。 標準は0.4です'},
+      {title: 'ニコレポのポップアップを置き換える(実験中)',       varName: 'replacePopupMarquee', reload: true,
+        description: '画面隅に出るポップアップの不可解な挙動を調整します',
+        values: {'する': true, 'しない': false}},
       {title: 'ゆっくり再生(スロー再生)ボタンを表示', varName: 'enableYukkuriPlayButton',
         values: {'する': true, 'しない': false}},
       {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
@@ -1917,7 +1999,6 @@
       {title: 'タッチパネル向けモード(画面を右フリックで開始)', varName: 'enableQTouch',
         description: '指で操作しやすいように、一部のボタンやメニューが大きくなります',
         values: {'使う': true, '使わない': false}},
-
 
       {title: 'マウスとキーボードの設定', description: '※Chromeはコメント入力中も反応してしまいます', className: 'shortcut'},
       {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
@@ -1990,6 +2071,7 @@
           $item.toggleClass('debugOnly', menus[i].debugOnly === true).toggleClass('reload', menus[i].reload === true);
           if ($ul) $ul.append($item);
         }
+        if ($ul) $inner.append($ul);
         $panel.toggleClass('debugMode', conf.debugMode);
         var $bottom = w.jQuery('<div class="foot"></div>'), self = this;
         $panel.append($bottom);
@@ -2295,7 +2377,6 @@
 
       function createPopup(tags, baseX, baseY) {
         var popup = createDOM(tags, baseX, baseY);
-        //document.body.appendChild(popup);
         popupContainer.appendChild(popup);
         popup.style.right = null;
         popup.style.left = baseX + 'px';
@@ -2328,6 +2409,7 @@
           }
           this.style.display = 'none';
           e.preventDefault();
+          e.stopPropagation();
         }, false);
         return popup;
       }
@@ -2358,9 +2440,15 @@
         var li  = document.createElement('li');
         li.className = 'popupTagItem';
 
+        // 大百科アイコン
         var dic = createDicIconDOM(tag, text);
         li.appendChild(dic);
 
+        // 新検索(search.nicovideo.jp)へのリンク
+        var newSearchIcon = createNewSearchIconDOM(tag, text);
+        li.appendChild(newSearchIcon);
+
+        // 本文リンク
         var a = document.createElement('a');
         a.appendChild(document.createTextNode(text));
 
@@ -2384,6 +2472,25 @@
         return li;
       }
 
+      function createNewSearchIconDOM(tag, text) {
+        var link = document.createElement('a');
+        link.className = 'newsearch';
+        link.title     = 'niconico新検索で開く';
+
+        // TODO: パラメータの対応表作ってあわせる
+        var newSortOrder = '';
+        link.href = 'http://search.nicovideo.jp/video/search/' + encodeURIComponent(text) + newSortOrder;
+        if (location.host !== 'search.nicovdieo.jp') {
+          link.target = '_blank';
+        }
+
+        var icon = document.createElement('img');
+        icon.className = 'icon';
+        icon.src = 'http://uni.res.nimg.jp/img/favicon.ico';
+        link.appendChild(icon);
+
+        return link;
+     }
       function createDicIconDOM(tag, text) {
         var dic = document.createElement('a');
         dic.className = 'nicodic';
@@ -3621,7 +3728,9 @@
   //===================================================
 
   var WatchController = (function(w) {
-    var WatchApp = w.WatchApp,
+    var WatchApp = w.WatchApp;
+    if (!w.WatchApp) return;
+    var
       watch          = (WatchApp && WatchApp.ns.init) || {},
       watchInfoModel = (watch.CommonModelInitializer && watch.CommonModelInitializer.watchInfoModel) || {},
       nicoPlayer     = (watch.PlayerInitializer && watch.PlayerInitializer.nicoPlayerConnector) || {},
@@ -3773,11 +3882,12 @@
         } else
         if (format === 'playlist') {
           var result = [];
-          for (var i = items.length - 1; i >= 0; i++) {
+          for (var i = items.length - 1; i >= 0; i--) {
             result.unshift(
               videoExplorerController._item2playlistItem(items[i])
             );
           }
+          return result;
         }
       },
       getMyNick: function() {
@@ -3866,7 +3976,7 @@
       appendSearchResultToPlaylist: function(mode) {
         var
           items = this.getPlaylistItems(),
-          searchItems = this.getVideoExplorerCurrentItems(),
+          searchItems = this.getVideoExplorerCurrentItems('playlist'),
           uniq = {}, i, f = WatchApp.ns.model.playlist.PlaylistItem, playingIndex = 0, c, len, currentItem = null;
         if (!searchItems || searchItems.length < 1) {
           return;
@@ -3878,12 +3988,12 @@
         if (mode === 'next') {
           for (i = searchItems.length - 1; i >= 0; i--) {
             c = searchItems[i];
-            ("undefined" === typeof c.type || "video" === c.type) && uniq[c.id] === undefined && items.splice(playingIndex + 1, 0, new f(c));
+            ("undefined" === typeof c.type || "video" === c.type) && uniq[c.id] === undefined && items.splice(playingIndex + 1, 0, c);
           }
         } else {
           for (i = 0, len = searchItems.length; i < len; i++) {
             c = searchItems[i];
-            ("undefined" === typeof c.type || "video" === c.type) && uniq[c.id] === undefined && items.push(new f(c));
+            ("undefined" === typeof c.type || "video" === c.type) && uniq[c.id] === undefined && items.push(c);
           }
         }
         this.setPlaylistItems(items, currentItem);
@@ -5728,7 +5838,8 @@
       $sideInfoPanel.find('*').unbind();
 
       $sidePanel
-        .toggleClass('ichibaEmpty',    $('#ichibaMain')   .find('.ichiba_mainitem').length < 1);
+        .toggleClass('ichibaEmpty',    $('#ichibaMain')   .find('.ichiba_mainitem').length < 1)
+        .toggleClass('nicommendEmpty', $('#nicommendList').find('.content')        .length < 1);
 
       $sideInfoPanel
         .empty()
@@ -6353,14 +6464,14 @@
       var largeUrl = baseUrl, size;
       if (baseUrl.indexOf('smilevideo.jp') >= 0) {
         largeUrl = baseUrl + '.L';
-        size = 'width: 360px; height: 270px;';
+        size = 'width: 360px; height: 270px;max-height: 500px;';
       } else {
         largeUrl = baseUrl.replace(/z$/, 'l');
-        size = 'width: 360px;';
+        size = 'width: 360px; max-height: 500px;';
       }
       var
         html = [
-          '<div onmousedown="if (event.button == 0) { $(\'#popupMarquee\').hide(); event.preventDefault(); }" style="background:#000;">',
+          '<div onmousedown="if (event.button == 0) { $(\'#popupMarquee\').removeClass(\'show\'); event.preventDefault(); }" style="background:#000;">',
           '<img src="', largeUrl, '" style="', size, ' z-index: 3; position: absolute; display: none;" onload="this.style.display = \'\';">',
           '<img src="', baseUrl, '"  style="', size, ' z-index: 2;">',
           '</div>',
@@ -6893,7 +7004,7 @@
       var duration_match = /^([0-9]+):([0-9]+)/;
       controller._item2playlistItem = function (item) {
         // 動画長が入るようにする
-        var len = item.getLength(), length_seconds = 0, m;
+        var length_seconds = 0, len = item.getLength ? item.getLength() : '', m;
         if (typeof len === 'string' && (m = duration_match.exec(len)) !== null) {
           length_seconds = m[1] * 60 + m[2] * 1;
         }
@@ -8412,82 +8523,6 @@
     } //
 
     function initOtherCss() {
-      var __css__ = Util.here(function() {/*
-        #foot_inner { width: 960px; }
-        .size_normal #foot_inner { width: 1186px; }
-        #footer.noBottom #foot_inner { padding: 0; }
-        #footer.noBottom a:nth-of-type(3):after, #footer.noBottom a:nth-of-type(6):after  {
-          content: ' | '; color: white;
-        }
-        #footer.noBottom br { display: none; }
-         html { background: #141414; }
-        .animateBlink {
-          -webkit-transition: 1s ease-in; transition: 1s ease-in;
-        }
-
-        .w_compact .toggleDetailExpand, .w_compact .shortVideoInfo {
-          display: none;
-        }
-        .videoDetailToggleButton {
-          cursor: pointer;
-        }
-        #leftPanel {
-          {*border-radius: 4px 4px 4px 4px;*}
-          display: none; padding: 0; position: absolute; text-align: left; top: 0; z-index: 101;
-        }
-        body.ja-jp #leftPanel { display: none; }
-        body:not(.videoExplorer) #leftPanel { display: none; }
-
-
-        body.full_with_browser #playerTabWrapper, body.full_with_browser:not(.videoExplorer) #playerTabWrapper.w_wide {
-          top: auto !important; bottom: 3000px !important; right: 50px !important;
-          transition: bottom 0.2s ease-out; max-height: 500px;
-        }
-        body.full_with_browser.w_fullScreenMenu:not(.videoExplorer) #playerTabWrapper {
-          top: auto !important; bottom:  200px !important; right: 50px !important;
-        }
-
-        #fullScreenMenuContainer { display: none; }
-        body.full_with_browser #fullScreenMenuContainer {
-          display: block; position: absolute; bottom: 3000px; left: 50px; z-index: 1;
-          background: #fff; cursor: pointer; transition: bottom 0.2s ease-out;
-        }
-        body.full_with_browser.w_fullScreenMenu #fullScreenMenuContainer {
-          bottom: 100px;
-        }
-
-        #fullScreenMenuContainer .button {
-          cursor: pointer; transition: color 0.4s ease-out;
-        }
-        #fullScreenMenuContainer .modeStatus { display: none; font-weight: bolder; }
-        body.trueBrowserFull       #fullScreenMenuContainer .fullScreenModeSwitch { color: blue; }
-        body:not(.trueBrowserFull) #fullScreenMenuContainer .fullScreenModeSwitch .mode_normal,
-        body.trueBrowserFull       #fullScreenMenuContainer .fullScreenModeSwitch .mode_noborder { display: inline; }
-
-        #nicoplayerContainerInner.stageVideo       #fullScreenMenuContainer .stageVideoSwitch { color: blue; }
-        #nicoplayerContainerInner:not(.stageVideo) #fullScreenMenuContainer .stageVideoSwitch .mode_off,
-        #nicoplayerContainerInner.stageVideo       #fullScreenMenuContainer .stageVideoSwitch .mode_on { display: inline; }
-
-
-        body.full_with_browser.w_fullScreenMenu .videoHeaderOuter {
-          position: absolute; z-index: 1000; width: 100%;
-        }
-
-        .popupMarqueeContent {
-          background: black;
-        }
-
-        #videoExplorer, #playlist {
-          transition: margin-left 0.2s ease-in-out;
-        }
-
-        .dummyMylist .editFavorite, .dummyMylist .mylistDetail .mylistNameContainer {
-          display: none;
-        }
-
-      */});
-      addStyle(__css__, 'watchItLaterStyle2');
-
       var __dynamic_css_template__ = Util.here(function() {/*
        .full_with_browser.w_fullScreenMenu #nicoHeatMap {
           transform: scaleX($scale); -webkit-transform: scaleX($scale); display: block;
@@ -8498,7 +8533,6 @@
         var css = __dynamic_css_template__;
         var innerWidth = $('body').innerWidth();
         css = css.split('$scale').join($('body').innerWidth() / 100);
-        //console.log(css);
         if (exStyle) {
           exStyle.innerHTML = css;
           return exStyle;
@@ -8710,6 +8744,107 @@
       }
     } // end of initHeatMap
 
+    /**
+     * 既存のポップアップの難点
+     *
+     * ・閉じる機能がなく、邪魔でも消えるまで待つしかない
+     * ・消えるまでの時間が毎回違う？
+     * ・クリックしたら消えるのかなと思ったらマイページに飛ばされる
+     * ・Chrome以外では動画プレイヤーの上に表示できない (半透明の部分が欠ける)
+     * ・￪によってプレイヤー上でフェードイン・アウトが出来ないため、まったく見えない状態から突然出現したようになる
+     * ・タイマー処理がバグっていて、一個目の表示中に2個目を連続表示すると2個目がすぐ消える
+     *
+     *  … という所があんまりなので、パッチをあてて直す。
+     *  ・Chrome以外は半透明をやめて画面外からのスライドにする
+     *　・CSS3アニメーションを使う(jQueryより軽い)
+     *  ・クリックでマイページに飛ぶのをやめて、クリックで消えるようにする
+     *  ・マウスオーバーしてる間は引っ込まない
+     *  ・消えるまでの時間を4秒に固定
+     *
+     *
+     *  このパッチでも直らない問題
+     *  ・自分が動画投稿やレビューをしたという情報がなぜか自分にも通知される
+     *
+     */
+    function initPopupMarquee() {
+      if (!conf.replacePopupMarquee) { return; }
+      var
+        marquee  = watch.PopupMarqueeInitializer.popupMarqueeViewController,
+        itemList = marquee.itemList,
+        $popup   = $('#popupMarquee'),
+        $inner   = $popup.find('.popupMarqueeContent'),
+        closeTimer = null,
+        popupDuration = 4000;
+
+      var
+        resetCloseTimer = function() {
+          if (closeTimer) {
+            clearTimeout(closeTimer);
+            closeTimer = null;
+          }
+        },
+        setCloseTimer  = function() {
+          resetCloseTimer();
+          closeTimer = setTimeout(function() {
+            disappear();
+            closeTimer = null;
+          }, popupDuration);
+        },
+        onData         = function(data) {
+          $inner.html(data);
+
+          $popup.removeClass('hide').removeClass('show');
+          setTimeout(function() {
+            $popup.removeClass('hide').addClass('show');
+          }, 100)
+          setCloseTimer();
+        },
+        disappear      = function() {
+          $popup.removeClass('show');
+          resetCloseTimer();
+          setTimeout(function() {
+            if (!$popup.hasClass('show')) $popup.addClass('hide');
+
+            setTimeout(function() {
+              itemList.next();
+            }, Math.random() * 5000 + 5000);
+
+          }, 500);
+        },
+        __css__ = Util.here(function() {/*
+          #popupMarquee      {
+            -webkit-filter: opacity(  0%); {* chrome以外はflashの上に半透明要素を置けない *}
+            background: #000 !important;
+            transition: -webkit-filter 0.25s ease-in,  top 0.5s ease-in,  bottom 0.5s ease-in;  display: block;
+          }
+          #popupMarquee.show {
+            -webkit-filter: opacity(100%);
+            transition: -webkit-filter 1.00s ease-out, top 0.5s ease-out, bottom 0.5s ease-out; display: block;
+          }
+
+          #popupMarquee.hide {
+            opacity: 0; z-index: -1;
+          }
+
+          #popupMarquee.popupMarqueeTopRight:not(.show),    #popupMarquee.popupMarqueeTopLeft:not(.show)    { top:    -600px; }
+          #popupMarquee.popupMarqueeBottomRight:not(.show), #popupMarquee.popupMarqueeBottomLeft:not(.show) { bottom: -600px; }
+        */});
+
+      addStyle(__css__, 'popupMarqueeFix');
+
+      itemList.eventTypeListenerMap.popup = []; //itemList.removeEventListener('popup', marquee.onData);
+      $popup
+        .css({opacity: ''})
+        .off('click').off('mouseover').off('mouseleave').off('mousemove')
+        .on('mouseover', resetCloseTimer)
+        .on('mouseout',    setCloseTimer)
+        .on('click', disappear);
+
+      marquee.onData    = $.proxy(onData,    marquee);
+      marquee.disappear = $.proxy(disappear, marquee);
+      itemList.addEventListener('popup', $.proxy(onData, marquee));
+    } //
+
     function initOther() {
       if (conf.headerViewCounter) $('#siteHeaderInner').width($('#siteHeaderInner').width() + 200);
 
@@ -8747,7 +8882,6 @@
       if (conf.flatDesignMode) $('#content').addClass('w_flat');
 
       if (conf.compactVideoInfo) $('#content, #outline').addClass('w_compact');
-
       onWatchInfoReset(watchInfoModel);
 
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
@@ -8755,6 +8889,9 @@
       $('#videoHeaderMenu .searchText input').attr('accesskey', '@');
 
       if (conf.debugMode) {
+        watch.PopupMarqueeInitializer.popupMarqueeViewController.itemList.addEventListener('popup', function(body) {
+          console.log('%c popup: ' + body, 'background: #0ff');
+        });
         console.log(JSON.parse($('#watchAPIDataContainer').text()));
       }
     }
@@ -8802,6 +8939,7 @@
     initOtherCss();
     initStageVideo($, conf, w);
     initHeatMap($, conf, w);
+    initPopupMarquee();
     initOther();
 
     onWindowResize();
