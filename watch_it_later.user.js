@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130728
+// @version        1.130729
 // ==/UserScript==
 
 /**
@@ -43,6 +43,11 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130729
+// - プレイリスト消えないモードの挙動改善
+//
+//
 
 // * ver 1.130728
 // - プレイリストメニューが一部機能しなくなっていたのを対応
@@ -474,7 +479,6 @@
   (function() { // watchページだけのstyle
     if (!w.WatchApp) { return; }
     var __css__ = (function() { /*
-    '
     {* 動画タグとプレイリストのポップアップ *}
       #videoTagPopupContainer {
       }
@@ -2243,12 +2247,20 @@
    * 通信用
    */
   w.WatchItLater = {
+    config: {
+      get: function(varName) {
+        return conf.getValue(varName);
+      },
+      set: function(varName, value) {
+        conf.setValue(varName, value);
+      }
+    },
     test: {
       assert: function(v, m) {
         if (v) {
-          console.log('%c OK :', 'color: black; background: lime;', m);
+          console.log('%c OK: ',  'color: black; background: lime;', v,  m);
         } else {
-          console.log('%cFail:', 'color: white; background: red;',  m);
+          console.log('%cFail: ', 'color: white; background: red;',  v,  m);
         }
       },
       spec: {},
@@ -2257,12 +2269,16 @@
           $.proxy(this.spec[name], this)();
           return;
         }
-        console.log(this.spec);
+        //console.log(this.spec);
         for(var v in this.spec) {
-          console.log(v, this.spec[v])
+          //console.log(v, this.spec[v]);
           if (!v.match(/^test/)) continue;
           //var
-          $.proxy(this.spec[v], this)();
+          try {
+            $.proxy(this.spec[v], this)();
+          } catch (e) {
+            console.log('%cException: test=' + v + ';', 'color: white; background: red;', e)
+          }
         }
       }
     }
@@ -2333,7 +2349,6 @@
   var VideoTags = (function(conf, w){
 
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
-    var isWatch = w.WatchApp ? true : false;
     var pt = function(){};
     var lastPopup = null;
 
@@ -2631,7 +2646,6 @@
 
     pt.reloadDefList = function(callback) {
       var url = 'http://' + host + '/api/deflist/list';
-      var self = this;
       GM_xmlhttpRequest({
         url: url,
         onload: function(resp) {
@@ -3890,6 +3904,12 @@
           return result;
         }
       },
+      getWatchId: function() {
+        return watchInfoModel.id;
+      },
+      getVideoId: function() {
+        return watchInfoModel.v;
+      },
       getMyNick: function() {
         return watch.CommonModelInitializer.viewerInfoModel.nickname;
       },
@@ -3977,7 +3997,7 @@
         var
           items = this.getPlaylistItems(),
           searchItems = this.getVideoExplorerCurrentItems('playlist'),
-          uniq = {}, i, f = WatchApp.ns.model.playlist.PlaylistItem, playingIndex = 0, c, len, currentItem = null;
+          uniq = {}, i, playingIndex = 0, c, len, currentItem = null;
         if (!searchItems || searchItems.length < 1) {
           return;
         }
@@ -4072,8 +4092,8 @@
       },
       toggleStageVideo: function() {
         if (!this.isStageVideoSupported()) {
-//        Popup.alert('ハードウェアアクセラレーションを使用できない状態か、未対応の環境です');
-//        return;
+          Popup.alert('ハードウェアアクセラレーションを使用できない状態か、未対応の環境です');
+          return;
         }
         var isAllowed = this.allowStageVideo(), exp = $('#external_nicoplayer')[0];
         exp.setIsForceUsingStageVideo(!isAllowed && conf.forceEnableStageVideo);
@@ -4205,7 +4225,6 @@
     };
 
 
-
     var self = {
       Cache: Cache,
       here: function(func) { // えせヒアドキュメント
@@ -4214,6 +4233,7 @@
     };
     return self;
   })();
+  w.WatchItLater.Util = Util;
 
   var NicoNews = (function() {
     var WatchApp = null, watch = null, $ = null, WatchJsApi = null, initialized = false;
@@ -4492,7 +4512,117 @@
 
 
     length_seconds: 0, // TODO:
-    thread_update_time: '2000-01-01 00:00:00', // TODO: 「コメントが新しい順でソート」に必要？
+    thread_update_time: '2000-01-01 00:00:00' // TODO: 「コメントが新しい順でソート」に必要？
+  };
+
+  // 参考:
+  // http://looooooooop.blog35.fc2.com/blog-entry-1146.html
+  // http://toxy.hatenablog.jp/entry/2013/07/25/200645
+  // http://ch.nicovideo.jp/pita/blomaga/ar297860
+  var NewNicoSearch = function() { this.initialize.apply(this, arguments); };
+  NewNicoSearch.API_BASE_URL  = 'http://api.search.nicovideo.jp/api/';
+  NewNicoSearch.PAGE_BASE_URL = 'http://search.nicovideo.jp/video/';
+  NewNicoSearch.prototype = {
+    _u: '',      // 24h, 1w, 1m, ft  期間指定
+    _ftfrom: '', // YYYY-MM-DD
+    _ftto: '',   // YYYY-MM-DD
+    _l: '',      // short long
+    _m: false,   // true=音楽ダウンロード
+    _sort: '',   // last_comment_time, last_comment_time_asc,
+                // view_counter,      view_counter_asc,
+                // comment_counter,   comment_counter_asc,
+                // mylist_counter,    mylist_counter_asc,
+                // upload_time,       upload_time_asc,
+                // length_seconds,    length_seconds_asc
+    _size: 32,   // 一ページの件数  maxは100
+    _issuer: 'pc',
+    _base_url: NewNicoSearch.API_BASE_URL,
+    initialize: function(params) {
+
+    },
+    load: function(params, callback) {
+      var url = this._base_url;
+      var data = {};
+      data.query   = params.query   || 'Qwatch';
+      data.service = params.service || ['video'];
+      data.search  = params.search  || ['title', 'tags', 'description'];
+      data.join    = params.join    || [
+        // TODO:投稿者IDを取得する方法がないか？
+          'cmsid', 'title', 'description', 'thumbnail_url', 'start_time',
+          'view_counter', 'comment_counter', 'mylist_counter', 'length_seconds', 'userid'
+        ];
+      data.filters = params.filters || [{}];
+      data.sort_by = params.sort_by || 'start_time';
+      data.order   = params.order   || 'desc';
+      data.timeout = params.timeout || 10000;
+      data.issuer  = params.issuer  || 'pc'; //'watchItLater';
+      data.reason  = params.reason  || 'watchItLater';
+      data.size    = params.size    || 32;
+      data.from    = params.from    || 0;
+
+      var cache_key = JSON.stringify({url: url, data: data}), cache = Util.Cache.get(cache_key);
+      if (cache) {
+        callback(null, cache);
+      }
+
+      $.ajax({
+        url: url,
+        type: 'POST',
+        data: JSON.stringify(data),
+//      data: data, //JSON.stringify(data),
+//      dataType: 'json',
+        complete: function(result) {
+          if (result.status !== 200) {
+            callback('fail', 'HTTP status:' + result.status);
+            return;
+          }
+          var data = {};
+          try {
+            var data = JSON.parse('[' + result.responseText.split('\n').join(',').replace(/,$/, '') + ']')
+            Util.Cache.set(cache_key, data);
+            callback(null, data);
+          } catch(e) {
+            if (conf.debugMode) console.log('Exception: ', e, result);
+            callback('fail', 'JSON syntax');
+          }
+        }
+      });
+    }
+  };
+
+  var NicoSearchSuggest = function() { this.initialize.apply(this, arguments); };
+  NicoSearchSuggest.API_BASE_URL = 'http://sug.search.nicovideo.jp/', //'/suggestion/complete';
+  NicoSearchSuggest.prototype = {
+    _base_url: NicoSearchSuggest.API_BASE_URL,
+    initialize: function(params) {
+    },
+    load: function(word, callback) {
+      // 現状はクロスドメインを越えられないので意味なし
+      var url = this._base_url + '/suggestion/complete';
+      var cache_key = JSON.stringify({url: url, word: word}), cache = Util.Cache.get(cache_key);
+      if (cache) {
+        callback(null, cache);
+      }
+      $.ajax({
+        url: url,
+        type: 'POST',
+        cache: true,
+        data: word,
+        success: function(result) {
+          try {
+            var data = JSON.parse(result);
+            Util.Cache.set(cache_key, data);
+            callback(null, data);
+          } catch(e) {
+            if (conf.debugMode) console.log('Exception: ', e, result);
+            callback('fail', 'JSON format');
+          }
+        },
+        error: function(error) {
+          callback('fail', error);
+        }
+      });
+    }
   };
 
 
@@ -5104,9 +5234,9 @@
       request(p.baseUrl, 1, p.maxRssPage, function(result) {
         //if (conf.debugMode) console.log(result);
         result.name = p.genreName;
-        if (p.sort !== '') {
+        //if (p.sort !== '') {
         //  result.sortItem(p.sort);
-        }
+        //}
         result.setPage(p.viewPage);
         if (typeof callback === 'function') {
           callback(result);
@@ -6376,7 +6506,7 @@
                 NicorepoVideo.loadOwner(onload);
                 break;
               default:
-                throw {message: '未定義のIDです:' + id, status: 'fail'}
+                throw {message: '未定義のIDです:' + id, status: 'fail'};
             }
           } catch(e) {
             // TODO: ここのエラーをちゃんと投げる
@@ -7020,7 +7150,7 @@
           ads_counter   : item.getUadCounter(),
           length_seconds: length_seconds
         });
-      }
+      };
 
 
       if (!conf.videoExplorerHack) { return; }
@@ -7196,7 +7326,6 @@
                   $('body').toggleClass('w_fullScreenMenu', wheelCounter < 0).hasClass('w_fullScreenMenu')
               );
               AnchorHoverPopup.hidePopup();
-            } else {
             }
           }, 500);
         }
@@ -7230,7 +7359,7 @@
             '<span class="modeStatus mode_off">OFF</span>',
             '<span class="modeStatus mode_on">ON</span>',
           '</button>'
-      ].join('')).attr('title', 'ハードウェアアクセラレーションのON/OFF').click(function() {WatchController.toggleStageVideo()});
+      ].join('')).attr('title', 'ハードウェアアクセラレーションのON/OFF').click(function() { WatchController.toggleStageVideo(); });
       var $toggleSetting = $([
           '<button class="toggleSetting button">',
           '</button>'
@@ -7254,33 +7383,30 @@
 
 
     function initPlaylist($, conf, w) {
-      var playlist = watch.PlaylistInitializer.playlist; //.getItems().length;
-      var blankVideoId = 'sm20353707', blankVideoUrl = 'http://www.nicovideo.jp/watch/' + blankVideoId + '?';
+      var
+        playlist = watch.PlaylistInitializer.playlist,
+        blankVideoId = 'sm20353707', blankVideoUrl = 'http://www.nicovideo.jp/watch/' + blankVideoId + '?',
+        items = {},
+        toCenter = function() { // 表示位置調整
+          var
+            pm = WatchApp.ns.view.playlist.PlaylistManager,
+            pv = watch.PlaylistInitializer.playlistView,
+            pl = playlist,
+            current = pl.getPlayingIndex(),
+            cols = Math.floor($('#playlistContainerInner').innerWidth() / pm.getItemWidth()),
+            center = Math.round(cols / 2);
 
-      var items = {};
-
-      // 表示位置調整
-      var toCenter = function() {
-        var
-          pm = WatchApp.ns.view.playlist.PlaylistManager,
-          pv = watch.PlaylistInitializer.playlistView,
-          pl = watch.PlaylistInitializer.playlist,
-          current = pl.getPlayingIndex(),
-          cols = Math.floor($('#playlistContainerInner').innerWidth() / pm.getItemWidth()),
-          center = Math.round(cols / 2);
-
-        if (cols < 1) { return; }
-        var currentLeft = pm.getLeftSideIndex();
-        pv.scroll(Math.max(0, current - center + 1));
-      };
-
-      var scroll = function(d) {
-        var isEffectEnabled = watch.PlaylistInitializer.playlistView.isEffectEnabled;
-        var left = WatchApp.ns.view.playlist.PlaylistManager.getLeftSideIndex();
-        watch.PlaylistInitializer.playlistView.isEffectEnabled = false;
-        watch.PlaylistInitializer.playlistView.scroll(Math.max(0, left + d));
-        watch.PlaylistInitializer.playlistView.isEffectEnabled = isEffectEnabled;
-      };
+          if (cols < 1) { return; }
+          var currentLeft = pm.getLeftSideIndex();
+          pv.scroll(Math.max(0, current - center + 1));
+        },
+        scroll = function(d) {
+          var isEffectEnabled = watch.PlaylistInitializer.playlistView.isEffectEnabled;
+          var left = WatchApp.ns.view.playlist.PlaylistManager.getLeftSideIndex();
+          watch.PlaylistInitializer.playlistView.isEffectEnabled = false;
+          watch.PlaylistInitializer.playlistView.scroll(Math.max(0, left + d));
+          watch.PlaylistInitializer.playlistView.isEffectEnabled = isEffectEnabled;
+        };
 
       $('#playlist').find('.playlistInformation').on('dblclick.watchItLater', function(e) {
         e.preventDefault();
@@ -7318,284 +7444,294 @@
         }
       });
 
+      var
+        updatePos = function() {
+          if (
+            conf.hashPlaylistMode === 2 || (conf.hashPlaylistMode === 1 && WatchController.isPlaylistActive())) {
+            LocationHashParser.setValue('playlist', exportPlaylist());
+            LocationHashParser.updateHash();
+          }
+          if (conf.storagePlaylistMode === 'sessionStorage' || conf.storagePlaylistMode === 'localStorage') {
+            setTimeout(function() {
+              w[conf.storagePlaylistMode].setItem('watchItLater_playlist', JSON.stringify(exportPlaylist()));
+            }, 0);
+          }
 
-      function updatePos() {
-        if (
-          conf.hashPlaylistMode === 2 || (conf.hashPlaylistMode === 1 && WatchController.isPlaylistActive())) {
-          LocationHashParser.setValue('playlist', exportPlaylist());
-          LocationHashParser.updateHash();
-        }
-        if (conf.storagePlaylistMode === 'sessionStorage' || conf.storagePlaylistMode === 'localStorage') {
-          setTimeout(function() {
-            w[conf.storagePlaylistMode].setItem('watchItLater_playlist', JSON.stringify(exportPlaylist()));
-          }, 0);
-        }
-
-        var pos = Math.max((playlist.getPlayingIndex() + 1), 1) + '/' + Math.max(playlist.getItems().length, 1);
-        $('.generationMessage').text(pos + " - \n" + $('.generationMessage').text().replace(/^.*\n/, ''));
-      }
-
-      function resetView() {
-        watch.PlaylistInitializer.playlistView.resetView();
-      }
-
-      function exportPlaylist(option, type, continuous, shuffle) {
-        var items = playlist.currentItems, list = [];
-        for (var i = 0, len = Math.min(300, items.length); i < len; i++) {
-          var item = items[i];
-          list.push([
-              item.id,
-              parseInt(item.mylistCounter,                10).toString(36),
-              parseInt(item.viewCounter,                  10).toString(36),
-              parseInt(item.numRes,                       10).toString(36),
-              (item.thumbnailUrl ? parseInt(item.thumbnailUrl.split('?i=')[1], 10).toString(36) : 'c490r'),
-            ].join(',') + ':' + item.title
-          );
-        }
-        return {
-          a: (typeof continuous === 'boolean') ? continuous : WatchController.isPlaylistContinuous(),
-          r: (typeof shuffle    === 'boolean') ? shuffle    : WatchController.isPlaylistRandom(),
-          o: option    || playlist.option,
-          t: type      || playlist.type,
-          i: list
-        };
-      }
-
-      function importPlaylist(list) {
-        var PlaylistItem = WatchApp.ns.model.playlist.PlaylistItem, newItems = [], uniq = {}, currentIndex = -1;
-
-        WatchController.clearPlaylist();
-        var currentItem = playlist.currentItems[0];
-        if (!currentItem) {
-          var wm = watchInfoModel;
-          currentItem = new PlaylistItem({
-            id:             wm.v,
-            title:          wm.title,
-            mylist_counter: wm.mylistCount,
-            view_counter:   wm.viewCount,
-            num_res:        wm.commentCount,
-            thumbnail_url:  wm.thumbnail,
-            first_retriee:  wm.postedAt
-          });
-        }
-
-        for (var i = 0, len = list.i.length; i < len; i++) {
+          var pos = Math.max((playlist.getPlayingIndex() + 1), 1) + '/' + Math.max(playlist.getItems().length, 1);
+          $('.generationMessage').text(pos + " - \n" + $('.generationMessage').text().replace(/^.*\n/, ''));
+        },
+        resetView = function() {
+          watch.PlaylistInitializer.playlistView.resetView();
+        },
+        exportPlaylist = function(option, type, continuous, shuffle) {
           var
-            dat = list.i[i],
-            c = dat.split(':')[0].split(','),
-            title = dat.replace(/^.*:/, ''),
-            id = c[0],
-            thumbnailId = parseInt(c[4], 36);
+            items = playlist.currentItems,
+            list = [],
+            current = 0,
+            len = conf.debugMode ? Math.min(600, items.length) : Math.min(300, items.length);
 
-          if (uniq[id] || typeof id !== 'string') { continue; }
-          uniq[id] = true;
-          if (id == watchInfoModel.v) {
-            currentIndex = i;
-            newItems.push(currentItem);
-          } else {
-            var item = new PlaylistItem({
-              id:             id,
-              title:          title.replace('<', '&lt;').replace('>', '&gt;'), // ないはずだけど一応
-              mylist_counter: parseInt(c[1], 36),
-              view_counter:   parseInt(c[2], 36),
-              num_res:        parseInt(c[3], 36),
-              thumbnail_url:  'http://tn-skr' + ((thumbnailId % 4) + 1) + '.smilevideo.jp/smile?i=' + thumbnailId,
-              first_retrieve: null
+          for (var i = 0; i < len; i++) {
+            var item = items[i];
+            if (item._isPlaying) current = i;
+            list.push([
+                item.id,
+                parseInt(item.mylistCounter, 10).toString(36),
+                parseInt(item.viewCounter,   10).toString(36),
+                parseInt(item.numRes,        10).toString(36),
+                (item.thumbnailUrl ? parseInt(item.thumbnailUrl.split('?i=')[1], 10).toString(36) : 'c490r'),
+              ].join(',') + ':' + item.title
+            );
+          }
+          return {
+            a: (typeof continuous === 'boolean') ? continuous : WatchController.isPlaylistContinuous(),
+            r: (typeof shuffle    === 'boolean') ? shuffle    : WatchController.isPlaylistRandom(),
+            o: option    || playlist.option,
+            t: type      || playlist.type,
+            i: list,
+            c: current
+          };
+        },
+        importPlaylist = function(list) {
+          var PlaylistItem = WatchApp.ns.model.playlist.PlaylistItem, newItems = [], uniq = {}, currentIndex = -1;
+
+          WatchController.clearPlaylist();
+          var currentItem = playlist.currentItems[0];
+          if (!currentItem) {
+            var wm = watchInfoModel;
+            currentItem = new PlaylistItem({
+              id:             wm.v,
+              title:          wm.title,
+              mylist_counter: wm.mylistCount,
+              view_counter:   wm.viewCount,
+              num_res:        wm.commentCount,
+              thumbnail_url:  wm.thumbnail,
+              first_retriee:  wm.postedAt
             });
-            newItems.push(item);
           }
-        }
-        if (currentIndex === -1) {
-          newItems.unshift(currentItem);
-          currentIndex = 0;
-        }
 
-        var isAutoPlay = playlist.isAutoPlay();
-        playlist.reset(newItems, list.t, list.o);
-        if (!isAutoPlay) { // 本家側の更新でリセット時に勝手に自動再生がONになるようになったので、リセット前の状態を復元する
-          playlist.disableAutoPlay();
-        }
-        if (currentIndex >= 0) { playlist.playingItem = newItems[currentIndex]; }
-        if (list.a) { playlist.enableAutoPlay(); }
-        if (list.r) {
-          if (newItems[0].id === blankVideoId) {
-            setTimeout(function() {WatchController.shufflePlaylist();}, 3000);
-          } else {
-            playlist.enableAutoPlay();
+          for (var i = 0, len = list.i.length; i < len; i++) {
+            var
+              dat = list.i[i],
+              c = dat.split(':')[0].split(','),
+              title = dat.replace(/^.*:/, ''),
+              id = c[0],
+              thumbnailId = parseInt(c[4], 36);
+
+            if (uniq[id] || typeof id !== 'string') { continue; }
+            uniq[id] = true;
+            if (id == watchInfoModel.v) {
+              currentIndex = i;
+              newItems.push(currentItem);
+            } else {
+              var item = new PlaylistItem({
+                id:             id,
+                title:          title.replace('<', '&lt;').replace('>', '&gt;'), // ないはずだけど一応
+                mylist_counter: parseInt(c[1], 36),
+                view_counter:   parseInt(c[2], 36),
+                num_res:        parseInt(c[3], 36),
+                thumbnail_url:  'http://tn-skr' + ((thumbnailId % 4) + 1) + '.smilevideo.jp/smile?i=' + thumbnailId,
+                first_retrieve: null
+              });
+              newItems.push(item);
+            }
           }
-        }
-      }
+          // 復元するリストの中に現在の動画がなかった
+          if (currentIndex === -1) {
+            //console.log(list.c, list.i.length, newItems.length);
+            if (typeof list.c === 'number') {
+              if (list.c < newItems.length) {
+                currentIndex = list.c + 1;
+                newItems.splice(currentIndex, 0, currentItem);
+              } else {
+                currentIndex = list.length;
+                newItems.push(currentItem);
+              }
+            } else {
+              newItems.unshift(currentItem);
+              currentIndex = 0;
+            }
+          }
 
-      var $dialog = null, $savelink = null, $continuous, $shuffle;
-      function openSaveDialog() {
-        function resetLink() {
-          var playlist = exportPlaylist(null, null, $continuous.is(':checked'), $shuffle.is(':checked'));
-          playlist.o = playlist.o || [];
-          playlist.o.name = $savelink.text();
-          playlist.t = 'mylist';
-          LocationHashParser.setValue('playlist', playlist);
-          $savelink
-            .attr('href', blankVideoUrl + LocationHashParser.getHash())
-            .unbind();
-        }
-        function closeDialog() {
-          $dialog.removeClass('show');
-        }
+          var isAutoPlay = playlist.isAutoPlay();
+          playlist.reset(newItems, list.t, list.o);
+          if (!isAutoPlay) { // 本家側の更新でリセット時に勝手に自動再生がONになるようになったので、リセット前の状態を復元する
+            playlist.disableAutoPlay();
+          }
+          if (currentIndex >= 0) { playlist.playingItem = newItems[currentIndex]; }
+          if (list.a) { playlist.enableAutoPlay(); }
+          if (list.r) {
+            if (newItems[0].id === blankVideoId) {
+              setTimeout(function() {WatchController.shufflePlaylist();}, 3000);
+            } else {
+              playlist.enableAutoPlay();
+            }
+          }
+        },
+        $dialog = null, $savelink = null, $continuous, $shuffle,
+        openSaveDialog = function() {
+          function resetLink() {
+            var playlist = exportPlaylist(null, null, $continuous.is(':checked'), $shuffle.is(':checked'));
+            playlist.o = playlist.o || [];
+            playlist.o.name = $savelink.text();
+            playlist.t = 'mylist';
+            LocationHashParser.setValue('playlist', playlist);
+            $savelink
+              .attr('href', blankVideoUrl + LocationHashParser.getHash())
+              .unbind();
+          }
+          function closeDialog() {
+            $dialog.removeClass('show');
+          }
 
-        if (!$dialog) {
-          $dialog = $('<div id="playlistSaveDialog" />');
-          $dialog.append($([
-            '<div class="shadow"></div>',
-            '<div class="formWindow"><div  class="formWindowInner">',
-              '<h3>プレイリスト保存用リンク(実験中)</h3>',
-              '<p class="link"><a target="_blank" class="playlistSaveLink">保存用リンク</a><button class="editButton">編集</button></p>',
-              '<label><input type="checkbox" class="continuous">開始時に連続再生をONにする</label><br>',
-              '<label><input type="checkbox" class="shuffle">開始時にリストをシャッフルする</label>',
-              '<p class="desc">リンクを右クリックしてコピーやブックマークする事で、現在のプレイリストを保存する事ができます。</p>',
-              '<button class="closeButton">閉じる</button>',
-            '</div></div>',
-          ''].join('')));
-          $savelink   = $dialog.find('a').attr('added', 1);
-          $continuous = $dialog.find('.continuous');
-          $shuffle    = $dialog.find('.shuffle');
-          $dialog.find('.shadow').on('click', closeDialog);
-          $dialog.find('.editButton').on('click', function() {
-            var newTitle = prompt('タイトルを編集', $savelink.text());
-            if (newTitle) {
-              $savelink.text(newTitle);
-              resetLink();
+          if (!$dialog) {
+            $dialog = $('<div id="playlistSaveDialog" />');
+            $dialog.append($([
+              '<div class="shadow"></div>',
+              '<div class="formWindow"><div  class="formWindowInner">',
+                '<h3>プレイリスト保存用リンク(実験中)</h3>',
+                '<p class="link"><a target="_blank" class="playlistSaveLink">保存用リンク</a><button class="editButton">編集</button></p>',
+                '<label><input type="checkbox" class="continuous">開始時に連続再生をONにする</label><br>',
+                '<label><input type="checkbox" class="shuffle">開始時にリストをシャッフルする</label>',
+                '<p class="desc">リンクを右クリックしてコピーやブックマークする事で、現在のプレイリストを保存する事ができます。</p>',
+                '<button class="closeButton">閉じる</button>',
+              '</div></div>',
+            ''].join('')));
+            $savelink   = $dialog.find('a').attr('added', 1);
+            $continuous = $dialog.find('.continuous');
+            $shuffle    = $dialog.find('.shuffle');
+            $dialog.find('.shadow').on('click', closeDialog);
+            $dialog.find('.editButton').on('click', function() {
+              var newTitle = prompt('タイトルを編集', $savelink.text());
+              if (newTitle) {
+                $savelink.text(newTitle);
+                resetLink();
+              }
+            });
+            $continuous.on('click', resetLink);
+            $shuffle   .on('click', resetLink);
+            $dialog.find('.closeButton').on('click', closeDialog);
+
+            $('body').append($dialog);
+          }
+          $savelink.text(
+            $('#playlist .generationMessage')
+              .text()
+              .replace(/^.*?\n/, '')
+              .replace(/^.*「/, '')
+              .replace(/」.*?$/, '')
+              .replace(/ *- \d{4}-\d\d-\d\d \d\d:\d\d$/, '') +
+            ' - ' + WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M', new Date())
+          );
+          $continuous.attr('checked', WatchController.isPlaylistActive());
+          $shuffle   .attr('checked', WatchController.isPlaylistRandom());
+          resetLink();
+          $dialog.addClass('show');
+        },
+        PlaylistMenu = (function($, conf, w, playlist) {
+          var $popup = null, $generationMessage = $('#playlist').find('.generationMessage'), self;
+
+          var
+            enableContinuous = function() {
+              if (playlist.getPlaybackMode() === 'normal') {
+                playlist.setPlaybackMode('continuous');
+              }
+            },
+            createDom = function() {
+              $popup = $('<div/>').addClass('playlistMenuPopup').toggleClass('w_touch', isTouchActive);
+              var $ul = $('<ul/>');
+              $popup.click(function() {
+                self.hide();
+              });
+              var $shuffle = $('<li >シャッフル: 全体</li>').click(function(e) {
+                WatchController.shufflePlaylist();
+                enableContinuous();
+              });
+              $ul.append($shuffle);
+              var $shuffleR = $('<li >シャッフル: 右</li>').click(function(e) {
+                WatchController.shufflePlaylist('right');
+                enableContinuous();
+              });
+              $ul.append($shuffleR);
+
+              var $next = $('<li>検索結果を追加： 次に再生</li>').click(function() {
+                WatchController.appendSearchResultToPlaylist('next');
+                enableContinuous();
+              });
+              $ul.append($next);
+
+              var $insert = $('<li>検索結果を追加： 末尾</li>').click(function() {
+                WatchController.appendSearchResultToPlaylist();
+                enableContinuous();
+              });
+              $ul.append($insert);
+
+              var $clear = $('<li>リストを消去： 全体</li>').click(function() {
+                WatchController.clearPlaylist();
+                watch.PlaylistInitializer.playlist.setPlaybackMode('normal');
+              });
+              $ul.append($clear);
+
+              var $clearLeft = $('<li>リストを消去： 左</li>').click(function() {
+                WatchController.clearPlaylist('left');
+              });
+              $ul.append($clearLeft);
+              var $clearRight = $('<li>リストを消去： 右</li>').click(function() {
+                WatchController.clearPlaylist('right');
+              });
+              $ul.append($clearRight);
+
+              var $saver = $('<li>リストを保存(実験中)</li>').click(function() {
+                openSaveDialog();
+              });
+
+              $ul.append($saver);
+              $popup.append($ul);
+              $('body').append($popup);
+            },
+            show = function() {
+              if ($popup === null) { createDom(); }
+              var offset = $generationMessage.offset(), $window = $(window) , pageBottom = $window.scrollTop() + $window.innerHeight();
+              $popup.css({
+                left: offset.left,
+                top: Math.min(offset.top + 24, pageBottom - $popup.outerHeight())
+              }).show();
+            },
+            hide = function() {
+              if ($popup) { $popup.hide(); }
+            },
+            toggle = function() {
+              if ($popup === null || !$popup.is(':visible')) {
+                show();
+              } else {
+                hide();
+              }
+            };
+
+          $generationMessage.click(function(e) {
+            e.preventDefault();
+            self.toggle();
+          });
+
+          $('body').on('click.watchItLater', function(e) {
+            var tagName = e.target.tagName, className = e.target.className;
+            if (className !== 'generationMessage') {
+              self.hide();
             }
           });
-          $continuous.on('click', resetLink);
-          $shuffle   .on('click', resetLink);
-          $dialog.find('.closeButton').on('click', closeDialog);
-
-          $('body').append($dialog);
-        }
-        $savelink.text(
-          $('#playlist .generationMessage')
-            .text()
-            .replace(/^.*?\n/, '')
-            .replace(/^.*「/, '')
-            .replace(/」.*?$/, '')
-            .replace(/ *- \d{4}-\d\d-\d\d \d\d:\d\d$/, '') +
-          ' - ' + WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M', new Date())
-        );
-        $continuous.attr('checked', WatchController.isPlaylistActive());
-        $shuffle   .attr('checked', WatchController.isPlaylistRandom());
-        resetLink();
-        $dialog.addClass('show');
-      }
-
-      var PlaylistMenu = (function($, conf, w, playlist){
-        var $popup = null, $generationMessage = $('#playlist').find('.generationMessage'), self;
-
-        function enableContinuous() {
-          if (playlist.getPlaybackMode() === 'normal') {
-            playlist.setPlaybackMode('continuous');
-          }
-        }
-
-        function createDom() {
-          $popup = $('<div/>').addClass('playlistMenuPopup').toggleClass('w_touch', isTouchActive);
-          var $ul = $('<ul/>');
-          $popup.click(function() {
-            self.hide();
-          });
-          var $shuffle = $('<li >シャッフル: 全体</li>').click(function(e) {
-            WatchController.shufflePlaylist();
-            enableContinuous();
-          });
-          $ul.append($shuffle);
-          var $shuffleR = $('<li >シャッフル: 右</li>').click(function(e) {
-            WatchController.shufflePlaylist('right');
-            enableContinuous();
-          });
-          $ul.append($shuffleR);
-
-          var $next = $('<li>検索結果を追加： 次に再生</li>').click(function() {
-            WatchController.appendSearchResultToPlaylist('next');
-            enableContinuous();
-          });
-          $ul.append($next);
-
-          var $insert = $('<li>検索結果を追加： 末尾</li>').click(function() {
-            WatchController.appendSearchResultToPlaylist();
-            enableContinuous();
-          });
-          $ul.append($insert);
-
-          var $clear = $('<li>リストを消去： 全体</li>').click(function() {
-            WatchController.clearPlaylist();
-            watch.PlaylistInitializer.playlist.setPlaybackMode('normal');
-          });
-          $ul.append($clear);
-
-          var $clearLeft = $('<li>リストを消去： 左</li>').click(function() {
-            WatchController.clearPlaylist('left');
-          });
-          $ul.append($clearLeft);
-          var $clearRight = $('<li>リストを消去： 右</li>').click(function() {
-            WatchController.clearPlaylist('right');
-          });
-          $ul.append($clearRight);
-
-
-          var $saver = $('<li>リストを保存(実験中)</li>').click(function() {
-            openSaveDialog();
-          });
-
-          $ul.append($saver);
-          $popup.append($ul);
-          $('body').append($popup);
-        }
-
-        function show() {
-          if ($popup === null) { createDom(); }
-          var offset = $generationMessage.offset(), $window = $(window) , pageBottom = $window.scrollTop() + $window.innerHeight();
-          $popup.css({
-            left: offset.left,
-            top: Math.min(offset.top + 24, pageBottom - $popup.outerHeight())
-          }).show();
-        }
-
-        function hide() {
-          if ($popup) { $popup.hide(); }
-        }
-
-        function toggle() {
-          if ($popup === null || !$popup.is(':visible')) {
-            show();
-          } else {
-            hide();
-          }
-        }
-
-        $generationMessage.click(function(e) {
-          e.preventDefault();
-          self.toggle();
-        });
-
-        $('body').on('click.watchItLater', function(e) {
-          var tagName = e.target.tagName, className = e.target.className;
-          if (className !== 'generationMessage') {
-            self.hide();
-          }
-        });
-        self = {
-          show: show,
-          hide: hide,
-          toggle: toggle
-        };
-        return self;
-      })($, conf, w, playlist);
+          self = {
+            show: show,
+            hide: hide,
+            toggle: toggle
+          };
+          return self;
+        })($, conf, w, playlist);
 
 
       // location.hashまでサーバーに送信してしまうので除去する
-      watch.PlayerInitializer.watchPageController.getURLParams_org = watch.PlayerInitializer.watchPageController.getURLParams;
-      watch.PlayerInitializer.watchPageController.getURLParams = $.proxy(function(url) {
-        return this.getURLParams_org(url.replace(/#.*$/, ''));
-      }, watch.PlayerInitializer.watchPageController);
+//      watch.PlayerInitializer.watchPageController.getURLParams_org = watch.PlayerInitializer.watchPageController.getURLParams;
+//      watch.PlayerInitializer.watchPageController.getURLParams = $.proxy(function(url) {
+//        return this.getURLParams_org(url.replace(/#.*$/, ''));
+//      }, watch.PlayerInitializer.watchPageController);
 
       var hashlist = LocationHashParser.getValue('playlist');
       if (hashlist && hashlist.i && hashlist.i.length > 0) {
@@ -8074,11 +8210,10 @@
       $(window).resize(onWindowResize);
 
       Mylist.onDefMylistUpdate(function() {
-        //WatchController.clearDeflistCache();
+        WatchController.clearDeflistCache();
       });
       Mylist.onMylistUpdate(function(info) {
         if (info.action === 'add') {
-          console.log('mylist added');
           WatchController.clearMylistCache(info.groupId);
         }
       });
@@ -8352,7 +8487,7 @@
         }},
         {name: 'shortcutToggleStageVideo',   exec: function(e) {
           WatchController.toggleStageVideo();
-        }},
+        }}
       ];
       for (var v in list) {
         var n = list[v].name;
@@ -8901,15 +9036,44 @@
       $('playerBottomAd').hide();
     }
 
-    function initTest() {
+    function initTest(test) {
+      console.log(test);
+      var assert = test.assert;
       WatchApp.mixin(w.WatchItLater.test.spec, {
         testChannelVideo: function() {
-          var self = this;
-
           ChannelVideoList.load(function(result) {
-            console.log(result);
-            self.assert(result.name === 'ニコニコアプリちゃんねるの動画', 'チャンネル名');
+            console.log('ChannelVideoList.load', result);
+            assert(result.name === 'ニコニコアプリちゃんねるの動画', 'チャンネル名');
           }, {id: '55', ownerName: 'ニコニコアプリちゃんねる'});
+        },
+        testNewNicoSearch: function() {
+          var size = 15;
+          var search = new NewNicoSearch({});
+          search.load({query: 'vocaloid', size: size, join: ['cmsid', 'tags']}, function(err, result) {
+            console.log('testNewNicoSearch.load', err, result);
+            assert(err === null, 'err === null');
+            assert(result[0].dqnid, '先頭にdqnidが含まれる(なんの略？)');
+            assert(typeof result[0].values[0].total   === 'number', 'ヒット件数');
+            assert(result[0].values[0].service === 'video',  '検索の種類');
+
+            assert(result[1].type === 'stats',  'type === stats'); // データの開始？
+
+            assert(result[2].type === 'hits',   'ヒットした内容');
+            assert(result[2].values,            'ヒットした内容');
+            assert(result[2].values.length === size, 'sizeで指定した件数が返る');
+            assert(result[2].values[0].cmsid,   'ヒットした内容にデータが含まれる');
+
+            assert(result[3].type === 'hits',  'type === stats'); // データの終了？
+          });
+        },
+        testSearchSuggest: function() {
+          var suggest = new NicoSearchSuggest({});
+          // TODO: 正攻法ではクロスドメインを越えられないので別解を考える
+          suggest.load('qwatch', function(err, result) {
+            console.log('testSearchSuggest.load', err, result);
+            assert(err === null, 'err === null');
+            assert(result.candidates && result.candidates, 'suggestの中身がある')
+          });
         }
       });
     }
@@ -8945,7 +9109,7 @@
     onWindowResize();
 
     if (conf.debugMode) {
-      initTest();
+      initTest(w.WatchItLater.test);
     }
   })(w);
 
