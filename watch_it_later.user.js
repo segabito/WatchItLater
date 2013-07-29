@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130730
+// @version        1.130730b
 // ==/UserScript==
 
 /**
@@ -1458,7 +1458,7 @@
       }
       .videoExplorerContent .contentItemList .nicorepoResult .itemVideoDescription, .videoExplorerContent .contentItemList .nicorepoResult .videoTitle{
       }
-      .videoExplorerBody.enableMylistDeleteButton.mylist.isMine .videoExplorerContent .contentItemList .item:hover .deleteFromMyMylist {
+      #videoExplorer.w_mylist .videoExplorerBody.enableMylistDeleteButton.isMine .videoExplorerContent .contentItemList .item:hover .deleteFromMyMylist {
         display: inline-block;
       }
 
@@ -6671,6 +6671,7 @@
         $ve = $('#videoExplorer')
           .removeClass('w_user').removeClass('w_upload').removeClass('w_mylist')
           .removeClass('w_deflist').removeClass('w_related').removeClass('w_search'),
+        $body = $ve.find('.videoExplorerBody').removeClass('isMine');
         className = 'w_user';
       switch (type) {
         case ContentType.USER_VIDEO:
