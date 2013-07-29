@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130729
+// @version        1.130730
 // ==/UserScript==
 
 /**
@@ -44,10 +44,12 @@
  * ・綺麗なコード
  */
 
+// * ver 1.130730
+// - キーワード/タグ検索時結果に関連タグが出るようにしてみた(リアルタイムの表示はできない)
+// - ニコニコ新検索を使うようにするための布石
+
 // * ver 1.130729
 // - プレイリスト消えないモードの挙動改善
-//
-//
 
 // * ver 1.130728
 // - プレイリストメニューが一部機能しなくなっていたのを対応
@@ -1846,6 +1848,19 @@
 
       .dummyMylist .editFavorite, .dummyMylist .mylistDetail .mylistNameContainer {
         display: none;
+      }
+
+      .wordSuggestList {
+        background: #ddd; padding: 8px;
+      }
+      .wordSuggestList p{
+        display: inline-block; margin: 4px;
+      }
+      .wordSuggestList li, .wordSuggestList ul {
+        display: inline-block;
+        margin: 0 18px 0 0;
+        list-style: none;
+        word-break: break-all;
       }
 
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
@@ -4562,7 +4577,8 @@
 
       var cache_key = JSON.stringify({url: url, data: data}), cache = Util.Cache.get(cache_key);
       if (cache) {
-        callback(null, cache);
+        setTimeout(function() { callback(null, cache); }, 0);
+        return;
       }
 
       $.ajax({
@@ -4576,7 +4592,6 @@
             callback('fail', 'HTTP status:' + result.status);
             return;
           }
-          var data = {};
           try {
             var data = JSON.parse('[' + result.responseText.split('\n').join(',').replace(/,$/, '') + ']')
             Util.Cache.set(cache_key, data);
@@ -4597,29 +4612,29 @@
     initialize: function(params) {
     },
     load: function(word, callback) {
-      // 現状はクロスドメインを越えられないので意味なし
-      var url = this._base_url + '/suggestion/complete';
+      var url = this._base_url + 'suggestion/complete';
       var cache_key = JSON.stringify({url: url, word: word}), cache = Util.Cache.get(cache_key);
       if (cache) {
-        callback(null, cache);
+        setTimeout(function() {callback(null, cache)}, 0);
+        return;
       }
       $.ajax({
         url: url,
         type: 'POST',
-        cache: true,
         data: word,
-        success: function(result) {
+        complete: function(result) {
+          if (result.status !== 200) {
+            callback('fail', 'HTTP status:' + result.status);
+            return;
+          }
           try {
-            var data = JSON.parse(result);
+            var data = JSON.parse(result.responseText);
             Util.Cache.set(cache_key, data);
             callback(null, data);
           } catch(e) {
             if (conf.debugMode) console.log('Exception: ', e, result);
-            callback('fail', 'JSON format');
+            callback('fail', 'JSON parse');
           }
-        },
-        error: function(error) {
-          callback('fail', error);
         }
       });
     }
@@ -4643,7 +4658,7 @@
 
       var CACHE_KEY = 'videohistory', CACHE_TIME = 1000 * 60 * 1, cacheData = Util.Cache.get(CACHE_KEY);
       if (cacheData) {
-        callback(cacheData);
+        setTimeout(function() {callback(cacheData);}, 0);
         return;
       }
 
@@ -4715,7 +4730,7 @@
       }
       var CACHE_KEY = 'recommend', CACHE_TIME = 1000 * 60 * 1, cacheData = Util.Cache.get(CACHE_KEY);
       if (cacheData) {
-        callback(cacheData);
+        setTimeout(function() {callback(cacheData); }, 0);
         return;
       }
 
@@ -4827,7 +4842,7 @@
 
       var cacheData = Util.Cache.get(baseUrl);
       if (cacheData) {
-        callback(cacheData);
+        setTimeout(function() {callback(cacheData); }, 0);
         return;
       }
 
@@ -5169,7 +5184,7 @@
 
       var cacheData = Util.Cache.get(baseUrl);
       if (cacheData) {
-        callback(cacheData);
+        setTimeout(function() {callback(cacheData); }, 0);
         return;
       }
 
@@ -5322,7 +5337,7 @@
 
         var CACHE_KEY = 'ch-' + id, CACHE_TIME = 1000 * 60 * 1, cacheData = Util.Cache.get(CACHE_KEY);
         if (cacheData) {
-          callback(cacheData);
+          setTimeout(function() {callback(cacheData); }, 0);
           return;
         }
 
@@ -6793,7 +6808,7 @@
             'body.videoExplorer:not(.content-fix) .w_adjusted #videoExplorerMenu {',
               // タグ領域三行分 bodyのスクロール位置をタグの場所にしてる時でもパネルは文章の末端までスクロールできるようにするための細工
               // (四行以上あるときは表示しきれないが)
-              //'padding-bottom: 72px; ',
+              'padding-bottom: 72px; ',
             '}',
             ( bottomHeight >= 250 ?
               [
@@ -8290,55 +8305,158 @@
     function initSearchContent() {
       var ContentType     = WatchApp.ns.components.videoexplorer.model.ContentType;
       var SearchSortOrder = WatchApp.ns.components.videoexplorer.model.SearchSortOrder;
+      var View            = WatchApp.ns.components.videoexplorer.view.content.SearchContentView;
       var vec             = watch.VideoExplorerInitializer.videoExplorerController;
       var explorer        = vec.getVideoExplorer();
       var content         = explorer.getContentList().getContent(ContentType.SEARCH);
+      var suggestList     = new NicoSearchSuggest({});
 
-      vec.searchVideo_org = vec.searchVideo;
-      vec.searchVideo = $.proxy(function(word, type) {
-        AnchorHoverPopup.hidePopup();
-        var originalWord = word;
+//      vec.searchVideo_org = vec.searchVideo;
+//      vec.searchVideo = $.proxy(function(word, type) {
+//        AnchorHoverPopup.hidePopup();
+//        content._originalWord = word;
+//
+//        if (conf.defaultSearchOption && conf.defaultSearchOption !== '') {
+//          if (word.indexOf(conf.defaultSearchOption) < 0 && !word.match(/(sm|nm|so)\d+/)) {
+//            word += " " + conf.defaultSearchOption;
+//          }
+//        }
+//
+//        EventDispatcher.dispatch('onSearchStart', content._originalWord, type);
+//        this.searchVideo_org(word, type);
+//      }, vec);
 
-        if (conf.defaultSearchOption && conf.defaultSearchOption !== '') {
-          if (word.indexOf(conf.defaultSearchOption) < 0 && !word.match(/(sm|nm|so)\d+/)) {
-            word += " " + conf.defaultSearchOption;
+      content._originalWord = '';
+      content.refresh_org = content.refresh;
+      content.refresh = $.proxy(function(params, callback) {
+        var word = WatchApp.get(params, 'searchWord', 'string', '');
+        var type = WatchApp.get(params, 'searchType', 'string', this.getSearchType());
+        if (typeof word === 'string' && word.length > 0) {
+          this._originalWord = word;
+
+          if (conf.defaultSearchOption && conf.defaultSearchOption !== '') {
+            if (word.indexOf(conf.defaultSearchOption) < 0 && !word.match(/(sm|nm|so)\d+/)) {
+              params.searchWord += " " + conf.defaultSearchOption;
+            }
           }
         }
+        AnchorHoverPopup.hidePopup();
+        EventDispatcher.dispatch('onSearchStart', this._originalWord, type);
+        this.refresh_org(params, callback);
+      }, content);
 
-        EventDispatcher.dispatch('onSearchStart', originalWord, type);
-        this.searchVideo_org(word, type);
-      }, vec);
 
-// 検索のフック  しばらく使わなそう
-//      content.refresh_org = content.refresh;
-//      content.refresh = $.proxy(function(params, callback) {
-//        //if (conf.debugMode) console.log('search refresh! ', params, callback);
-//        this.refresh_org(params, callback);
-//      }, content);
+      var SuggestListView = function() { this.initialize.apply(this, arguments);};
+      SuggestListView.prototype = {
+        _$view: null,
+        _suggestList: null,
+        initialize: function(params) {
+          this._suggestList = params.suggestList;
+          this._$view       = params.$view;
+          this._$list       = this._$view.find('ul');
+        },
+        getView: function() {
+          return this._$view;
+        },
+        detach: function() {
+          this._$view.detach();
+        },
+        update: function(candidates) {
+          if (!candidates || candidates.length < 1) {
+            this.detach();
+            return;
+          }
+          var $ul = this._$list.empty();
+          for (var i = 0, len = candidates.length; i < len; i++) {
+            $ul.append(this._create$tag(candidates[i]));
+          }
+        },
+        clear: function() {
+          this._$list.empty();
+        },
+        _create$tag: function(text) {
+          var
+            $a = $('<a/>')
+              .html(text)
+              .attr('href', 'http://search.nicovideo.jp/video/tag/' + encodeURIComponent(text))
+              .on('click', function(e) {
+                if (e.button !== 0 || e.metaKey || e.shiftKey || e.ctrlKey || e.altKey) return;
+                e.preventDefault();
+                WatchController.nicoSearch(text);
+              }),
+            $tag = $('<li/>').append($a);
+          return $tag;
+        }
+      };
 
-      // ソート順を記憶するためのフック
-      var proto = SearchSortOrder.prototype;
-      proto.getSort_org  = proto.getSort;
-      proto.getSort  = function() {
-        return conf.searchSortType;
-      };
-      proto.setSort_org  = proto.setSort;
-      proto.setSort  = function(type, sort)  {
-        //console.log('setSort', type, sort);
-        conf.setValue('searchSortType', sort);
-        this.setSort_org(type, sort);
-      };
+      var
+        overrideSearchSortOrder = function(proto) { // ソート順を記憶するためのフック
+          proto.getSort_org  = proto.getSort;
+          proto.getSort = function() {
+            return conf.searchSortType;
+          };
 
-      proto.getOrder_org = proto.getOrder;
-      proto.getOrder = function() {
-        return conf.searchSortOrder;
-      };
-      proto.setOrder_org = proto.setOrder;
-      proto.setOrder = function(type, order) {
-        //console.log('setOrder', type,  order);
-        conf.setValue('searchSortOrder', order);
-        this.setOrder_org(type, order);
-      };
+          proto.setSort_org  = proto.setSort;
+          proto.setSort = function(type, sort)  {
+            conf.setValue('searchSortType', sort);
+            this.setSort_org(type, sort);
+          };
+
+          proto.getOrder_org = proto.getOrder;
+          proto.getOrder = function() {
+            return conf.searchSortOrder;
+          };
+
+          proto.setOrder_org = proto.setOrder;
+          proto.setOrder = function(type, order) {
+            conf.setValue('searchSortOrder', order);
+            this.setOrder_org(type, order);
+          };
+        },
+        overrideSearchContentView = function(proto, suggestList) {
+          var suggestListView = new SuggestListView({
+            suggestList: suggestList,
+            $view: $('<div class="wordSuggestList"><p>関連タグ: </p><ul></ul></div>')
+          });
+
+          proto._updateSuggestList = function() {
+            var word = this._content._originalWord; //this._content.getSearchWord();
+            suggestListView.clear();
+            if (typeof word === 'string' && word.length > 0) {
+              this._$header.append(suggestListView.getView());
+              suggestList.load(word, function(err, result) {
+                if (conf.debugMode) { console.log('SearchContentView._updateSuggestList', err, result); }
+                if (err) {
+                  if (conf.debugMode) { console.log('load suggest fail', err, result); }
+                } else {
+                  suggestListView.update(result.candidates);
+                }
+              });
+            }
+          };
+
+          proto.detach_org = proto.detach;
+          proto.detach = function() {
+            this.detach_org();
+            suggestListView.detach();
+          };
+
+          proto.onUpdate_org = proto.onUpdate;
+          proto.onUpdate = function() {
+            this.onUpdate_org();
+            this._updateSuggestList();
+          };
+
+          proto.onError_org = proto.onError;
+          proto.onError = function() {
+            this.onError_org();
+            this._updateSuggestList();
+          };
+
+        };
+
+      overrideSearchSortOrder(SearchSortOrder.prototype);
+      overrideSearchContentView(View.prototype, suggestList);
 
     } // end initSearchContent
 
@@ -9021,7 +9139,9 @@
 
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
 
-      $('#videoHeaderMenu .searchText input').attr('accesskey', '@');
+      $('#videoHeaderMenu .searchText input').attr('accesskey', '@').on('focus', function() {
+        WatchController.scrollTop(0, 400);
+      });
 
       if (conf.debugMode) {
         watch.PopupMarqueeInitializer.popupMarqueeViewController.itemList.addEventListener('popup', function(body) {
@@ -9037,7 +9157,6 @@
     }
 
     function initTest(test) {
-      console.log(test);
       var assert = test.assert;
       WatchApp.mixin(w.WatchItLater.test.spec, {
         testChannelVideo: function() {
@@ -9049,16 +9168,16 @@
         testNewNicoSearch: function() {
           var size = 15;
           var search = new NewNicoSearch({});
-          search.load({query: 'vocaloid', size: size, join: ['cmsid', 'tags']}, function(err, result) {
+          search.load({query: 'vocaloid', size: size, join: ['cmsid', 'tags', 'start_time', 'thumbnail_url']}, function(err, result) {
             console.log('testNewNicoSearch.load', err, result);
             assert(err === null, 'err === null');
             assert(result[0].dqnid, '先頭にdqnidが含まれる(なんの略？)');
-            assert(typeof result[0].values[0].total   === 'number', 'ヒット件数');
+            assert(typeof result[0].values[0].total === 'number', 'ヒット件数');
             assert(result[0].values[0].service === 'video',  '検索の種類');
 
             assert(result[1].type === 'stats',  'type === stats'); // データの開始？
 
-            assert(result[2].type === 'hits',   'ヒットした内容');
+            assert(result[2].type === 'hits',   'type === hits');
             assert(result[2].values,            'ヒットした内容');
             assert(result[2].values.length === size, 'sizeで指定した件数が返る');
             assert(result[2].values[0].cmsid,   'ヒットした内容にデータが含まれる');
@@ -9068,8 +9187,7 @@
         },
         testSearchSuggest: function() {
           var suggest = new NicoSearchSuggest({});
-          // TODO: 正攻法ではクロスドメインを越えられないので別解を考える
-          suggest.load('qwatch', function(err, result) {
+          suggest.load('MMD', function(err, result) {
             console.log('testSearchSuggest.load', err, result);
             assert(err === null, 'err === null');
             assert(result.candidates && result.candidates, 'suggestの中身がある')
