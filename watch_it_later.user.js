@@ -44,6 +44,10 @@
  * ・綺麗なコード
  */
 
+// * ver 1.130731
+// - 関連タグの取得はもっといいAPIがあった
+// - ニコニコ新検索を使うようにするための布石
+
 // * ver 1.130730
 // - キーワード/タグ検索時結果に関連タグが出るようにしてみた(リアルタイムの表示はできない)
 // - ニコニコ新検索を使うようにするための布石
@@ -1850,13 +1854,13 @@
         display: none;
       }
 
-      .wordSuggestList {
+      .relatedTagList {
         background: #ddd; padding: 8px;
       }
-      .wordSuggestList p{
+      .relatedTagList p{
         display: inline-block; margin: 4px;
       }
-      .wordSuggestList li, .wordSuggestList ul {
+      .relatedTagList li, .relatedTagList ul {
         display: inline-block;
         margin: 0 18px 0 0;
         list-style: none;
@@ -2258,10 +2262,11 @@
     return pt;
   })(conf, w);
 
+
   /**
    * 通信用
    */
-  w.WatchItLater = {
+  var WatchItLater = {
     config: {
       get: function(varName) {
         return conf.getValue(varName);
@@ -2272,32 +2277,49 @@
     },
     test: {
       assert: function(v, m) {
-        if (v) {
-          console.log('%c OK: ',  'color: black; background: lime;', v,  m);
+        if (v === true) {
+          console.log('%c OK: ',  'color: black; background: lime;',  m);
         } else {
-          console.log('%cFail: ', 'color: white; background: red;',  v,  m);
+          console.log('%cFail: ', 'color: white; background: red;',   m);
+          throw {message: 'Fail'};
+        }
+      },
+      expect: function(a) {
+        try {
+          var assert = WatchItLater.test.assert, exp = {
+            toBeTrue:    function(   desc) { assert(a === true      , desc); },
+            toBeFalse:   function(   desc) { assert(a === false     , desc); },
+            toEqual:     function(b, desc) { assert(a === b         , desc); },
+            toBeNull:    function(   desc) { assert(a === null      , desc); },
+            toBeNotNull: function(   desc) { assert(a !== null      , desc); },
+            toBeDefined: function(   desc) { assert(a !== undefined , desc); },
+            toBeTruthy:  function(   desc) { assert(a ? true : false, desc); }
+          };
+          return exp;
+        } catch(e) {
+          console.log('%c', a);
         }
       },
       spec: {},
       run: function(name) {
         if (name) {
+          console.log('%c run : ' + name, 'background: #8ff;');
           $.proxy(this.spec[name], this)();
           return;
         }
-        //console.log(this.spec);
         for(var v in this.spec) {
-          //console.log(v, this.spec[v]);
           if (!v.match(/^test/)) continue;
-          //var
           try {
             $.proxy(this.spec[v], this)();
           } catch (e) {
-            console.log('%cException: test=' + v + ';', 'color: white; background: red;', e)
+            console.log('%cException: test=' + v + ';', 'color: white; background: red;', e);
+            console.trace();
           }
         }
       }
     }
   };
+  w.WatchItLater = WatchItLater;
 
 
   var EventDispatcher = (function(conf, w) {
@@ -2333,7 +2355,7 @@
       _dispatch: _dispatch // コンソール汚したくない用
     };
   })(conf, w);
-  w.WatchItLater.event = EventDispatcher;
+  WatchItLater.event = EventDispatcher;
 
   /*
   * 通算視聴回数をカウント。 カウントしても意味はないけど、どれだけ無駄な時間を費やしたかを知りたくて実装。
@@ -2355,7 +2377,7 @@
     };
     return self;
   })(conf, w);
-  w.WatchItLater.counter = WatchCounter;
+  WatchItLater.counter = WatchCounter;
 
   /**
    *  動画タグ取得とポップアップ
@@ -4209,7 +4231,7 @@
       }
     };
   })(w);
-  w.WatchItLater.WatchController = WatchController;
+  WatchItLater.WatchController = WatchController;
 
   var Util = (function() {
     var Cache = {
@@ -4248,7 +4270,7 @@
     };
     return self;
   })();
-  w.WatchItLater.Util = Util;
+  WatchItLater.Util = Util;
 
   var NicoNews = (function() {
     var WatchApp = null, watch = null, $ = null, WatchJsApi = null, initialized = false;
@@ -4335,8 +4357,8 @@
   /**
    *  マイリストや検索API互換形式のデータを返すやつ
    */
-  var SearchResult = function() { this.initialize.apply(this, arguments); };
-  SearchResult.prototype = {
+  var DummyMylist = function() { this.initialize.apply(this, arguments); };
+  DummyMylist.prototype = {
     banner: '',
     id: '-100',
     sort: '4',
@@ -4409,7 +4431,6 @@
         var tm = this._baseCreateTime - 60000 * this.itemCount;
         item.create_time = tm;//WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date(tm));
       }
-      //console.log(item.create_time, item.first_retrieve, item.title);
       this.rawData.list.push(item);
       this.itemCount = this.rawData.list.length;
       this.setPage(this.page);
@@ -4419,7 +4440,6 @@
         var tm = this._baseCreateTime + 60000 * this.itemCount;
         item.create_time = tm;//WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date(tm));
       }
-      //console.log(item.create_time);
       this.rawData.list.unshift(item);
       this.itemCount = this.rawData.list.length;
       this.setPage(this.page);
@@ -4445,7 +4465,6 @@
       ])[sortId],
       order = (sortId % 2 === 0) ? 'asc' : 'desc';
 
-      //console.log(sortKey, order);
       if (!sortKey) { return; }
       var compare= {
         asc:   function(a, b) { return (a[sortKey]   > b[sortKey]  ) ? 1 : -1; },
@@ -4469,15 +4488,14 @@
         order = (sortId % 2 === 1) ? 'iasc' : 'idesc';
       }
       this.sort = this.rawData.sort = sortId.toString();
-      //console.log(this.rawData.list);
       this.rawData.list.sort(compare[order]);
       this.items = this.rawData.list.slice(0, 32);
       this.list  = this.rawData.list.slice(0);
     }
   };
 
-  var SearchResultVideo = function() { this.initialize.apply(this, arguments); };
-  SearchResultVideo.prototype = {
+  var DummyMylistVideo = function() { this.initialize.apply(this, arguments); };
+  DummyMylistVideo.prototype = {
     id: 0,
     title: '',
     length: 0,
@@ -4559,19 +4577,20 @@
       var url = this._base_url;
       var data = {};
       data.query   = params.query   || 'Qwatch';
-      data.service = params.service || ['video'];
+      data.service = params.service || ['video']; // video video_tag
       data.search  = params.search  || ['title', 'tags', 'description'];
       data.join    = params.join    || [
         // TODO:投稿者IDを取得する方法がないか？
           'cmsid', 'title', 'description', 'thumbnail_url', 'start_time',
-          'view_counter', 'comment_counter', 'mylist_counter', 'length_seconds', 'userid'
+          'view_counter', 'comment_counter', 'mylist_counter', 'length_seconds', 'userid',
+          'channel_id', 'main_community_id', 'ss_adlut'
         ];
       data.filters = params.filters || [{}];
       data.sort_by = params.sort_by || 'start_time';
       data.order   = params.order   || 'desc';
       data.timeout = params.timeout || 10000;
-      data.issuer  = params.issuer  || 'pc'; //'watchItLater';
-      data.reason  = params.reason  || 'watchItLater';
+      data.issuer  = params.issuer  || 'pc';
+      data.reason  = params.reason  || 'user'; // 'watchItLater';
       data.size    = params.size    || 32;
       data.from    = params.from    || 0;
 
@@ -4593,20 +4612,125 @@
             return;
           }
           try {
-            var data = JSON.parse('[' + result.responseText.split('\n').join(',').replace(/,$/, '') + ']')
+            var lines = result.responseText.split('\n');
+            var data = [JSON.parse(lines[0]), JSON.parse(lines[1]), JSON.parse(lines[2]), JSON.parse(lines[3])];
             Util.Cache.set(cache_key, data);
-            callback(null, data);
           } catch(e) {
             if (conf.debugMode) console.log('Exception: ', e, result);
             callback('fail', 'JSON syntax');
+            return;
           }
+          callback(null, data);
         }
       });
     }
   };
 
+  var NewNicoSearchWrapper = function() { this.initialize.apply(this, arguments); };
+  NewNicoSearchWrapper.prototype = {
+    _search: null,
+    sortTable: {f: 'start_time', v: 'view_counter', r: 'comment_counter', m: 'mylist_counter', l: 'length_seconds'},
+    initialize: function(params) {
+      this._search = params.search;
+    },
+    _buildSearchQuery: function(params) {
+      var query = {filters: []};
+      var sortTable = this.sortTable;
+      query.query   = params.word;
+      query.search  = params.type === 'tag' ? ['tags'] : ['tags', 'title', 'description'];
+      query.sort_by = params.sort && sortTable[params.sort] ? sortTable[params.sort] : 'last_comment_time';
+      query.order   = params.order === 'd' ? 'desc' : 'asc';
+      query.from    = params.page ? Math.max(parseInt(params.page, 10) - 1, 0) * 32 : 0;
+
+      var now = Date.now();
+      if (params.u === '1h') {
+        query.filters.push(this._buildStartTimeRangeFilter(new Date(now -  1 *  1 * 60  * 60 * 1000)));
+      } else
+      if (params.u === '24h' || params.u === '1d') {
+        query.filters.push(this._buildStartTimeRangeFilter(new Date(now -  1 * 24 * 60  * 60 * 1000)));
+      } else
+      if (params.u === '1w') {
+        query.filters.push(this._buildStartTimeRangeFilter(new Date(now -  7 * 24 * 60  * 60 * 1000)));
+      } else
+      if (params.u === '1m') { // TODO: 真面目に一ヶ月引く？
+        query.filters.push(this._buildStartTimeRangeFilter(new Date(now - 30 * 24 * 60  * 60 * 1000)));
+      }
+
+      if (params.l === 'short') { // 5分以内
+        query.filters.push(this._buildLengthSecondsRangeFilter(0, 60 * 5));
+      } else
+      if (params.l === 'long' ) { // 20分以上
+        query.filters.push(this._buildLengthSecondsRangeFilter(60 * 20));
+      }
+
+      // TODO: これの調査 → {field: 'ss_adult', type: 'equal', value: false}
+
+      return query;
+    },
+    _buildStartTimeRangeFilter: function(from, to) {
+      var format = function(date) { return WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', date); };
+      var range = {field: 'start_time',     type: 'range', include_lower: true, };
+      range.from = format(from);
+      if (to) range.to = format(to);
+      return range;
+    },
+    _buildLengthSecondsRangeFilter: function(from, to) {
+      var range = {field: 'length_seconds', type: 'range'};
+      if (to) { // xxx ～ xxx
+        range.from = Math.min(from, to);
+        range.to   = Math.max(from, to);
+        range.include_lower = range.include_upper = true;
+      } else { // xxx以上
+        range.from = from;
+        range.include_lower = true;
+      }
+      return range;
+    },
+    load: function(params, callback) {
+      var query = this._buildSearchQuery(params);
+      this._search.load(query, $.proxy(function(err, result) {
+        this.onLoad(err, result, callback);
+      }, this));
+    },
+    onLoad: function(err, result, callback) {
+      if (err) {
+        if (conf.debugMode) {console.log('load fail', err, result);}
+        callback('fail', {message: '通信に失敗しました1'});
+        return;
+      }
+      var searchResult;
+        searchResult = {
+          count: result[0].values[0].total,
+          list: []
+        };
+        var items = result[2].values, len = items.length;
+        for (var i = 0; i < len; i++) {
+          var item = items[i];
+          searchResult.list.push({
+            id:             item.cmsid,
+            type:           'video',
+            length:         item.length_seconds ?
+                              Math.floor(item.length_seconds / 60) + ':' + (item.length_seconds % 60 + 100).toString().substr(1) : '',
+            mylist_counter: item.mylist_counter,
+            view_counter:   item.view_counter,
+            num_res:        item.comment_counter,
+            first_retrieve: item.start_time,
+            create_time:    item.start_time,
+            thumnail_url:   item.thumbnail_url,
+            title:          item.title,
+            description_short: item.description,
+            length_seconds: item.length_seconds,
+            channel_id:     item.channel_id,
+            main_community_id: item.main_community_id
+          });
+        }
+      callback(null, searchResult);
+    }
+  };
+
   var NicoSearchSuggest = function() { this.initialize.apply(this, arguments); };
-  NicoSearchSuggest.API_BASE_URL = 'http://sug.search.nicovideo.jp/', //'/suggestion/complete';
+  NicoSearchSuggest.API_BASE_URL = 'http://sug.search.nicovideo.jp/'; //'/suggestion/complete';
+  // sug.search.nicovideo.jpはリアルタイムの入力補完用？ で、関連タグはhttp://api.search.nicovideo.jp/api/tag/ っぽい
   NicoSearchSuggest.prototype = {
     _base_url: NicoSearchSuggest.API_BASE_URL,
     initialize: function(params) {
@@ -4615,7 +4739,7 @@
       var url = this._base_url + 'suggestion/complete';
       var cache_key = JSON.stringify({url: url, word: word}), cache = Util.Cache.get(cache_key);
       if (cache) {
-        setTimeout(function() {callback(null, cache)}, 0);
+        setTimeout(function() { callback(null, cache); }, 0);
         return;
       }
       $.ajax({
@@ -4627,18 +4751,58 @@
             callback('fail', 'HTTP status:' + result.status);
             return;
           }
+          var data;
           try {
-            var data = JSON.parse(result.responseText);
-            Util.Cache.set(cache_key, data);
-            callback(null, data);
+            data = JSON.parse(result.responseText);
           } catch(e) {
             if (conf.debugMode) console.log('Exception: ', e, result);
-            callback('fail', 'JSON parse');
+            callback('fail', 'JSON syntax');
           }
+          Util.Cache.set(cache_key, data);
+          callback(null, data);
         }
       });
     }
   };
+  var NicoSearchRelatedTag = function() { this.initialize.apply(this, arguments); };
+  NicoSearchRelatedTag.API_BASE_URL = 'http://api.search.nicovideo.jp/';
+  // sug.search.nicovideo.jpはリアルタイムの入力補完用？ で、詳細はhttp://api.search.nicovideo.jp/api/tag/ に投げた方がよさそう
+  NicoSearchRelatedTag.prototype = {
+    _base_url: NicoSearchRelatedTag.API_BASE_URL,
+    initialize: function(params) {
+    },
+    load: function(word, callback) {
+      var url = this._base_url + 'api/tag/';
+      var cache_key = JSON.stringify({url: url, word: word}), cache = Util.Cache.get(cache_key);
+      if (cache) {
+        setTimeout(function() { callback(null, cache); }, 0);
+        return;
+      }
+      var query = {query: word, service: ['tag_video'], from: 0, size: 15, timeout: 10000, issuer: 'pc', reason: 'user'};
+      $.ajax({
+        url: url,
+        type: 'POST',
+        data: JSON.stringify(query),
+        complete: function(result) {
+          if (result.status !== 200) {
+            callback('fail', 'HTTP status:' + result.status);
+            return;
+          }
+          var data;
+          try {
+            var lines = result.responseText.split('\n');
+            data = JSON.parse(lines[0]);
+          } catch(e) {
+            if (conf.debugMode) console.log('Exception: ', e, result);
+            callback('fail', 'JSON syntax');
+            return;
+          }
+          Util.Cache.set(cache_key, data);
+          callback(null, data);
+        }
+      });
+    }
+ };
 
 
   /**
@@ -4662,7 +4826,7 @@
         return;
       }
 
-      var result = new SearchResult({
+      var result = new DummyMylist({
         id: '-1',
         sort: '1',
         name: myNick + 'の視聴履歴',
@@ -4684,7 +4848,7 @@
               postedAt  = '20' + $meta.find('.posttime').text().replace(/(年|月)/g, '-').replace(/(日| *投稿)/g, ''),
               thumbnail = $item.find('.thumbContainer a .video').attr('src');
 
-            var item = new SearchResultVideo({
+            var item = new DummyMylistVideo({
               id: id,
               length: duration,
               mylist_counter: mylistCnt,
@@ -4734,7 +4898,7 @@
         return;
       }
 
-      var result = new SearchResult({
+      var result = new DummyMylist({
         id: '-2',
         sort: '1',
         name: 'あなたにオススメの動画'
@@ -4763,7 +4927,7 @@
             if (histories[video.id]) {
               delete histories[video.id];
             }
-            var item = new SearchResultVideo({
+            var item = new DummyMylistVideo({
               id: video.id,
               length: video.length,
               mylist_counter: video.mylist_counter,
@@ -4848,7 +5012,7 @@
 
       var
         last_timeline = false,
-        result = new SearchResult({
+        result = new DummyMylist({
           id: '-10',
           sort: '1',
           default_sort: '1',
@@ -4902,7 +5066,7 @@
                 ownerPage = $item.find('.log-body a:last').attr('href');
               }
 
-              var item = new SearchResultVideo({
+              var item = new DummyMylistVideo({
                 id: id,
                 length: duration,
                 mylist_counter: mylistCnt,
@@ -5122,13 +5286,13 @@
         $x = $(xml),
         title = $x.find('channel title:first').text(),
         $items = $x.find('channel item'),
-        result = new SearchResult({
+        result = new DummyMylist({
           name: title,
           id: '-100'
         });
       $items.each(function() {
         var video = parseRssItem($(this));
-        var item = new SearchResultVideo({
+        var item = new DummyMylistVideo({
           id: video.id,
           length: video.duration,
           mylist_counter: video.mylistCnt,
@@ -5188,7 +5352,7 @@
         return;
       }
 
-      var result = new SearchResult({
+      var result = new DummyMylist({
         name: '総合ランキング',
         id: '-100'
       });
@@ -5341,7 +5505,7 @@
           return;
         }
 
-        var result = new SearchResult({
+        var result = new DummyMylist({
           id: 'ch' + id,
           sort: '1',
           name: ownerName + 'の動画',
@@ -5369,7 +5533,7 @@
           var id = $item.find('.title a').attr('href').split('/').reverse()[0];
           var $counts = $item.find('.counts'), first_retrieve = $item.find('.time var').attr('title');
           w.$item = $item;
-          result.push(new SearchResultVideo({
+          result.push(new DummyMylistVideo({
             id: id,
             length: $item.find('.length').text(),
             mylist_counter: $counts.find('.mylist  var').text().split(',').join(''),
@@ -6444,8 +6608,8 @@
             }
           }, 0);
         };
-      w.WatchItLater.onDeleteFromMyMylistClick = onDeleteFromMyMylistClick;
-      w.WatchItLater.onShowLargeThumbnailClick = onShowLargeThumbnailClick;
+      WatchItLater.onDeleteFromMyMylistClick = onDeleteFromMyMylistClick;
+      WatchItLater.onShowLargeThumbnailClick = onShowLargeThumbnailClick;
 
 
       var content = explorer.getContentList().getContent(ContentType.MYLIST_VIDEO);
@@ -8310,22 +8474,8 @@
       var vec             = watch.VideoExplorerInitializer.videoExplorerController;
       var explorer        = vec.getVideoExplorer();
       var content         = explorer.getContentList().getContent(ContentType.SEARCH);
-      var suggestList     = new NicoSearchSuggest({});
+      var relatedTag      = new NicoSearchRelatedTag({});
 
-//      vec.searchVideo_org = vec.searchVideo;
-//      vec.searchVideo = $.proxy(function(word, type) {
-//        AnchorHoverPopup.hidePopup();
-//        content._originalWord = word;
-//
-//        if (conf.defaultSearchOption && conf.defaultSearchOption !== '') {
-//          if (word.indexOf(conf.defaultSearchOption) < 0 && !word.match(/(sm|nm|so)\d+/)) {
-//            word += " " + conf.defaultSearchOption;
-//          }
-//        }
-//
-//        EventDispatcher.dispatch('onSearchStart', content._originalWord, type);
-//        this.searchVideo_org(word, type);
-//      }, vec);
 
       content._originalWord = '';
       content.refresh_org = content.refresh;
@@ -8347,12 +8497,12 @@
       }, content);
 
 
-      var SuggestListView = function() { this.initialize.apply(this, arguments);};
-      SuggestListView.prototype = {
+      var RelatedTagView = function() { this.initialize.apply(this, arguments); };
+      RelatedTagView.prototype = {
         _$view: null,
-        _suggestList: null,
+        _relatedTag: null,
         initialize: function(params) {
-          this._suggestList = params.suggestList;
+          this._relatedTag = params.relatedTag;
           this._$view       = params.$view;
           this._$list       = this._$view.find('ul');
         },
@@ -8369,7 +8519,7 @@
           }
           var $ul = this._$list.empty();
           for (var i = 0, len = candidates.length; i < len; i++) {
-            $ul.append(this._create$tag(candidates[i]));
+            $ul.append(this._create$tag(candidates[i].tag));
           }
         },
         clear: function() {
@@ -8414,23 +8564,23 @@
             this.setOrder_org(type, order);
           };
         },
-        overrideSearchContentView = function(proto, suggestList) {
-          var suggestListView = new SuggestListView({
-            suggestList: suggestList,
-            $view: $('<div class="wordSuggestList"><p>関連タグ: </p><ul></ul></div>')
+        overrideSearchContentView = function(proto, relatedTag) {
+          var relatedTagView = new RelatedTagView({
+            relatedTag: relatedTag,
+            $view: $('<div class="relatedTagList"><p>関連タグ: </p><ul></ul></div>')
           });
 
-          proto._updateSuggestList = function() {
+          proto._updateRelatedTag = function() {
             var word = this._content._originalWord; //this._content.getSearchWord();
-            suggestListView.clear();
+            relatedTagView.clear();
             if (typeof word === 'string' && word.length > 0) {
-              this._$header.append(suggestListView.getView());
-              suggestList.load(word, function(err, result) {
-                if (conf.debugMode) { console.log('SearchContentView._updateSuggestList', err, result); }
+              this._$header.append(relatedTagView.getView());
+              relatedTag.load(word, function(err, result) {
+                if (conf.debugMode) { console.log('SearchContentView._updateRelatedTag', err, result); }
                 if (err) {
                   if (conf.debugMode) { console.log('load suggest fail', err, result); }
                 } else {
-                  suggestListView.update(result.candidates);
+                  relatedTagView.update(result.values);
                 }
               });
             }
@@ -8439,25 +8589,25 @@
           proto.detach_org = proto.detach;
           proto.detach = function() {
             this.detach_org();
-            suggestListView.detach();
+            relatedTagView.detach();
           };
 
           proto.onUpdate_org = proto.onUpdate;
           proto.onUpdate = function() {
             this.onUpdate_org();
-            this._updateSuggestList();
+            this._updateRelatedTag();
           };
 
           proto.onError_org = proto.onError;
           proto.onError = function() {
             this.onError_org();
-            this._updateSuggestList();
+            this._updateRelatedTag();
           };
 
         };
 
       overrideSearchSortOrder(SearchSortOrder.prototype);
-      overrideSearchContentView(View.prototype, suggestList);
+      overrideSearchContentView(View.prototype, relatedTag);
 
     } // end initSearchContent
 
@@ -9158,40 +9308,96 @@
     }
 
     function initTest(test) {
-      var assert = test.assert;
-      WatchApp.mixin(w.WatchItLater.test.spec, {
+      var expect = test.expect;
+      WatchApp.mixin(WatchItLater.test.spec, {
         testChannelVideo: function() {
           ChannelVideoList.load(function(result) {
             console.log('ChannelVideoList.load', result);
-            assert(result.name === 'ニコニコアプリちゃんねるの動画', 'チャンネル名');
+            expect(result.name).toEqual('ニコニコアプリちゃんねるの動画', 'チャンネル名');
           }, {id: '55', ownerName: 'ニコニコアプリちゃんねる'});
         },
         testNewNicoSearch: function() {
           var size = 15;
           var search = new NewNicoSearch({});
-          search.load({query: 'vocaloid', size: size, join: ['cmsid', 'tags', 'start_time', 'thumbnail_url']}, function(err, result) {
+          search.load({query: 'vocaloid', size: size}, function(err, result) {
             console.log('testNewNicoSearch.load', err, result);
-            assert(err === null, 'err === null');
-            assert(result[0].dqnid, '先頭にdqnidが含まれる(なんの略？)');
-            assert(typeof result[0].values[0].total === 'number', 'ヒット件数');
-            assert(result[0].values[0].service === 'video',  '検索の種類');
+            expect(err).toBeNull('err === null');
+            expect(result[0].dqnid)                 .toBeTruthy('先頭にdqnidが含まれる(なんの略？)');
+            expect(typeof result[0].values[0].total).toEqual('number', 'ヒット件数');
+            expect(result[0].values[0].service)     .toEqual('video',  '検索の種類');
 
-            assert(result[1].type === 'stats',  'type === stats'); // データの開始？
+            expect(result[1].type).toEqual('stats',  'type === stats'); // データの開始？
 
-            assert(result[2].type === 'hits',   'type === hits');
-            assert(result[2].values,            'ヒットした内容');
-            assert(result[2].values.length === size, 'sizeで指定した件数が返る');
-            assert(result[2].values[0].cmsid,   'ヒットした内容にデータが含まれる');
+            expect(result[2].type           ).toEqual   ('hits',   'type === hits');
+            expect(result[2].values         ).toBeTruthy('ヒットした内容');
+            expect(result[2].values.length  ).toEqual   (size, 'sizeで指定した件数が返る');
+            expect(result[2].values[0].cmsid).toBeTruthy('ヒットした内容にデータが含まれる');
 
-            assert(result[3].type === 'hits',  'type === stats'); // データの終了？
+            expect(result[3].type).toEqual('hits',  'type === stats'); // データの終了？
+          });
+        },
+        testNewNicoSearchWrapperQuery: function() {
+          var wrapper = new NewNicoSearchWrapper({search: {}});
+          var params = {
+            word: 'VOCALOID',
+            u: '1m',
+            l: 'short',
+            sort: 'l',
+            order: 'a',
+            type: 'tag',
+            page: 3
+          };
+          var query = wrapper._buildSearchQuery(params);
+
+          console.log(params, query);
+          expect(query.query).toEqual(params.word,        '検索ワードのセット');
+          expect(query.from).toEqual(params.page * 32 - 32,    'ページ番号 -> fromの変換');
+          expect(query.sort_by).toEqual('length_seconds', 'l -> length_seconds');
+          expect(query.order).toEqual('asc',              'a -> asc');
+
+          // TODO:
+          expect(JSON.stringify(query.search).indexOf('["tags"]') >= 0).toBeTrue('タグ検索');
+          var filters = JSON.stringify(query.filters);
+          //console.log(filters);
+          expect(query.filters.length >= 2).toBeTrue('filters.lengthが2以上');
+          expect(filters.indexOf('"field":"start_time"') >= 0).toBeTrue('filtersにstart_timeが含まれる');
+          expect(filters.indexOf('"field":"length_seconds"') >= 0).toBeTrue('filtersにlength_secondsが含まれる');
+
+        },
+        testNewNicoSearchWrapper: function() {
+          console.log('testNewNicoSearchWrapper');
+          var search = new NewNicoSearch({});
+          var wrapper = new NewNicoSearchWrapper({search: search});
+          wrapper.load({word: 'ぬこぬこ動画'}, function(err, result) {
+            console.log('testNewNicoSearchWrapper.load', err, result);
+            expect(err).toBeNull('err === null');
+            expect(typeof result.count).toEqual('number', '件数がnumber');
+            expect(result.count > 0).toBeTrue('件数が入っている');
+            expect(result.list.length).toBeTruthy('データが入っている');
+            expect(result.list[0].type).toEqual('video', 'type === "video"');
+            expect(/^\d+:\d+/.test(result.list[0].length)).toBeTrue('動画長がmm:dd形式で入ってる');
+          });
+        },
+        testNicoSearchRelatedTag: function() {
+          var related = new NicoSearchRelatedTag({});
+          related.load('voiceroid', function(err, result) {
+            console.log('testNicoSearchRelatedTag.load', err, result);
+            console.log(expect(err));
+            expect(err).toBeNull('err === null');
+            expect(result.type).toEqual('tags', 'type === "tags"');
+            expect(result.values).toBeTruthy('データが入っている');
+            expect(typeof result.values[0]._rowid).toEqual('number', 'データに_rowidが入っている');
+            expect(typeof result.values[0].tag)   .toEqual('string', 'データにtagが入っている');
           });
         },
         testSearchSuggest: function() {
           var suggest = new NicoSearchSuggest({});
           suggest.load('MMD', function(err, result) {
             console.log('testSearchSuggest.load', err, result);
-            assert(err === null, 'err === null');
-            assert(result.candidates && result.candidates, 'suggestの中身がある')
+            console.log(expect(err));
+            expect(err).toBeNull('err === null');
+            expect(result.candidates).toBeTruthy('suggestの中身がある')
+            expect(result.candidates.length).toBeTruthy('suggestのlengthがある')
           });
         }
       });
@@ -9228,7 +9434,7 @@
     onWindowResize();
 
     if (conf.debugMode) {
-      initTest(w.WatchItLater.test);
+      initTest(WatchItLater.test);
     }
   })(w);
 
