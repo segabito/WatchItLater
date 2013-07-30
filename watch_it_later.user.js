@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130730b
+// @version        1.130731
 // ==/UserScript==
 
 /**
@@ -237,6 +237,7 @@
       enableHeatMap: false, //
       heatMapDisplayMode: 'hover', // 'always' 'hover'
       replacePopupMarquee: false, // 'always' 'hover'
+      searchEngine: 'normal', // 'normal' 'sugoi'
 
       hideVideoExplorerExpand: true, // 「動画をもっと見る」ボタンを小さくする
       nicommendVisibility: 'visible', // ニコメンドの表示 'visible', 'underIchiba', 'hidden'
@@ -1854,6 +1855,20 @@
         display: none;
       }
 
+      .newSearchOption {
+        text-align: center; padding: 8px; padding: 8px;
+        display: none;
+      }
+      .newSearchOption select{
+        margin-right: 32px;
+      }
+      .newSearchOption .reset{
+        cursor: pointer; background: #eee;
+      }
+      .w_sugoiSearch .newSearchOption {
+        display: block;
+      }
+
       .relatedTagList {
         background: #ddd; padding: 8px;
       }
@@ -1968,6 +1983,9 @@
       {title: '「マイリストから外す」ボタンを表示', varName: 'enableMylistDeleteButton',
         description: 'マイリストの整理に便利。\n ※ 消す時に確認ダイアログは出ないので注意',
         values: {'する': true, 'しない': false}},
+      {title: 'ニコニコ新検索を使う', varName: 'searchEngine', debugOnly: true,
+        description: '投稿期間指定・長さ指定が使えるようになります',
+        values: {'使う': 'sugoi',  '使わない': 'normal'}},
 
       {title: '全画面モードの設定', className: 'fullScreen'},
       {title: '操作パネルとコメント入力欄を隠す', varName: 'controllerVisibilityInFull',
@@ -4582,8 +4600,8 @@
       data.join    = params.join    || [
         // TODO:投稿者IDを取得する方法がないか？
           'cmsid', 'title', 'description', 'thumbnail_url', 'start_time',
-          'view_counter', 'comment_counter', 'mylist_counter', 'length_seconds', 'userid',
-          'channel_id', 'main_community_id', 'ss_adlut'
+          'view_counter', 'comment_counter', 'mylist_counter', 'length_seconds',
+        //  'userid', 'channel_id', 'main_community_id', 'ss_adlut'
         ];
       data.filters = params.filters || [{}];
       data.sort_by = params.sort_by || 'start_time';
@@ -4612,8 +4630,16 @@
             return;
           }
           try {
-            var lines = result.responseText.split('\n');
-            var data = [JSON.parse(lines[0]), JSON.parse(lines[1]), JSON.parse(lines[2]), JSON.parse(lines[3])];
+            var lines = result.responseText.split('\n'), head = JSON.parse(lines[0]);
+            var data;
+            if (head.values[0].total > 0) {
+              data = [head];
+              for (var i = 1, len = lines.length; i < len - 1; i++) {
+                data.push(JSON.parse(lines[i]));
+              }
+            } else {
+              data = [head, JSON.parse(lines[1]), {type: 'hits', values: []}, JSON.parse(lines[2])];
+            }
             Util.Cache.set(cache_key, data);
           } catch(e) {
             if (conf.debugMode) console.log('Exception: ', e, result);
@@ -4636,11 +4662,12 @@
     _buildSearchQuery: function(params) {
       var query = {filters: []};
       var sortTable = this.sortTable;
-      query.query   = params.word;
-      query.search  = params.type === 'tag' ? ['tags'] : ['tags', 'title', 'description'];
+      query.query   = params.searchWord;
+      query.search  = params.searchType === 'tag' ? ['tags'] : ['tags', 'title', 'description'];
       query.sort_by = params.sort && sortTable[params.sort] ? sortTable[params.sort] : 'last_comment_time';
       query.order   = params.order === 'd' ? 'desc' : 'asc';
-      query.from    = params.page ? Math.max(parseInt(params.page, 10) - 1, 0) * 32 : 0;
+      query.size    = params.size || 32;
+      query.from    = params.page ? Math.max(parseInt(params.page, 10) - 1, 0) * query.size : 0;
 
       var now = Date.now();
       if (params.u === '1h') {
@@ -4688,11 +4715,12 @@
     },
     load: function(params, callback) {
       var query = this._buildSearchQuery(params);
+      //console.log('searchQuery', params, query);
       this._search.load(query, $.proxy(function(err, result) {
-        this.onLoad(err, result, callback);
+        this.onLoad(err, result, params, query, callback);
       }, this));
     },
-    onLoad: function(err, result, callback) {
+    onLoad: function(err, result, params, query, callback) {
       if (err) {
         if (conf.debugMode) {console.log('load fail', err, result);}
         callback('fail', {message: '通信に失敗しました1'});
@@ -4700,44 +4728,56 @@
       }
       var searchResult;
         searchResult = {
+          status: 'ok',
           count: result[0].values[0].total,
+          page: params.page,
           list: []
         };
-        var items = result[2].values, len = items.length;
-        for (var i = 0; i < len; i++) {
-          var item = items[i];
-          searchResult.list.push({
-            id:             item.cmsid,
-            type:           'video',
-            length:         item.length_seconds ?
-                              Math.floor(item.length_seconds / 60) + ':' + (item.length_seconds % 60 + 100).toString().substr(1) : '',
-            mylist_counter: item.mylist_counter,
-            view_counter:   item.view_counter,
-            num_res:        item.comment_counter,
-            first_retrieve: item.start_time,
-            create_time:    item.start_time,
-            thumnail_url:   item.thumbnail_url,
-            title:          item.title,
-            description_short: item.description,
-            length_seconds: item.length_seconds,
-            channel_id:     item.channel_id,
-            main_community_id: item.main_community_id
-          });
+        var pushItems = function(items) {
+          var len = items.length;
+          for (var i = 0; i < len; i++) {
+            var item = items[i];
+            searchResult.list.push({
+              id:                item.cmsid,
+              type:              0, // 0 = VIDEO,
+              length:            item.length_seconds ?
+                                   Math.floor(item.length_seconds / 60) + ':' + (item.length_seconds % 60 + 100).toString().substr(1) : '',
+              mylist_counter:    item.mylist_counter,
+              view_counter:      item.view_counter,
+              num_res:           item.comment_counter,
+              first_retrieve:    item.start_time,
+              create_time:       item.start_time,
+              thumbnail_url:     item.thumbnail_url,
+              title:             item.title,
+              description_short: item.description ? item.description.substr(0, 150) : '',
+              length_seconds:    item.length_seconds
+  //            channel_id:        item.channel_id,
+  //            main_community_id: item.main_community_id
+            });
+          }
+        };
+        for (var i = 1; i < result.length; i++) {
+          if (result[i].type === 'hits' && result[i].endofstream) { break; }
+          if (result[i].type === 'hits' && result[i].values) {
+            pushItems(result[i].values);
+          }
         }
       callback(null, searchResult);
     }
   };
 
+  // sug.search.nicovideo.jpはリアルタイムの入力補完用？ で、関連タグはhttp://api.search.nicovideo.jp/api/tag/ っぽい
   var NicoSearchSuggest = function() { this.initialize.apply(this, arguments); };
   NicoSearchSuggest.API_BASE_URL = 'http://sug.search.nicovideo.jp/'; //'/suggestion/complete';
-  // sug.search.nicovideo.jpはリアルタイムの入力補完用？ で、関連タグはhttp://api.search.nicovideo.jp/api/tag/ っぽい
   NicoSearchSuggest.prototype = {
     _base_url: NicoSearchSuggest.API_BASE_URL,
     initialize: function(params) {
     },
     load: function(word, callback) {
-      var url = this._base_url + 'suggestion/complete';
-      var cache_key = JSON.stringify({url: url, word: word}), cache = Util.Cache.get(cache_key);
+      var url        = this._base_url + 'suggestion/complete',
+          cache_key  = JSON.stringify({url: url, word: word}),
+          cache_time = 60 * 1000 * 1,
+          cache      = Util.Cache.get(cache_key);
       if (cache) {
         setTimeout(function() { callback(null, cache); }, 0);
         return;
@@ -4758,22 +4798,24 @@
             if (conf.debugMode) console.log('Exception: ', e, result);
             callback('fail', 'JSON syntax');
           }
-          Util.Cache.set(cache_key, data);
+          Util.Cache.set(cache_key, data, cache_time);
           callback(null, data);
         }
       });
     }
   };
+
   var NicoSearchRelatedTag = function() { this.initialize.apply(this, arguments); };
   NicoSearchRelatedTag.API_BASE_URL = 'http://api.search.nicovideo.jp/';
-  // sug.search.nicovideo.jpはリアルタイムの入力補完用？ で、詳細はhttp://api.search.nicovideo.jp/api/tag/ に投げた方がよさそう
   NicoSearchRelatedTag.prototype = {
     _base_url: NicoSearchRelatedTag.API_BASE_URL,
     initialize: function(params) {
     },
     load: function(word, callback) {
-      var url = this._base_url + 'api/tag/';
-      var cache_key = JSON.stringify({url: url, word: word}), cache = Util.Cache.get(cache_key);
+      var url        = this._base_url + 'api/tag/',
+          cache_key  = JSON.stringify({url: url, word: word}),
+          cache_time = 60 * 1000 * 3,
+          cache      = Util.Cache.get(cache_key);
       if (cache) {
         setTimeout(function() { callback(null, cache); }, 0);
         return;
@@ -4797,7 +4839,7 @@
             callback('fail', 'JSON syntax');
             return;
           }
-          Util.Cache.set(cache_key, data);
+          Util.Cache.set(cache_key, data, cache_time);
           callback(null, data);
         }
       });
@@ -8468,34 +8510,16 @@
 
 
     function initSearchContent() {
-      var ContentType     = WatchApp.ns.components.videoexplorer.model.ContentType;
-      var SearchSortOrder = WatchApp.ns.components.videoexplorer.model.SearchSortOrder;
-      var View            = WatchApp.ns.components.videoexplorer.view.content.SearchContentView;
-      var vec             = watch.VideoExplorerInitializer.videoExplorerController;
-      var explorer        = vec.getVideoExplorer();
-      var content         = explorer.getContentList().getContent(ContentType.SEARCH);
-      var relatedTag      = new NicoSearchRelatedTag({});
-
-
-      content._originalWord = '';
-      content.refresh_org = content.refresh;
-      content.refresh = $.proxy(function(params, callback) {
-        var word = WatchApp.get(params, 'searchWord', 'string', '');
-        var type = WatchApp.get(params, 'searchType', 'string', this.getSearchType());
-        if (typeof word === 'string' && word.length > 0) {
-          this._originalWord = word;
-
-          if (conf.defaultSearchOption && conf.defaultSearchOption !== '') {
-            if (word.indexOf(conf.defaultSearchOption) < 0 && !word.match(/(sm|nm|so)\d+/)) {
-              params.searchWord += " " + conf.defaultSearchOption;
-            }
-          }
-        }
-        AnchorHoverPopup.hidePopup();
-        EventDispatcher.dispatch('onSearchStart', this._originalWord, type);
-        this.refresh_org(params, callback);
-      }, content);
-
+      var ContentType      = WatchApp.ns.components.videoexplorer.model.ContentType;
+      var SearchSortOrder  = WatchApp.ns.components.videoexplorer.model.SearchSortOrder;
+      var View             = WatchApp.ns.components.videoexplorer.view.content.SearchContentView;
+      var vec              = watch.VideoExplorerInitializer.videoExplorerController;
+      var explorer         = vec.getVideoExplorer();
+      var content          = explorer.getContentList().getContent(ContentType.SEARCH);
+      var relatedTag       = new NicoSearchRelatedTag({});
+      var newSearch        = new NewNicoSearch({});
+      var newSearchWrapper = new NewNicoSearchWrapper({search: newSearch});
+      var pager            = content._pager;
 
       var RelatedTagView = function() { this.initialize.apply(this, arguments); };
       RelatedTagView.prototype = {
@@ -8540,6 +8564,140 @@
         }
       };
 
+      var NewSearchOptionView = function() { this.initialize.apply(this, arguments); };
+      NewSearchOptionView.prototype = {
+        _content: null,
+        _$view: null,
+        _$startTimeRange: null,
+        _$lengthSecondsRange: null,
+        initialize: function(params) {
+          this._content             = params.content;
+          this._$view               = params.$view;
+          this._$startTimeRange     = this._$view.find('.startTimeRange');
+          this._$lengthSecondsRange = this._$view.find('.lengthSecondsRange');
+          this._$resetButton        = this._$view.find('.reset');
+
+          this._$startTimeRange    .on('change', $.proxy(this._onStartTimeRangeSelect    , this));
+          this._$lengthSecondsRange.on('change', $.proxy(this._onLengthSecondsRangeSelect, this));
+          this._$resetButton       .on('click',  $.proxy(this.reset                      , this));
+        },
+        getView: function() {
+          return this._$view;
+        },
+        detach: function() {
+          this._$view.detach();
+        },
+        update: function() {
+        },
+        _onStartTimeRangeSelect: function() {
+          this._content.setStartTimeRange(this._$startTimeRange.val());
+          this._content.refresh({ page: 1 });
+        },
+        _onLengthSecondsRangeSelect: function() {
+          this._content.setLengthSecondsRange(this._$lengthSecondsRange.val());
+          //console.log('_onLengthSecondsRangeSelect', this._$lengthSecondsRange.val(), this._content.getLengthSecondsRange());
+          this._content.refresh({ page: 1 });
+        },
+        reset: function() {
+          var v = this._$startTimeRange.val() + this._$lengthSecondsRange.val();
+          if (v !== '') {
+            this._$startTimeRange.val('');
+            this._$lengthSecondsRange.val('');
+            this._content.refresh({ page: 1 });
+          }
+        }
+      };
+
+      var relatedTagView = new RelatedTagView({
+        relatedTag: relatedTag,
+        $view: $('<div class="relatedTagList"><p>関連タグ: </p><ul></ul></div>')
+      });
+      var newSearchOptionView = new NewSearchOptionView({
+        content: content,
+        $view: $([
+          '<div class="newSearchOption">',
+            '<span>投稿日時: </span>',
+            '<select class="startTimeRange" name="u">',
+              '<option selected="selected" value=""   >指定なし</option>',
+              '<option                     value="24h">24時間以内</option>',
+              '<option                     value="1w" >1週間以内</option>',
+              '<option                     value="1m" >1ヶ月(30日)以内</option>',
+            '</select>',
+            '<span>再生時間: </span>',
+            '<select class="lengthSecondsRange" name="l">',
+              '<option selected="selected" value=""     >指定なし</option>',
+              '<option                     value="short">5分以内</option>',
+              '<option                     value="long" >20分以上</option>',
+            '</select>',
+            '<button class="reset">リセット</button>',
+          '</div>',
+          ''].join(''))
+      });
+
+
+
+      content._originalWord = '';
+      content.refresh_org = content.refresh;
+      content.refresh = $.proxy(function(params, callback) {
+        var word = WatchApp.get(params, 'searchWord', 'string', '');
+        var type = WatchApp.get(params, 'searchType', 'string', this.getSearchType());
+        if (typeof word === 'string' && word.length > 0) {
+          this._originalWord = word;
+
+          if (conf.defaultSearchOption && conf.defaultSearchOption !== '') {
+            if (word.indexOf(conf.defaultSearchOption) < 0 && !word.match(/(sm|nm|so)\d+/)) {
+              params.searchWord += " " + conf.defaultSearchOption;
+            }
+          }
+        }
+        AnchorHoverPopup.hidePopup();
+        EventDispatcher.dispatch('onSearchStart', this._originalWord, type);
+        this.refresh_org(params, callback);
+      }, content);
+
+      // ニコニコ新検索エンジンを使うための布石
+      content._searchEngineType = conf.searchEngine;
+      content.setSearchEngineType   = $.proxy(function(type) {
+        this._searchEngineType = type;
+        this._pager._pageItemCount = type === 'sugoi' ? 100 : 32; // 32より増えないっぽい？
+      }, content);
+      content.getSearchEngineType   = function() { return conf.searchEngine === 'sugoi' ? 'sugoi' : 'normal'; };
+      content._newSearchWrapper     = newSearchWrapper;
+
+      content._startTimeRange       = '';
+      content._lengthSecondsRange   = '';
+      content.getStartTimeRange     = function() { return this._startTimeRange; };
+      content.getLengthSecondsRange = function() { return this._lengthSecondsRange; };
+      content.setStartTimeRange     = function(value) { this._startTimeRange     = value; };
+      content.setLengthSecondsRange = function(value) { this._lengthSecondsRange = value; };
+
+
+      content.load_org = content.load;
+      content.load = $.proxy(function(callback) {
+        if (this.getSearchEngineType() !== 'sugoi' || this.getSearchWord().length <= 0) {
+          this.load_org(callback);
+        } else {
+          this._newSearchWrapper.load({
+            searchWord:  this.getSearchWord(),
+            searchType:  this.getSearchType(),
+            page:        this.getPage(),
+            sort:        this.getSort(),
+            order:       this.getOrder(),
+            l:           this.getLengthSecondsRange(),
+            u:           this.getStartTimeRange(),
+            size:        this._pager._pageItemCount
+          }, function(err, result) {
+            if (conf.debugMode)console.log('%cNewNicoSearchWrapper result', 'color: green;', result);
+            callback(err, result);
+          });
+        }
+      }, content);
+      content.setSearchEngineType(conf.searchEngine);
+
+      EventDispatcher.addEventListener('on.config.searchEngine', function(type) {
+        content.setSearchEngineType(type);
+      });
+
       var
         overrideSearchSortOrder = function(proto) { // ソート順を記憶するためのフック
           proto.getSort_org  = proto.getSort;
@@ -8565,14 +8723,10 @@
           };
         },
         overrideSearchContentView = function(proto, relatedTag) {
-          var relatedTagView = new RelatedTagView({
-            relatedTag: relatedTag,
-            $view: $('<div class="relatedTagList"><p>関連タグ: </p><ul></ul></div>')
-          });
-
           proto._updateRelatedTag = function() {
             var word = this._content._originalWord; //this._content.getSearchWord();
             relatedTagView.clear();
+
             if (typeof word === 'string' && word.length > 0) {
               this._$header.append(relatedTagView.getView());
               relatedTag.load(word, function(err, result) {
@@ -8589,18 +8743,25 @@
           proto.detach_org = proto.detach;
           proto.detach = function() {
             this.detach_org();
+            newSearchOptionView.detach();
             relatedTagView.detach();
           };
 
           proto.onUpdate_org = proto.onUpdate;
           proto.onUpdate = function() {
             this.onUpdate_org();
+            this._$content.find('.searchBox').after(newSearchOptionView.getView());
             this._updateRelatedTag();
+            var engine = this._content.getSearchEngineType();
+            $('.videoExplorerBody')
+              .toggleClass('w_sugoiSearch',  engine === 'sugoi')
+              .toggleClass('w_normalSearch', engine !== 'sugoi');
           };
 
           proto.onError_org = proto.onError;
           proto.onError = function() {
             this.onError_org();
+            this._$header.append(newSearchOptionView.getView());
             this._updateRelatedTag();
           };
 
@@ -9339,18 +9500,18 @@
         testNewNicoSearchWrapperQuery: function() {
           var wrapper = new NewNicoSearchWrapper({search: {}});
           var params = {
-            word: 'VOCALOID',
+            searchWord: 'VOCALOID',
+            searchType: 'tag',
             u: '1m',
             l: 'short',
             sort: 'l',
             order: 'a',
-            type: 'tag',
             page: 3
           };
           var query = wrapper._buildSearchQuery(params);
 
           console.log(params, query);
-          expect(query.query).toEqual(params.word,        '検索ワードのセット');
+          expect(query.query).toEqual(params.searchWord,        '検索ワードのセット');
           expect(query.from).toEqual(params.page * 32 - 32,    'ページ番号 -> fromの変換');
           expect(query.sort_by).toEqual('length_seconds', 'l -> length_seconds');
           expect(query.order).toEqual('asc',              'a -> asc');
@@ -9368,13 +9529,13 @@
           console.log('testNewNicoSearchWrapper');
           var search = new NewNicoSearch({});
           var wrapper = new NewNicoSearchWrapper({search: search});
-          wrapper.load({word: 'ぬこぬこ動画'}, function(err, result) {
+          wrapper.load({searchWord: 'ぬこぬこ動画'}, function(err, result) {
             console.log('testNewNicoSearchWrapper.load', err, result);
             expect(err).toBeNull('err === null');
             expect(typeof result.count).toEqual('number', '件数がnumber');
             expect(result.count > 0).toBeTrue('件数が入っている');
             expect(result.list.length).toBeTruthy('データが入っている');
-            expect(result.list[0].type).toEqual('video', 'type === "video"');
+            expect(result.list[0].type).toEqual(0, 'type === 0');
             expect(/^\d+:\d+/.test(result.list[0].length)).toBeTrue('動画長がmm:dd形式で入ってる');
           });
         },
