@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130731
+// @version        1.130801
 // ==/UserScript==
 
 /**
@@ -43,6 +43,9 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130801
+// - タグ・キーワード検索にniconico新検索βを組み込んでみた
 
 // * ver 1.130731
 // - 関連タグの取得はもっといいAPIがあった
@@ -236,8 +239,13 @@
       enableFullScreenMenu: true, // 全画面時にホイールでメニューを出す
       enableHeatMap: false, //
       heatMapDisplayMode: 'hover', // 'always' 'hover'
-      replacePopupMarquee: false, // 'always' 'hover'
-      searchEngine: 'normal', // 'normal' 'sugoi'
+      replacePopupMarquee: true, // 'always' 'hover'
+      enableRelatedTag: true, // 関連タグを表示するかどうか
+
+      searchEngine:              'normal', // 'normal' 'sugoi'
+      searchStartTimeRange:      '', //
+      searchLengthSecondsRange:  '', //
+      searchMusicDlFilter:       false, //
 
       hideVideoExplorerExpand: true, // 「動画をもっと見る」ボタンを小さくする
       nicommendVisibility: 'visible', // ニコメンドの表示 'visible', 'underIchiba', 'hidden'
@@ -1856,7 +1864,8 @@
       }
 
       .newSearchOption {
-        text-align: center; padding: 8px; padding: 8px;
+        text-align: center; margin-bottom: 16px; padding: 8px;
+        background: #eee;
         display: none;
       }
       .newSearchOption select{
@@ -1983,8 +1992,10 @@
       {title: '「マイリストから外す」ボタンを表示', varName: 'enableMylistDeleteButton',
         description: 'マイリストの整理に便利。\n ※ 消す時に確認ダイアログは出ないので注意',
         values: {'する': true, 'しない': false}},
-      {title: 'ニコニコ新検索を使う', varName: 'searchEngine', debugOnly: true,
-        description: '投稿期間指定・長さ指定が使えるようになります',
+      {title: '検索時に関連タグを表示する', varName: 'enableRelatedTag',
+        values: {'する': true,  'しない': false}},
+      {title: 'niconico新検索βを使う', varName: 'searchEngine',
+        description: '投稿期間や動画長さによる絞り込みができるようになります',
         values: {'使う': 'sugoi',  '使わない': 'normal'}},
 
       {title: '全画面モードの設定', className: 'fullScreen'},
@@ -4652,6 +4663,11 @@
     }
   };
 
+
+
+  /**
+   *  niconico新検索の検索結果を既存の検索API互換形式に変換して返すやつ
+   */
   var NewNicoSearchWrapper = function() { this.initialize.apply(this, arguments); };
   NewNicoSearchWrapper.prototype = {
     _search: null,
@@ -4681,6 +4697,9 @@
       } else
       if (params.u === '1m') { // TODO: 真面目に一ヶ月引く？
         query.filters.push(this._buildStartTimeRangeFilter(new Date(now - 30 * 24 * 60  * 60 * 1000)));
+      } else
+      if (params.u === '3m') {
+        query.filters.push(this._buildStartTimeRangeFilter(new Date(now - 90 * 24 * 60  * 60 * 1000)));
       }
 
       if (params.l === 'short') { // 5分以内
@@ -4688,6 +4707,10 @@
       } else
       if (params.l === 'long' ) { // 20分以上
         query.filters.push(this._buildLengthSecondsRangeFilter(60 * 20));
+      }
+
+      if (params.m === true) {    // 音楽ダウンロード
+        query.filters.push({type: 'equal', field: 'music_download', value: true});
       }
 
       // TODO: これの調査 → {field: 'ss_adult', type: 'equal', value: false}
@@ -4820,7 +4843,7 @@
         setTimeout(function() { callback(null, cache); }, 0);
         return;
       }
-      var query = {query: word, service: ['tag_video'], from: 0, size: 15, timeout: 10000, issuer: 'pc', reason: 'user'};
+      var query = {query: word, service: ['tag_video'], from: 0, size: 15, timeout: 10000, issuer: 'pc', reason: 'watchItLater'};
       $.ajax({
         url: url,
         type: 'POST',
@@ -8575,10 +8598,16 @@
           this._$view               = params.$view;
           this._$startTimeRange     = this._$view.find('.startTimeRange');
           this._$lengthSecondsRange = this._$view.find('.lengthSecondsRange');
+          this._$musicDlFilter      = this._$view.find('.musicDlFilter');
           this._$resetButton        = this._$view.find('.reset');
+
+          this._$startTimeRange    .val(params.startTimeRange     || '');
+          this._$lengthSecondsRange.val(params.lengthSecondsRange || '');
+          this._$musicDlFilter     .attr('checked', !!params.musicDlFilter);
 
           this._$startTimeRange    .on('change', $.proxy(this._onStartTimeRangeSelect    , this));
           this._$lengthSecondsRange.on('change', $.proxy(this._onLengthSecondsRangeSelect, this));
+          this._$musicDlFilter     .on('click',  $.proxy(this._onMusicDlFilterChange     , this));
           this._$resetButton       .on('click',  $.proxy(this.reset                      , this));
         },
         getView: function() {
@@ -8595,14 +8624,21 @@
         },
         _onLengthSecondsRangeSelect: function() {
           this._content.setLengthSecondsRange(this._$lengthSecondsRange.val());
-          //console.log('_onLengthSecondsRangeSelect', this._$lengthSecondsRange.val(), this._content.getLengthSecondsRange());
+          this._content.refresh({ page: 1 });
+        },
+        _onMusicDlFilterChange: function() {
+          this._content.setMusicDlFilter(!!this._$musicDlFilter.attr('checked'));
           this._content.refresh({ page: 1 });
         },
         reset: function() {
           var v = this._$startTimeRange.val() + this._$lengthSecondsRange.val();
           if (v !== '') {
+            this._content.setStartTimeRange('');
+            this._content.setLengthSecondsRange('');
+            this._content.setMusicDlFilter(false);
             this._$startTimeRange.val('');
             this._$lengthSecondsRange.val('');
+            this._$musicDlFilter.attr('checked', false);
             this._content.refresh({ page: 1 });
           }
         }
@@ -8614,6 +8650,9 @@
       });
       var newSearchOptionView = new NewSearchOptionView({
         content: content,
+        startTimeRange:     conf.searchStartTimeRange,
+        lengthSecondsRange: conf.searchLengthSecondsRange,
+        musicDlFilter:      conf.searchMusicDlFilter,
         $view: $([
           '<div class="newSearchOption">',
             '<span>投稿日時: </span>',
@@ -8622,6 +8661,7 @@
               '<option                     value="24h">24時間以内</option>',
               '<option                     value="1w" >1週間以内</option>',
               '<option                     value="1m" >1ヶ月(30日)以内</option>',
+              '<option                     value="3m" >3ヶ月(90日)以内</option>',
             '</select>',
             '<span>再生時間: </span>',
             '<select class="lengthSecondsRange" name="l">',
@@ -8629,7 +8669,10 @@
               '<option                     value="short">5分以内</option>',
               '<option                     value="long" >20分以上</option>',
             '</select>',
-            '<button class="reset">リセット</button>',
+//            '<button class="reset">リセット</button>',
+            '<label>',
+              '<input type="checkbox" name="m" class="musicDlFilter">音楽DL対応のみ</input>',
+            '</label>',
           '</div>',
           ''].join(''))
       });
@@ -8656,27 +8699,47 @@
       }, content);
 
       // ニコニコ新検索エンジンを使うための布石
-      content._searchEngineType = conf.searchEngine;
+      content._searchEngineType  = conf.searchEngine;
+      content._lastSearchEngineType = '';
       content.setSearchEngineType   = $.proxy(function(type) {
         this._searchEngineType = type;
-        this._pager._pageItemCount = type === 'sugoi' ? 100 : 32; // 32より増えないっぽい？
+        this._pager._pageItemCount = type === 'sugoi' ? 100 : 32;
       }, content);
-      content.getSearchEngineType   = function() { return conf.searchEngine === 'sugoi' ? 'sugoi' : 'normal'; };
+      content.getSearchEngineType     = $.proxy(function()   {
+        return this._searchEngineType === 'sugoi' ? 'sugoi' : 'normal';
+      }, content);
+      content.setLastSearchEngineType = $.proxy(function(type) { this._lastSearchEngineType = type; }, content);
+      content.getLastSearchEngineType = $.proxy(function()     { return this._lastSearchEngineType; }, content);
       content._newSearchWrapper     = newSearchWrapper;
 
-      content._startTimeRange       = '';
-      content._lengthSecondsRange   = '';
-      content.getStartTimeRange     = function() { return this._startTimeRange; };
-      content.getLengthSecondsRange = function() { return this._lengthSecondsRange; };
-      content.setStartTimeRange     = function(value) { this._startTimeRange     = value; };
-      content.setLengthSecondsRange = function(value) { this._lengthSecondsRange = value; };
+      content._startTimeRange       = conf.searchStartTimeRange;
+      content._lengthSecondsRange   = conf.searchLengthSecondsRange;
+      content._musicDlFilter        = conf.searchMusicDlFilter;
+      content.getStartTimeRange     = $.proxy(function() { return this._startTimeRange;           }, content);
+      content.getLengthSecondsRange = $.proxy(function() { return this._lengthSecondsRange;       }, content);
+      content.getMusicDlFilter      = $.proxy(function() { return this._musicDlFilter;            }, content);
+      content.setStartTimeRange     = $.proxy(function(value) {
+        this._startTimeRange = value;
+        conf.setValue('searchStartTimeRange', value);
+      }, content);
+      content.setLengthSecondsRange = $.proxy(function(value) {
+        this._lengthSecondsRange = value;
+        conf.setValue('searchLengthSecondsRange',value);
+      }, content);
+      content.setMusicDlFilter      = $.proxy(function(value) {
+        this._musicDlFilter = !!value;
+        conf.setValue('searchMusicDlFilter', !!value);
+      }, content);
 
 
       content.load_org = content.load;
       content.load = $.proxy(function(callback) {
-        if (this.getSearchEngineType() !== 'sugoi' || this.getSearchWord().length <= 0) {
+        var word = this.getSearchWord();
+        if (this.getSearchEngineType() !== 'sugoi' || word.length <= 0 || word.match(/(sm|nm|so)\d+/)) {
+          this.setLastSearchEngineType('normal');
           this.load_org(callback);
         } else {
+          this.setLastSearchEngineType('sugoi');
           this._newSearchWrapper.load({
             searchWord:  this.getSearchWord(),
             searchType:  this.getSearchType(),
@@ -8685,6 +8748,7 @@
             order:       this.getOrder(),
             l:           this.getLengthSecondsRange(),
             u:           this.getStartTimeRange(),
+            m:           this.getMusicDlFilter(),
             size:        this._pager._pageItemCount
           }, function(err, result) {
             if (conf.debugMode)console.log('%cNewNicoSearchWrapper result', 'color: green;', result);
@@ -8724,7 +8788,8 @@
         },
         overrideSearchContentView = function(proto, relatedTag) {
           proto._updateRelatedTag = function() {
-            var word = this._content._originalWord; //this._content.getSearchWord();
+            if (!conf.enableRelatedTag) { return; }
+            var word = this._content._originalWord;
             relatedTagView.clear();
 
             if (typeof word === 'string' && word.length > 0) {
@@ -8752,7 +8817,7 @@
             this.onUpdate_org();
             this._$content.find('.searchBox').after(newSearchOptionView.getView());
             this._updateRelatedTag();
-            var engine = this._content.getSearchEngineType();
+            var engine = this._content.getLastSearchEngineType();
             $('.videoExplorerBody')
               .toggleClass('w_sugoiSearch',  engine === 'sugoi')
               .toggleClass('w_normalSearch', engine !== 'sugoi');
@@ -8763,6 +8828,10 @@
             this.onError_org();
             this._$header.append(newSearchOptionView.getView());
             this._updateRelatedTag();
+            var engine = this._content.getLastSearchEngineType();
+            $('.videoExplorerBody')
+              .toggleClass('w_sugoiSearch',  engine === 'sugoi')
+              .toggleClass('w_normalSearch', engine !== 'sugoi');
           };
 
         };
@@ -9529,12 +9598,13 @@
           console.log('testNewNicoSearchWrapper');
           var search = new NewNicoSearch({});
           var wrapper = new NewNicoSearchWrapper({search: search});
-          wrapper.load({searchWord: 'ぬこぬこ動画'}, function(err, result) {
+          wrapper.load({searchWord: 'ぬこぬこ動画', size: 100}, function(err, result) {
             console.log('testNewNicoSearchWrapper.load', err, result);
             expect(err).toBeNull('err === null');
             expect(typeof result.count).toEqual('number', '件数がnumber');
             expect(result.count > 0).toBeTrue('件数が入っている');
             expect(result.list.length).toBeTruthy('データが入っている');
+            expect(result.list.length).toEqual(100, 'sizeで指定した件数が入っている');
             expect(result.list[0].type).toEqual(0, 'type === 0');
             expect(/^\d+:\d+/.test(result.list[0].length)).toBeTrue('動画長がmm:dd形式で入ってる');
           });
