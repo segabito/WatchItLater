@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130801
+// @version        1.130801b
 // ==/UserScript==
 
 /**
@@ -710,8 +710,8 @@
       #trueBrowserFullShield .blink, #videoCounter .blink {
         color: #000;
       }
-      .videoCountDiff:before      {content: \'+\';}
-      .videoCountDiff.down:before {content: \'\'; }
+      .videoCountDiff:before      {content: '+';}
+      .videoCountDiff.down:before {content: ''; }
       #popupMarquee .videoCountDiff {display: none;}
       .sidePanel .sideVideoInfo .videoDescription{
         overflow-x: hidden; text-align: left;
@@ -794,7 +794,7 @@
       }
 
       .sideVideoInfo.isFavorite .userName:after, .sideVideoInfo.isFavorite.isChannel .videoOwnerInfoContainer .channelName:after{
-        content: \' ★ \'; color: gold; text-shadow: 1px 1px 1px black;
+        content: ' ★ '; color: gold; text-shadow: 1px 1px 1px black;
       }
 
       .sidePanel.videoInfo  #leftPanelContent, .sidePanel.ichiba  #leftPanelContent {
@@ -1113,7 +1113,7 @@
         color: #ccc; text-shadow: -1px -1px 0 #888;
       }
       #watchItLaterConfigPanel .reload .title:after {
-        content: \' (※)\'; font-size: 80%; color: #900;
+        content: ' (※)'; font-size: 80%; color: #900;
       }
       #watchItLaterConfigPanel .debugOnly {
         display: none;
@@ -1131,12 +1131,12 @@
         transition: border-width 0.2s ease-in-out     ; -webkit-transition: border-width 0.2s ease-in-out     ;
       }
       #watchItLaterConfigPanel .section:hover:after {
-        content: \'▼\';
+        content: '▼';
         position: absolute; top: 0px; right: 10px; font-size: 150%;
         transition: transform 0.2s ease-in-out 0.4s; -webkit-transition: -webkit-transform 0.2s ease-in-out 0.4s;
       }
       #watchItLaterConfigPanel .open .section:after {
-        content: \'▼\';
+        content: '▼';
         position: absolute; top: 0px; right: 10px; font-size: 150%;
         transform: rotate(180deg); -webkit-transform: rotate(180deg);
         transition: transform 0.2s ease-in-out     ; -webkit-transition: -webkit-transform 0.2s ease-in-out;
@@ -1166,10 +1166,10 @@
         cursor: pointer; margin: auto 10px;
       }
       #watchItLaterConfigPanel .shortcutSetting        .enable:before {
-        content: \'○ \';
+        content: '○ ';
       }
       #watchItLaterConfigPanel .shortcutSetting.enable .enable:before {
-        content: \'㋹ \'; color: blue;
+        content: '㋹ '; color: blue;
       }
       #watchItLaterConfigPanel .shortcutSetting      .ctrl, #watchItLaterConfigPanel .shortcutSetting     .alt, #watchItLaterConfigPanel .shortcutSetting       .shift {
         cursor: pointer; border: 2px outset; margin: 4px 4px; padding: 2px 4px; width: 180px; border-radius: 4px;background: #eee;
