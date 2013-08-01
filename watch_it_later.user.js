@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130801b
+// @version        1.130802
 // ==/UserScript==
 
 /**
@@ -907,7 +907,7 @@
         background: none repeat scroll 0 0 #AAAAAA;padding: 0 3px;
       }
       .sideIchibaPanel .ichiba_mainitem .blomagaText {
-        color: #666666;font-family: \'HGS明朝E\',\'ＭＳ 明朝\';font-size: 16px;height: 100px;
+        color: #666666;font-family: 'HGS明朝E','ＭＳ 明朝';font-size: 16px;height: 100px;
         padding: 7px 25px 0 15px;text-align: center;white-space: normal;word-break: break-all;word-wrap: break-word;
       }
       .sideIchibaPanel .ichiba_mainitem .blomagaAuthor {
@@ -939,7 +939,7 @@
       }
       .sideIchibaPanel .ichiba_mainitem .thumbnail span {
         font-size: 22px; color: #0066CC;
-        font-family: \'ヒラギノ明朝 Pro W3\',\'Hiragino Mincho Pro\',\'ＭＳ Ｐ明朝\',\'MS PMincho\',serif;
+        font-family: 'ヒラギノ明朝 Pro W3','Hiragino Mincho Pro','ＭＳ Ｐ明朝','MS PMincho',serif;
       }
       .sideIchibaPanel .ichiba_mainitem .action {
         font-size: 85%;
@@ -4843,7 +4843,7 @@
         setTimeout(function() { callback(null, cache); }, 0);
         return;
       }
-      var query = {query: word, service: ['tag_video'], from: 0, size: 15, timeout: 10000, issuer: 'pc', reason: 'watchItLater'};
+      var query = {query: word, service: ['tag_video'], from: 0, size: 15, timeout: 10000, issuer: 'pc', reason: 'user'};
       $.ajax({
         url: url,
         type: 'POST',
