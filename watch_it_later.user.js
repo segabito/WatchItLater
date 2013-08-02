@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130802
+// @version        1.130803
 // ==/UserScript==
 
 /**
@@ -43,6 +43,9 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130803
+// - 動画終了時に自動でニコメンドを開かない・または中身がある時だけ開くようにする設定を追加
 
 // * ver 1.130801
 // - タグ・キーワード検索にniconico新検索βを組み込んでみた
@@ -241,6 +244,7 @@
       heatMapDisplayMode: 'hover', // 'always' 'hover'
       replacePopupMarquee: true, // 'always' 'hover'
       enableRelatedTag: true, // 関連タグを表示するかどうか
+      playerTabAutoOpenNicommend: 'enable', // 終了時にニコメンドを自動で開くかどうか 'enable' 'auto' 'disable'
 
       searchEngine:              'normal', // 'normal' 'sugoi'
       searchStartTimeRange:      '', //
@@ -895,7 +899,7 @@
         max-width: 266px; margin: auto; text-align: center;
       }
       .sideIchibaPanel .ichiba_mainitem .blomagaArticleNP {
-        background: url("http://ichiba.dev.nicovideo.jp/embed/zero/img/bgMainBlomagaArticleNP.png") no-repeat scroll 0 0 transparent;
+        background: url("http://ichiba.nicovideo.jp/embed/zero/img/bgMainBlomagaArticleNP.png") no-repeat scroll 0 0 transparent;
         height: 170px;
         margin: 0 auto;
         width: 180px;
@@ -1891,6 +1895,9 @@
         word-break: break-all;
       }
 
+      {* 不要な時まで横スクロールバーが出てしまうので *}
+      #songrium_inline { overflow: hidden; }
+
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
     addStyle(__css__, 'watchItLaterStyle');
@@ -1950,6 +1957,8 @@
       {title: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
         description: '全画面状態だと再生数がわからなくて不便、という時に',
         values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
+      {title: '終了時に自動でニコメンドを開く', varName: 'playerTabAutoOpenNicommend',
+        values: {'開かない': 'disable', '中身がある時だけ開く': 'auto', '開く': 'enable'}},
 
       {title: 'プレイヤーの設定', className: 'playerSetting'},
 //      {title: 'コメントパネルを広くする', varName: 'wideCommentPanel',
@@ -4257,6 +4266,10 @@
           console.log('%cexception', 'background: red; color: white;', e);
           return false;
         }
+      },
+      // ニコメンドの中身が空っぽかどうか？
+      isNicommendEmpty: function() {
+        return $('#nicommendList').find('.content').length < 1;
       }
     };
   })(w);
@@ -4686,20 +4699,27 @@
       query.from    = params.page ? Math.max(parseInt(params.page, 10) - 1, 0) * query.size : 0;
 
       var now = Date.now();
-      if (params.u === '1h') {
-        query.filters.push(this._buildStartTimeRangeFilter(new Date(now -  1 *  1 * 60  * 60 * 1000)));
-      } else
-      if (params.u === '24h' || params.u === '1d') {
-        query.filters.push(this._buildStartTimeRangeFilter(new Date(now -  1 * 24 * 60  * 60 * 1000)));
-      } else
-      if (params.u === '1w') {
-        query.filters.push(this._buildStartTimeRangeFilter(new Date(now -  7 * 24 * 60  * 60 * 1000)));
-      } else
-      if (params.u === '1m') { // TODO: 真面目に一ヶ月引く？
-        query.filters.push(this._buildStartTimeRangeFilter(new Date(now - 30 * 24 * 60  * 60 * 1000)));
-      } else
-      if (params.u === '3m') {
-        query.filters.push(this._buildStartTimeRangeFilter(new Date(now - 90 * 24 * 60  * 60 * 1000)));
+      switch (params.u) {
+        case '1h':
+          query.filters.push(this._buildStartTimeRangeFilter(new Date(now -   1 *  1 * 60  * 60 * 1000)));
+          break;
+        case '24h': case '1d':
+          query.filters.push(this._buildStartTimeRangeFilter(new Date(now -   1 * 24 * 60  * 60 * 1000)));
+          break;
+        case '1w':  case '7d':
+          query.filters.push(this._buildStartTimeRangeFilter(new Date(now -   7 * 24 * 60  * 60 * 1000)));
+          break;
+        case '1m':
+          query.filters.push(this._buildStartTimeRangeFilter(new Date(now -  30 * 24 * 60  * 60 * 1000)));
+          break;
+        case '3m':
+          query.filters.push(this._buildStartTimeRangeFilter(new Date(now -  90 * 24 * 60  * 60 * 1000)));
+          break;
+        case '6m':
+          query.filters.push(this._buildStartTimeRangeFilter(new Date(now - 180 * 24 * 60  * 60 * 1000)));
+          break;
+        default:
+          break;
       }
 
       if (params.l === 'short') { // 5分以内
@@ -4772,7 +4792,7 @@
               create_time:       item.start_time,
               thumbnail_url:     item.thumbnail_url,
               title:             item.title,
-              description_short: item.description ? item.description.substr(0, 150) : '',
+              description_short: item.description ? item.description.replace(/<.*?>/g, '').substr(0, 150) : '',
               length_seconds:    item.length_seconds
   //            channel_id:        item.channel_id,
   //            main_community_id: item.main_community_id
@@ -6213,7 +6233,7 @@
 
       $sidePanel
         .toggleClass('ichibaEmpty',    $('#ichibaMain')   .find('.ichiba_mainitem').length < 1)
-        .toggleClass('nicommendEmpty', $('#nicommendList').find('.content')        .length < 1);
+        .toggleClass('nicommendEmpty', WatchController.isNicommendEmpty());
 
       $sideInfoPanel
         .empty()
@@ -8133,6 +8153,7 @@
 
     function initRightPanel($rightPanel) {
       initRightPanelJack($rightPanel);
+      initRightPanelTabHook();
       var $playerTabWrapper = $rightPanel, $playerTabWrapper = $rightPanel, wideCss = null;
       var
         createWideCommentPanelCss = function (targetWidth) {
@@ -8207,6 +8228,30 @@
       });
 
     } // end initRightPanel
+
+    function initRightPanelTabHook() {
+      var playerTab = WatchApp.ns.init.PlayerInitializer.playerTab;
+      // 終了時にニコメンドが勝手に開かなくするやつ
+      // 連続再生中はニコメンドパネルが開かない事を利用する
+      playerTab.playlist_org = playerTab.playlist;
+      playerTab.playlist = {
+        isContinuousPlayback: function() {
+          if (conf.playerTabAutoOpenNicommend === 'disable') {
+            if (conf.debugMode) console.log('ニコメンドキャンセル: "disabled"');
+            // 'disable'の時は常に「連続再生中」という嘘を返す事でパネルオープンを止める
+            return true;
+          } else
+          if (conf.playerTabAutoOpenNicommend === 'auto' && WatchController.isNicommendEmpty()) {
+            if (conf.debugMode) console.log('ニコメンドキャンセル: "auto"');
+            // 'auto' の時は、ニコメンドが空の時だけキャンセルする
+            return true;
+          } else
+          if (conf.playerTabAutoOpenNicommend === 'enable') {
+            return playerTab.playlist_org.isContinuousPlayback();
+          }
+        }
+      };
+    } //
 
     // - 右パネル乗っ取る
     var rightInfoPanelInitialized = false;
@@ -8662,6 +8707,7 @@
               '<option                     value="1w" >1週間以内</option>',
               '<option                     value="1m" >1ヶ月(30日)以内</option>',
               '<option                     value="3m" >3ヶ月(90日)以内</option>',
+              '<option                     value="6m" >6ヶ月(180日)以内</option>',
             '</select>',
             '<span>再生時間: </span>',
             '<select class="lengthSecondsRange" name="l">',
@@ -8840,6 +8886,26 @@
       overrideSearchContentView(View.prototype, relatedTag);
 
     } // end initSearchContent
+
+    function initUserVideoContent() {
+      var ContentType = WatchApp.ns.components.videoexplorer.model.ContentType;
+      var vec         = watch.VideoExplorerInitializer.videoExplorerController;
+      var explorer    = vec.getVideoExplorer();
+      var content     = explorer.getContentList().getContent(ContentType.USER_VIDEO);
+      var pager       = content._pager;
+
+      pager._pageItemCount = 100;
+    }
+
+    function initUploadedVideoContent() {
+      var ContentType = WatchApp.ns.components.videoexplorer.model.ContentType;
+      var vec         = watch.VideoExplorerInitializer.videoExplorerController;
+      var explorer    = vec.getVideoExplorer();
+      var content     = explorer.getContentList().getContent(ContentType.UPLOADED_VIDEO);
+      var pager       = content._pager;
+
+      pager._pageItemCount = 100;
+    }
 
     function initDeflistContent() {
       var ContentType = WatchApp.ns.components.videoexplorer.model.ContentType;
@@ -9642,6 +9708,8 @@
     initTouch();
     initEvents();
     initSearchContent();
+    initUserVideoContent();
+    initUploadedVideoContent();
     initDeflistContent();
     initRightPanel($rightPanel);
     initLeftPanel($leftPanel);
