@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130803
+// @version        1.130804
 // ==/UserScript==
 
 /**
@@ -43,6 +43,10 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130804
+// - 検索画面のメニューの所にある入力欄を少しだけ賢く&サジェスト対応
+
 
 // * ver 1.130803
 // - 動画終了時に自動でニコメンドを開かない・または中身がある時だけ開くようにする設定を追加
@@ -1414,7 +1418,7 @@
         padding-left: 4px;
         position: absolute;
         top: 2px;
-        width: 200px;
+        width: 180px;
       }
       .videoExplorerMenu.w_touch .quickSearchInput {
         top: 4px; font-size: 20px;
@@ -1867,34 +1871,6 @@
         display: none;
       }
 
-      .newSearchOption {
-        text-align: center; margin-bottom: 16px; padding: 8px;
-        background: #eee;
-        display: none;
-      }
-      .newSearchOption select{
-        margin-right: 32px;
-      }
-      .newSearchOption .reset{
-        cursor: pointer; background: #eee;
-      }
-      .w_sugoiSearch .newSearchOption {
-        display: block;
-      }
-
-      .relatedTagList {
-        background: #ddd; padding: 8px;
-      }
-      .relatedTagList p{
-        display: inline-block; margin: 4px;
-      }
-      .relatedTagList li, .relatedTagList ul {
-        display: inline-block;
-        margin: 0 18px 0 0;
-        list-style: none;
-        word-break: break-all;
-      }
-
       {* 不要な時まで横スクロールバーが出てしまうので *}
       #songrium_inline { overflow: hidden; }
 
@@ -2004,7 +1980,7 @@
       {title: '検索時に関連タグを表示する', varName: 'enableRelatedTag',
         values: {'する': true,  'しない': false}},
       {title: 'niconico新検索βを使う', varName: 'searchEngine',
-        description: '投稿期間や動画長さによる絞り込みができるようになります',
+        description: '投稿期間や動画長による絞り込みができるようになります',
         values: {'使う': 'sugoi',  '使わない': 'normal'}},
 
       {title: '全画面モードの設定', className: 'fullScreen'},
@@ -4220,34 +4196,52 @@
       },
       getOwnerIcon: function() {
         try {
-          return watchInfoModel.uploaderInfo.iconUrl || watchInfoModel.channelInfo.iconUrl;
+          return this.isChannelVideo() ? watchInfoModel.channelInfo.iconUrl : watchInfoModel.uploaderInfo.iconUrl;
         } catch (e) {
           return 'http://uni.res.nimg.jp/img/user/thumb/blank_s.jpg';
         }
       },
       getOwnerName: function() {
         try {
-          return watchInfoModel.uploaderInfo.nickname ? watchInfoModel.uploaderInfo.nickname : watchInfoModel.channelInfo.name;
+          return this.isChannelVideo() ? watchInfoModel.channelInfo.name    : watchInfoModel.uploaderInfo.nickname;
         } catch (e) {
           return '';
         }
       },
       getOwnerId: function() {
         try {
-          return watchInfoModel.uploaderInfo.id;
+          return this.isChannelVideo() ? watchInfoModel.channelInfo.id      : watchInfoModel.uploaderInfo.id;
         } catch (e) {
           return '0';
         }
       },
+      getOwnerType: function() {
+        try {
+          return this.isChannelVideo() ? 'channel' : 'user';
+        } catch (e) {
+          return 'channel';
+        }
+      },
       isFavoriteOwner: function() {
         try {
-          return watchInfoModel.uploaderInfo.isFavorited || !!(watchInfoModel.channelInfo && watchInfoModel.channelInfo.isFavorited);
+          return this.isChannelVideo() ?
+            !!(watchInfoModel.channelInfo && watchInfoModel.channelInfo.isFavorited) :
+            watchInfoModel.uploaderInfo.isFavorited;
         } catch (e) {
           return false;
         }
       },
       isChannelVideo: function() {
         return watchInfoModel.isChannelVideo();
+      },
+      getOwnerInfo: function() {
+        return {
+          type:       this.getOwnerType(),
+          name:       this.getOwnerName(),
+          icon:       this.getOwnerIcon(),
+          id:         this.getOwnerId(),
+          isFavorite: this.isFavoriteOwner()
+        }
       },
       isSearchMode: function() {
         return videoExplorer.isOpen(); ////return $('body').hasClass('videoExplorer');
@@ -4624,8 +4618,8 @@
       data.join    = params.join    || [
         // TODO:投稿者IDを取得する方法がないか？
           'cmsid', 'title', 'description', 'thumbnail_url', 'start_time',
-          'view_counter', 'comment_counter', 'mylist_counter', 'length_seconds',
-        //  'userid', 'channel_id', 'main_community_id', 'ss_adlut'
+          'view_counter', 'comment_counter', 'mylist_counter', 'length_seconds'
+        //  'user_id', 'channel_id', 'main_community_id', 'ss_adlut'
         ];
       data.filters = params.filters || [{}];
       data.sort_by = params.sort_by || 'start_time';
@@ -4720,6 +4714,13 @@
           break;
         default:
           break;
+      }
+
+      if (typeof params.userId === 'string' && params.userId.match(/^\d+$/)) {
+        query.filters.push({type: 'equal', field: 'user_id',    value: params.userId});
+      }
+      if (typeof params.channelId === 'string' && params.channelId.match(/^\d+$/)) {
+        query.filters.push({type: 'equal', field: 'channel_id', value: params.channelId});
       }
 
       if (params.l === 'short') { // 5分以内
@@ -4817,6 +4818,9 @@
     initialize: function(params) {
     },
     load: function(word, callback) {
+      if (typeof word !== 'string' || word.length <= 0) {
+        throw Exception('wordが設定されてない！');
+      }
       var url        = this._base_url + 'suggestion/complete',
           cache_key  = JSON.stringify({url: url, word: word}),
           cache_time = 60 * 1000 * 1,
@@ -4857,13 +4861,13 @@
     load: function(word, callback) {
       var url        = this._base_url + 'api/tag/',
           cache_key  = JSON.stringify({url: url, word: word}),
-          cache_time = 60 * 1000 * 3,
+          cache_time = 60 * 1000 * 10,
           cache      = Util.Cache.get(cache_key);
       if (cache) {
         setTimeout(function() { callback(null, cache); }, 0);
         return;
       }
-      var query = {query: word, service: ['tag_video'], from: 0, size: 15, timeout: 10000, issuer: 'pc', reason: 'user'};
+      var query = {query: word, service: ['tag_video'], from: 0, size: 100, timeout: 10000, issuer: 'pc', reason: 'user'};
       $.ajax({
         url: url,
         type: 'POST',
@@ -7279,6 +7283,77 @@
       return addStyle(__css__, 'videoExplorerStyleStatic');
     } // end setupVideoExplorerStaticCss
 
+    function initAutoComplete($searchInput) {
+      var
+        $suggestList = $('<datalist id="quickSearchSuggestList"></datalist>'),
+        suggestUpdateTimer = null,
+        loading = false,
+        val = '',
+        suggestLoader = new NicoSearchSuggest({});
+        update = function() {
+          if (suggestUpdateTimer) {
+            clearTimeout(suggestUpdateTimer);
+            suggestUpdateTimer = null;
+          }
+          suggestUpdateTimer = setTimeout(onSuggestUpdateTimerTick, 300);
+        },
+        onSuggestUpdateTimerTick = function() {
+          //console.log('onSuggestUpdateTimerTick');
+          if (loading) {
+            return;
+          }
+          var value = $searchInput.val();
+          //console.log('val"', val, '" ', val.length);
+          if (value.length >= 2 && val !== value) {
+            val = $searchInput.val();
+            loading = true;
+            //suggestLoader.load(val.slice(0, -1), onSuggestLoaded);
+            suggestLoader.load(val, onSuggestLoaded);
+          } else {
+            loading = false;
+          }
+        },
+        onSuggestLoaded = function(err, result) {
+          if (err) {
+            return;
+          }
+          //console.log('load suggest result', err, result);
+          if (result.candidates) {
+            if (conf.debugMode) console.log(result.candidates);
+            var candidates = result.candidates, suggestList = $suggestList[0];
+            $suggestList.empty();
+            for (var i = candidates.length - 1; i >= 0; i--) {
+              var opt = document.createElement('option');
+              opt.setAttribute('value', candidates[i]);
+              suggestList.appendChild(opt);
+            }
+          }
+          loading = false;
+        },
+        bind = function($elm) {
+          $elm
+            .on('focus',   update)
+            .on('keydown',   update)
+            .on('keyup',     update)
+            .on('keypress',  update)
+            .on('click',     update)
+            .on('mousedown', update)
+            .on('mouseup',   update)
+            .attr({'autocomplete': 'on', 'list': 'quickSearchSuggestList', 'placeholder': '検索ワードを入力'});
+         // try {
+         //   //$elm.attr('type', 'search');
+         //   //$elm[0].setAttribute('type', 'search');//.attr('type', 'search');
+         // } catch (e) {
+         //   console.log(e);
+         // }
+        };
+
+      $('body').append($suggestList);
+
+      bind($searchInput);
+      //bind($('.searchText input'));
+    }
+
     function initVideoExplorer($, conf, w) {
       setupVideoExplorerStaticCss();
 
@@ -7293,7 +7368,8 @@
         playerConnector = watch.PlayerInitializer.nicoPlayerConnector,
         searchType      = 'tag',
         $menu           = $('.videoExplorerMenu'),
-        $searchInput    = $('<input class="quickSearchInput" type="search" name="q" accesskey="q" />').attr('title', '検索ワードを入力'),
+        $searchInput    = $('<input class="quickSearchInput" type="search" name="q" accesskey="q" required="required" />')
+          .attr({'title': '検索ワードを入力', 'placeholder': '検索ワードを入力'}),
         $closeExplorer  = $('<div class="closeVideoExplorer"><a href="javascript:;">▲ 画面を戻す</a></div>'),
         $inputForm      = $('<form />').append($searchInput);
 
@@ -7307,13 +7383,18 @@
         e.preventDefault();
         var val = $.trim($searchInput.val());
         if (val.length > 0) {
-          WatchController.nicoSearch(val, searchType);
+          if (val.match(/(sm|nm|so)\d+/)) {
+            WatchController.nicoSearch(val, 'tag');
+          } else {
+            WatchController.nicoSearch(val, 'keyword');
+          }
         }
       });
       EventDispatcher.addEventListener('onSearchStart', function(word, type) {
         searchType = type.replace(/^.*\./, '');
         $searchInput.val(word);
       });
+      initAutoComplete($searchInput);
 
       $closeExplorer.find('a').on('click', function() {
         WatchController.closeSearch();
@@ -7444,9 +7525,15 @@
     } // end initVideoExplorer
 
 
+    var lastVideoOwnerJson = '';
     function onWatchInfoReset(watchInfoModel) {
       $('body').toggleClass('w_channel', watchInfoModel.isChannelVideo());
       EventDispatcher.dispatch('onWatchInfoReset', watchInfoModel);
+      var owner = WatchController.getOwnerInfo(), owner_json = JSON.stringify(owner);
+      if (lastVideoOwnerJson !== owner_json) {
+        lastVideoOwnerJson = owner_json
+        EventDispatcher.dispatch('onVideoOwnerChanged', owner);
+      }
     }
 
     function onScreenModeChange(sc) {
@@ -8588,6 +8675,41 @@
       var newSearch        = new NewNicoSearch({});
       var newSearchWrapper = new NewNicoSearchWrapper({search: newSearch});
       var pager            = content._pager;
+      var __css__          = Util.here(function() {/*
+        .newSearchOption {
+          text-align: center; margin-bottom: 16px; padding: 8px;
+          background: #eee;
+          display: none;
+        }
+        .newSearchOption select, .newSearchOption label{
+          margin-right: 32px;
+        }
+        .newSearchOption .reset{
+          cursor: pointer; background: #eee;
+        }
+        .newSearchOption p{
+          margin: 8px;
+        }
+        .newSearchOption .ownerName {
+        }
+        .w_sugoiSearch .newSearchOption {
+          display: block;
+        }
+
+        .relatedTagList {
+          background: #ddd; padding: 8px;
+        }
+        .relatedTagList p{
+          display: inline-block; margin: 4px;
+        }
+        .relatedTagList li, .relatedTagList ul {
+          display: inline-block;
+          margin: 0 18px 0 0;
+          list-style: none;
+          word-break: break-all;
+        }
+      */});
+      addStyle(__css__, 'searchContent');
 
       var RelatedTagView = function() { this.initialize.apply(this, arguments); };
       RelatedTagView.prototype = {
@@ -8609,8 +8731,14 @@
             this.detach();
             return;
           }
+          if (candidates.length > 10) {
+            candidates = candidates
+              .map(function(a){return {weight:Math.random(), value:a};})
+              .sort(function(a, b){return a.weight - b.weight;})
+              .map(function(a){return a.value;});
+          }
           var $ul = this._$list.empty();
-          for (var i = 0, len = candidates.length; i < len; i++) {
+          for (var i = 0, len = Math.min(10, candidates.length); i < len; i++) {
             $ul.append(this._create$tag(candidates[i].tag));
           }
         },
@@ -8644,6 +8772,8 @@
           this._$startTimeRange     = this._$view.find('.startTimeRange');
           this._$lengthSecondsRange = this._$view.find('.lengthSecondsRange');
           this._$musicDlFilter      = this._$view.find('.musicDlFilter');
+          this._$ownerFilter        = this._$view.find('.ownerFilter');
+            this._$ownerName        = this._$view.find('.ownerName');
           this._$resetButton        = this._$view.find('.reset');
 
           this._$startTimeRange    .val(params.startTimeRange     || '');
@@ -8653,7 +8783,11 @@
           this._$startTimeRange    .on('change', $.proxy(this._onStartTimeRangeSelect    , this));
           this._$lengthSecondsRange.on('change', $.proxy(this._onLengthSecondsRangeSelect, this));
           this._$musicDlFilter     .on('click',  $.proxy(this._onMusicDlFilterChange     , this));
+          this._$ownerFilter       .on('click',  $.proxy(this._onOwnerFilterChange       , this));
           this._$resetButton       .on('click',  $.proxy(this.reset                      , this));
+
+          EventDispatcher.addEventListener('onVideoOwnerChanged', $.proxy(this.onVideoOwnerChange, this));
+          this._$ownerName.text(WatchController.getOwnerName());
         },
         getView: function() {
           return this._$view;
@@ -8662,6 +8796,11 @@
           this._$view.detach();
         },
         update: function() {
+        },
+        onVideoOwnerChange: function(ownerInfo) {
+          this._content.setOwnerFilter(false);
+          this._$ownerFilter.attr('checked', false);
+          this._$ownerName.text(ownerInfo.name);
         },
         _onStartTimeRangeSelect: function() {
           this._content.setStartTimeRange(this._$startTimeRange.val());
@@ -8673,6 +8812,10 @@
         },
         _onMusicDlFilterChange: function() {
           this._content.setMusicDlFilter(!!this._$musicDlFilter.attr('checked'));
+          this._content.refresh({ page: 1 });
+        },
+        _onOwnerFilterChange: function() {
+          this._content.setOwnerFilter(!!this._$ownerFilter.attr('checked'));
           this._content.refresh({ page: 1 });
         },
         reset: function() {
@@ -8715,10 +8858,14 @@
               '<option                     value="short">5分以内</option>',
               '<option                     value="long" >20分以上</option>',
             '</select>',
-//            '<button class="reset">リセット</button>',
-            '<label>',
-              '<input type="checkbox" name="m" class="musicDlFilter">音楽DL対応のみ</input>',
-            '</label>',
+            '<p>',
+              '<label>',
+                '<input type="checkbox" name="m" class="musicDlFilter">音楽DL対応のみ</input>',
+              '</label>',
+              '<label>',
+                '<input type="checkbox" name="owner" class="ownerFilter"><span class="ownerName">この投稿者</span>&nbsp;の動画のみ</input>',
+              '</label>',
+            '</p>',
           '</div>',
           ''].join(''))
       });
@@ -8761,9 +8908,12 @@
       content._startTimeRange       = conf.searchStartTimeRange;
       content._lengthSecondsRange   = conf.searchLengthSecondsRange;
       content._musicDlFilter        = conf.searchMusicDlFilter;
+      content._ownerFilter          = false;
+
       content.getStartTimeRange     = $.proxy(function() { return this._startTimeRange;           }, content);
       content.getLengthSecondsRange = $.proxy(function() { return this._lengthSecondsRange;       }, content);
       content.getMusicDlFilter      = $.proxy(function() { return this._musicDlFilter;            }, content);
+      content.getOwnerFilter        = $.proxy(function() { return this._ownerFilter;              }, content);
       content.setStartTimeRange     = $.proxy(function(value) {
         this._startTimeRange = value;
         conf.setValue('searchStartTimeRange', value);
@@ -8776,6 +8926,9 @@
         this._musicDlFilter = !!value;
         conf.setValue('searchMusicDlFilter', !!value);
       }, content);
+      content.setOwnerFilter        = $.proxy(function(value) {
+        this._ownerFilter = !!value;
+      }, content);
 
 
       content.load_org = content.load;
@@ -8786,7 +8939,7 @@
           this.load_org(callback);
         } else {
           this.setLastSearchEngineType('sugoi');
-          this._newSearchWrapper.load({
+          var params = {
             searchWord:  this.getSearchWord(),
             searchType:  this.getSearchType(),
             page:        this.getPage(),
@@ -8796,7 +8949,16 @@
             u:           this.getStartTimeRange(),
             m:           this.getMusicDlFilter(),
             size:        this._pager._pageItemCount
-          }, function(err, result) {
+          };
+          if (this.getOwnerFilter()) {
+            if (WatchController.isChannelVideo()) {
+              params.channelId = WatchController.getOwnerId();
+            } else {
+              params.userId = WatchController.getOwnerId();
+            }
+          }
+
+          this._newSearchWrapper.load(params, function(err, result) {
             if (conf.debugMode)console.log('%cNewNicoSearchWrapper result', 'color: green;', result);
             callback(err, result);
           });
@@ -8807,6 +8969,7 @@
       EventDispatcher.addEventListener('on.config.searchEngine', function(type) {
         content.setSearchEngineType(type);
       });
+
 
       var
         overrideSearchSortOrder = function(proto) { // ソート順を記憶するためのフック
@@ -9586,7 +9749,7 @@
 
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
 
-      $('#videoHeaderMenu .searchText input').attr('accesskey', '@').on('focus', function() {
+      $('#videoHeaderMenu .searchText input').attr({'accesskey': '@', 'placeholder': '検索ワードを入力'}).on('focus', function() {
         WatchController.scrollTop(0, 400);
       });
 
