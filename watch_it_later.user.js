@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130805
+// @version        1.130805b
 // ==/UserScript==
 
 /**
@@ -44,8 +44,11 @@
  * ・綺麗なコード
  */
 
+// * ver 1.130805b
+// - コメントパネルを広くするとフルスクリーンが崩れる不具合の修正
+
 // * ver 1.130805
-// - コメントパネルを太くする機能の復活
+// - コメントパネルを広くする機能の復活
 // - 新検索β使用時、現在見ている動画の投稿者の動画だけを探す機能を追加
 // - 角丸をなくす設定が無意味になったので廃止。 プレイヤーの背景色の設定を追加
 
@@ -642,8 +645,12 @@
         padding: 0px 0px 0 0px; width: 280px; height: 100%;
         position: absolute; top: 0; right:0;
       }
-      .w_wide #playerTabWrapper .sideVideoInfo, .w_wide #playerTabWrapper .sideIchibaPanel, .w_wide #playerTabWrapper .sideReviewPanel,
-      .videoExplorer #playerTabWrapper .sideVideoInfo, .videoExplorer #playerTabWrapper .sideIchibaPanel, .videoExplorer #playerTabWrapper .sideReviewPanel {
+      body:not(.full_with_browser) .w_wide #playerTabWrapper .sideVideoInfo,
+      body:not(.full_with_browser) .w_wide #playerTabWrapper .sideIchibaPanel,
+      body:not(.full_with_browser) .w_wide #playerTabWrapper .sideReviewPanel,
+      .videoExplorer #playerTabWrapper .sideVideoInfo,
+      .videoExplorer #playerTabWrapper .sideIchibaPanel,
+      .videoExplorer #playerTabWrapper .sideReviewPanel {
         width: 420px; z-index: 10030;
       }
       #playerTabWrapper.w_videoInfo #appliPanel, #playerTabWrapper.w_ichiba #appliPanel, #playerTabWrapper.w_review #appliPanel  {
@@ -1665,13 +1672,13 @@
       #content.w_compact        #topVideoInfo .videoDescription.description {
         background: #fff; margin: 10px 0 0;padding: 4px ;width: 952px; {*font-size: 90%;*}
       }
-      #content.w_compact.w_wide #topVideoInfo .videoDescription.description {
+      body:not(.full_with_browser) #content.w_compact.w_wide #topVideoInfo .videoDescription.description {
         width: 1192px;
       }
       .size_normal #content.w_compact        #videoDetailInformation .description {
         width: 1178px;
       }
-      .size_normal #content.w_compact.w_wide #videoDetailInformation .description {
+      body:not(.full_with_browser) .size_normal #content.w_compact.w_wide #videoDetailInformation .description {
         width: 1318px;
       }
       #content.w_compact #topVideoInfo .videoMainInfoContainer{
@@ -1825,7 +1832,7 @@
       body:not(.videoExplorer) #leftPanel { display: none; }
 
 
-      body.full_with_browser #playerTabWrapper, body.full_with_browser:not(.videoExplorer) #playerTabWrapper.w_wide {
+      body.full_with_browser #playerTabWrapper, body.full_with_browser:not(.videoExplorer) .w_wide #playerTabWrapper {
         top: auto !important; bottom: 3000px !important; right: 50px !important;
         transition: bottom 0.2s ease-out; max-height: 500px;
       }
@@ -1921,7 +1928,7 @@
         values: {'する': true, 'しない': false}, addClass: true},
       {title: '自動全画面化オンでも、ユーザーニコ割のある動画は', varName: 'disableAutoBrowserFullIfNicowari',
         values: {'全画面化しない': true, '全画面化する': false}},
-      {title: '自動で検索画面にする(自動全画面化オフ時)', varName: 'autoOpenSearch',
+      {title: '自動で検索モードにする(自動全画面化オフ時)', varName: 'autoOpenSearch',
         values: {'する': true, 'しない': false}},
       {title: '動画の位置に自動スクロール(自動全画面化オフ時)', varName: 'autoScrollToPlayer',
         values: {'する': true, 'しない': false}},
@@ -8246,18 +8253,18 @@
             '#playerCommentPanel .commentTable .commentTableContainer'
           ];
           var css = [
-            'body.videoExplorer #content.w_adjusted #playerTabWrapper { width: ', targetWidth,'px;}\n',
-            '.w_wide #playerTabWrapper { width: ', targetWidth,'px;}\n',
+            'body.videoExplorer #content.w_adjusted #playerTabWrapper { width: ', targetWidth,'px; }\n',
+            'body:not(.full_with_browser) .w_wide #playerTabWrapper { width: ', targetWidth,'px; }\n',
             //'body:not(.videoExplorer) .w_wide #playerTabWrapper.w_wide { right: -140px;}\n'
-            'body:not(.videoExplorer) .w_wide #playerAlignmentArea             { width: 1100px; }\n', //  960 + 140
-            'body:not(.videoExplorer) .w_wide #playerAlignmentArea.size_normal { width: 1326px; }\n'  // 1186 + 140
+            'body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea             { width: 1100px; }\n', //  960 + 140
+            'body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea.size_normal { width: 1326px; }\n\n'  // 1186 + 140
           ];
           for (var v in elms) {
             var $e = $(elms[v]), newWidth = $e.width() + px;
             css.push([
               '.w_wide #playerTabWrapper ', elms[v],
               ' , body.videoExplorer #content.w_adjusted ',
-              elms[v], ' { width: ', newWidth,'px !important;}\n'
+              elms[v], '\n{ width: ', newWidth,'px !important; }\n\n'
             ].join(''));
           }
           wideCss = addStyle(css.join(''), 'wideCommentPanelCss');
@@ -8270,22 +8277,27 @@
         };
 
       var wideCommentPanelCss = Util.here(function() {/*
-        body.videoExplorer #content.w_adjusted #playerTabWrapper { width: 420px;}
-        .w_wide #playerTabWrapper { width: 420px;}
-        body:not(.videoExplorer) .w_wide #playerAlignmentArea             { width: 1100px; }
-        body:not(.videoExplorer) .w_wide #playerAlignmentArea.size_normal { width: 1326px; }
-        .w_wide #playerTabWrapper #playerTabWrapper,
+        body.videoExplorer #content.w_adjusted #playerTabWrapper { width: 420px; }
+        body:not(.full_with_browser) .w_wide #playerTabWrapper   { width: 420px; }
+
+        body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea             { width: 1100px; }
+        body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea.size_normal { width: 1326px; }
+
+        body:not(.full_with_browser) .w_wide #playerTabWrapper #playerTabWrapper,
         body.videoExplorer #content.w_adjusted #playerTabWrapper
-        { width: 420px !important;}
-        .w_wide #playerTabWrapper #commentDefaultHeader,
+        { width: 420px !important; }
+
+        body:not(.full_with_browser) .w_wide #playerTabWrapper #commentDefaultHeader,
         body.videoExplorer #content.w_adjusted #commentDefaultHeader
-        { width: 408px !important;}
-        .w_wide #playerTabWrapper #playerCommentPanel .commentTable,
+        { width: 408px !important; }
+
+        body:not(.full_with_browser) .w_wide #playerTabWrapper #playerCommentPanel .commentTable,
         body.videoExplorer #content.w_adjusted #playerCommentPanel .commentTable
-        { width: 406px !important;}
-        .w_wide #playerTabWrapper #playerCommentPanel .commentTable .commentTableContainer,
+        { width: 406px !important; }
+
+        body:not(.full_with_browser) .w_wide #playerTabWrapper #playerCommentPanel .commentTable .commentTableContainer,
         body.videoExplorer #content.w_adjusted #playerCommentPanel .commentTable .commentTableContainer
-        { width: 406px !important;}
+        { width: 406px !important; }
      */});
       addStyle(wideCommentPanelCss, 'wideCommentPanelCss');
 
@@ -8480,13 +8492,13 @@
         .sidePanel.w_review #videoReview .inner { width: 260px; }
         .sidePanel.w_review .commentContent { width: 238px; }
         .sidePanel.w_review .commentContentBody { width: 192px; }
-        .w_wide .sidePanel.w_review #videoReview { width: 400px; }
-        .w_wide .sidePanel.w_review textarea.newVideoReview { width: 377px; }
-        .w_wide .sidePanel.w_review #videoReviewHead { width: 383px; }
-        .w_wide .sidePanel.w_review #videoReview .stream { width: 400px; }
-        .w_wide .sidePanel.w_review #videoReview .inner { width: 400px; }
-        .w_wide .sidePanel.w_review .commentContent { width: 378px; }
-        .w_wide .sidePanel.w_review .commentContentBody { width: 332px; }
+        body:not(.full_with_browser) .w_wide .sidePanel.w_review #videoReview { width: 400px; }
+        body:not(.full_with_browser) .w_wide .sidePanel.w_review textarea.newVideoReview { width: 377px; }
+        body:not(.full_with_browser) .w_wide .sidePanel.w_review #videoReviewHead { width: 383px; }
+        body:not(.full_with_browser) .w_wide .sidePanel.w_review #videoReview .stream { width: 400px; }
+        body:not(.full_with_browser) .w_wide .sidePanel.w_review #videoReview .inner { width: 400px; }
+        body:not(.full_with_browser) .w_wide .sidePanel.w_review .commentContent { width: 378px; }
+        body:not(.full_with_browser) .w_wide .sidePanel.w_review .commentContentBody { width: 332px; }
         body.videoExplorer .sidePanel.w_review #videoReview { width: 400px; }
         body.videoExplorer .sidePanel.w_review textarea.newVideoReview { width: 377px; }
         body.videoExplorer .sidePanel.w_review #videoReviewHead { width: 383px; }
