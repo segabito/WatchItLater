@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130804
+// @version        1.130805
 // ==/UserScript==
 
 /**
@@ -44,9 +44,13 @@
  * ・綺麗なコード
  */
 
+// * ver 1.130805
+// - コメントパネルを太くする機能の復活
+// - 新検索β使用時、現在見ている動画の投稿者の動画だけを探す機能を追加
+// - 角丸をなくす設定が無意味になったので廃止。 プレイヤーの背景色の設定を追加
+
 // * ver 1.130804
 // - 検索画面のメニューの所にある入力欄を少しだけ賢く&サジェスト対応
-
 
 // * ver 1.130803
 // - 動画終了時に自動でニコメンドを開かない・または中身がある時だけ開くようにする設定を追加
@@ -262,7 +266,8 @@
       bottomContentsVisibility: 'hidden', // 動画下のコンテンツ表示表示非表示
       hideMenuInFull: 'hide', // 全画面時にマイリストメニューを隠す '', 'hide' = 目立たなくする, 'hideAll' = 完全非表示
 
-      flatDesignMode: '',  // 'on' グラデーションや角丸をなくす
+      flatDesignMode: '',  // 'on' グラデーションや角丸をなくす。 7/25からQwatchがフラットデザインになったので不要になった
+      playerBgStyle: '',  // ￪ の後継パラメータ 'gray' 'white' ''
 
       shortcutDefMylist:          {char: 'M', shift: true,  ctrl: false, alt: false, enable: false}, // とりマイ登録のショートカット
       shortcutMylist:             {char: 'M', shift: false, ctrl: true , alt: false, enable: false}, // マイリスト登録のショートカット
@@ -629,7 +634,7 @@
       {* 右に表示する動画情報 *}
       .sidePanel .sideVideoInfo, .sidePanel .sideIchibaPanel, .sidePanel .sideReviewPanel  {
         padding: 0px 0px 0 0px; width: 196px; height: 100%; z-index: 10;
-        position:absolute; top:0; right:0;
+        position:absolute; top:0; right:0; border: 1px solid #000;
         display:none; overflow-x: visible; overflow-y: auto;
       }
       {* 右に表示する動画情報 *}
@@ -637,18 +642,15 @@
         padding: 0px 0px 0 0px; width: 280px; height: 100%;
         position: absolute; top: 0; right:0;
       }
-      {*#playerTabWrapper.w_wide .sideVideoInfo, #playerTabWrapper.w_wide .sideIchibaPanel, #playerTabWrapper.w_wide .sideReviewPanel,*}
+      .w_wide #playerTabWrapper .sideVideoInfo, .w_wide #playerTabWrapper .sideIchibaPanel, .w_wide #playerTabWrapper .sideReviewPanel,
       .videoExplorer #playerTabWrapper .sideVideoInfo, .videoExplorer #playerTabWrapper .sideIchibaPanel, .videoExplorer #playerTabWrapper .sideReviewPanel {
         width: 420px; z-index: 10030;
       }
       #playerTabWrapper.w_videoInfo #appliPanel, #playerTabWrapper.w_ichiba #appliPanel, #playerTabWrapper.w_review #appliPanel  {
         top: -9999px;
       }
-      #content:not(.w_flat) .sidePanel .sideVideoInfo, #content:not(.w_flat) .sidePanel .sideIchibaPanel, #content:not(.w_flat) .sidePanel .sideReviewPanel  {
-        border-radius: 4px;
-      }
       .sidePanel .sideVideoInfo {
-        background: #bbb; text-Align:   left; overflow-x: hidden; overflow-Y: auto; box-shadow: none; font-size: 90%;
+        background: #f4f4f4; text-Align:   left; overflow-x: hidden; overflow-Y: auto; box-shadow: none; font-size: 90%; border: 1px solid black;
       }
       .sidePanel .sideIchibaPanel, .sidePanel .sideReviewPanel  {
         background: #f4f4f4; text-Align: center; overflow-x: hidden; overflow-Y: auto; box-shadow: none; font-size: 90%;
@@ -657,13 +659,14 @@
         padding: 0 4px; position: relative;
       }
       .sidePanel .sideVideoInfo .videoTitleContainer {
-        background: #ccc; text-align: center;  color: #000; margin: 6px 0 0;
+        background: #ddd; text-align: center;  color: #000; margin: 6px 0 0;
+        border: solid; border-width: 1px 1px 0; border-color: #ccc;
       }
-      #content:not(.w_flat) .sidePanel .sideVideoInfo .videoTitleContainer {
-        border-radius: 4px 4px 0 0;
+      .sidePanel .sideVideoInfo .videoOwnerInfoContainer {
+        border: solid; border-width: 0 1px 0; border-color: #ccc;
       }
       .sidePanel .sideVideoInfo .videoThumbnailContainer {
-        background: #ccc; text-align: center; color: #000; margin: 0;
+        background: #ddd; text-align: center; color: #000; margin: 0;
       }
       .sidePanel .sideVideoInfo .videoThumbnailContainer img {
         cursor: pointer;
@@ -687,7 +690,8 @@
         display: none !important;
       }
       .sidePanel .sideVideoInfo .videoInfo{
-        background: #ccc; text-align: center; padding: 4px;
+        background: #ddd; text-align: center; padding: 4px;
+        border: solid; border-width: 0 1px 1px; border-color: #ccc;
       }
       .sideVideoInfo .sideVideoInfoInner{
         -webkit-transition: opacity 1s ease-out, color 3s ease-out;
@@ -737,21 +741,16 @@
         display: block;
       }
       .sideVideoInfo .userIconContainer, .sideVideoInfo .channelIconContainer {
-        background: #ccc; width: 100%; text-align: center; float: none;
-      }
-      #content:not(.w_flat) .sideVideoInfo .userIconContainer, #content:not(.w_flat) .sideVideoInfo .channelIconContainer{
-        border-radius: 0 0 4px 4px;
+        background: #ddd; width: 100%; text-align: center; float: none;
       }
       .sidePanel .userIcon, .sidePanel .channelIcon{
         min-width: 128px; max-width: 150px; width: auto; height: auto; border: 0;
       }
       .sidePanel .sideVideoInfo .descriptionThumbnail {
-        text-align: left; font-size: 90%; padding: 4px; background: #ccc;{*box-shadow: 2px 2px 2px #666;*}
+        text-align: left; font-size: 90%; padding: 4px; background: #ddd; border: 1px solid #ccc;
         min-height: 60px; margin-bottom: 4px; font-weight: normal; color: black;
       }
-      #content:not(.w_flat) .sidePanel .sideVideoInfo .descriptionThumbnail {
-        border-radius: 4px;
-      }
+
       .sidePanel .sideVideoInfo .descriptionThumbnail.video img{
         height: 50px; cursor: pointer; float: left;
       }
@@ -778,9 +777,7 @@
         width: 180px; display:inline-block; vertical-align: top;
         margin: 4px 3px; border 1px solid silver;
       }
-      body.videoExplorer #content.w_adjusted:not(.w_flat) .sideIchibaPanel .ichiba_mainitem {
-        border-radius: 8px
-      }
+
       body.videoExplorer #content.w_adjusted .sideIchibaPanel .ichiba_mainitem .thumbnail span {
         font-size: 60px;
       }
@@ -832,14 +829,12 @@
                 transform: rotate(-90deg);         transform-origin: 100% 0 0;
         -webkit-transform: rotate(-90deg); -webkit-transform-origin: 100% 0 0;
       }
-      #content:not(.w_flat) #leftPanelTabContainer {
-        border-radius: 4px 4px 0px 0px;
-      }
+
       #leftPanelTabContainer.w_touch {
         top: -40px; height: 33px;
       }
       .sidePanel:hover #sidePanelTabContainer, .sidePanel:hover #leftPanelTabContainer {
-        display:block;
+        display: block;
       }
       #leftPanelTabContainer .tab{
         display: inline-block; cursor: pointer; background: #999; padding: 2px 4px 0px; border-width: 1px 1px 0px;
@@ -855,11 +850,8 @@
       #sidePanelTabContainer.left .tab {
         display: inline-block; font-size: 13px; padding: 5px 10px 0px;
       }
-      #leftPanel.videoInfo .tab.videoInfo {
-        background: #bbb;    border-style: outset;
-      }
-      #leftPanel.ichiba .tab.ichiba {
-        background: #eee;    border-style: outset;
+      #leftPanel.videoInfo .tab.videoInfo, #leftPanel.ichiba .tab.ichiba {
+        background: #f4f4f4;    border-style: outset;
       }
       #playerTabWrapper.w_comment   .tab.comment,
       #playerTabWrapper.w_videoInfo .tab.videoInfo,
@@ -876,7 +868,6 @@
       #playerTabWrapper.w_review #playerCommentPanel {
         {*display: none;*} top: -9999px;
       }
-      {*body.videoExplorer #sidePanelTabContainer { display: none; }*}
       .sidePanel.ichibaEmpty  .tab.ichiba, .sidePanel.reviewEmpty .tab.review {
         color: #ccc;
       }
@@ -1566,7 +1557,7 @@
       body:not(.full_with_browser) #trueBrowserFullShield { display: none; }
 
       #sharedNgSettingContainer {
-        display: inline-block; font-size: 80%; position: absolute; top: 0; left: 85px;
+        display: inline-block; font-size: 80%; position: absolute; top: -18px; left: 5px;
       }
       #sharedNgSetting {
         background: #ddd; border: 1px solid silver;
@@ -1615,27 +1606,29 @@
         background: #141414; padding-top: 0; padding-bottom: 35px;
       }
 
-      #content.w_flat #playerContainerWrapper, #content.w_flat #playlist .playlistInformation {
+      #content.w_flat_gray  #playerContainerWrapper {
+        background: #666;
+      }
+      #content.w_flat_white #playerContainerWrapper {
+        background: #f4f4f4;
+      }
+      #content #playlist .playlistInformation {
         background: #444;
       }
-      #content.w_flat #leftPanel, #content.w_flat #playerCommentPanel {
-        background: #ddd; border-radius: 0;
-      }
-      #content.w_flat .sideVideoInfo {
-        border-radius: 0;
-      }
-     #content.w_flat #videoExplorerExpand a {
+      #content #videoExplorerExpand a {
         text-shadow: none;
       }
-      #content.w_flat #playerCommentPanel .section .commentTable .commentTableHeaderWrapper {
-        background: gray;
-      }
-
       body:not(.full_with_browser) #content.w_compact #videoHeader {
         width: 960px;
       }
       body:not(.full_with_browser).size_normal #content.w_compact #videoHeader {
         width: 1186px;
+      }
+      body:not(.full_with_browser) #content.w_compact.w_wide #videoHeader {
+        width: 1100px;
+      }
+      body:not(.full_with_browser).size_normal #content.w_compact.w_wide #videoHeader {
+        width: 1326px;
       }
       .videoMenuToggle {
         -webkit-transform-origin: 100% 100%; -webkit-transition: -webkit-transform 0.4s;
@@ -1669,11 +1662,17 @@
       #content.w_compact #videoHeaderDetail .videoDetailExpand{
         height: auto; padding: 0;
       }
-      #content.w_compact #topVideoInfo .videoDescription.description {
+      #content.w_compact        #topVideoInfo .videoDescription.description {
         background: #fff; margin: 10px 0 0;padding: 4px ;width: 952px; {*font-size: 90%;*}
       }
-      .size_normal #content.w_compact #videoDetailInformation .description {
-        width: 1178px
+      #content.w_compact.w_wide #topVideoInfo .videoDescription.description {
+        width: 1192px;
+      }
+      .size_normal #content.w_compact        #videoDetailInformation .description {
+        width: 1178px;
+      }
+      .size_normal #content.w_compact.w_wide #videoDetailInformation .description {
+        width: 1318px;
       }
       #content.w_compact #topVideoInfo .videoMainInfoContainer{
         padding: 0;
@@ -1690,11 +1689,17 @@
       #content.w_compact #topVideoInfo .videoStats {
         margin-bottom: 2px;
       }
-      body:not(.full_with_browser) #content.w_compact #videoTagContainer{
+      body:not(.full_with_browser) #content.w_compact        #videoTagContainer{
         width: 900px;
       }
-      body:not(.full_with_browser).size_normal #content.w_compact #videoTagContainer{
+      body:not(.full_with_browser) #content.w_compact.w_wide #videoTagContainer{
+        width: 1040px;
+      }
+      body:not(.full_with_browser).size_normal #content.w_compact        #videoTagContainer{
         width: 1123px;
+      }
+      body:not(.full_with_browser).size_normal #content.w_compact.w_wide #videoTagContainer{
+        width: 1263px;
       }
       body:not(.full_with_browser) #content.w_compact #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit {
         width: 72px;
@@ -1753,10 +1758,6 @@
       }
       #outline.w_compact .sidebar { width: 300px; }
 
-      #outline.w_compact .outer {
-        {* 左パネルを隠した標準サイズのプレイヤーに合わせる *}
-        width: 960px;
-      }
       #outline.w_compact #ichibaMain dl.ichiba_mainitem {
         margin: 0 22px 30px 0;
       }
@@ -1937,8 +1938,8 @@
         values: {'開かない': 'disable', '中身がある時だけ開く': 'auto', '開く': 'enable'}},
 
       {title: 'プレイヤーの設定', className: 'playerSetting'},
-//      {title: 'コメントパネルを広くする', varName: 'wideCommentPanel',
-//        values: {'する': true, 'しない': false}},
+      {title: 'コメントパネルを広くする', varName: 'wideCommentPanel',
+        values: {'する': true, 'しない': false}},
       {title: 'コメントパネルにNG共有設定を表示', varName: 'enableSharedNgSetting',
         values: {'する': true, 'しない': false}, addClass: true},
       {title: 'コメントの表示', varName: 'commentVisibility',
@@ -1951,6 +1952,8 @@
         values: {'する': true, 'しない': false}},
       {title: 'ニコニコニュースを消す', varName: 'hideNicoNews',
         values: {'消す': true, '消さない': false}},
+      {title: 'プレイヤーの背景', varName: 'playerBgStyle',
+        values: {'白': 'white', 'グレー': 'gray', '標準': ''}},
       {title: 'コメントの盛り上がりをグラフ表示', varName: 'enableHeatMap', reload: true,
         description: '動画のどのあたりが盛り上がっているのか、わかりやすくなります',
         values: {'する': true, 'しない': false}},
@@ -2007,9 +2010,9 @@
       {title: '動画情報の空きスペースを詰める', varName: 'compactVideoInfo',
         description: '原宿ぐらいの密度になります。ちょっと窮屈かも',
         values: {'詰める': true, '詰めない': false}},
-      {title: 'グラデーションや角の丸みをなくす', varName: 'flatDesignMode',
-        description: '軽い表示になります',
-        values: {'なくす': 'on', 'なくさない': ''}},
+//      {title: '背景のグラデーションをなくす', varName: 'flatDesignMode',
+//        description: '軽い表示になります',
+//        values: {'なくす': 'on', 'なくさない': ''}},
       {title: '「ニコる」をなくす', varName: 'noNicoru',
         description: '画面上から見えなくなります。',
         values: {'なくす': true, 'なくさない': false}},
@@ -7029,7 +7032,7 @@
 
 
         'body.videoExplorer #content.w_adjusted #leftPanel {',
-          ' display: block; top: ', (availableHeight + otherPluginsHeight), 'px !important; max-height: ', bottomHeight, 'px !important; width: ', (xdiff - 4), 'px !important; left: 0;',
+          ' display: block; top: ', (availableHeight + otherPluginsHeight - 1), 'px !important; max-height: ', bottomHeight, 'px !important; width: ', (xdiff - 4 + 1), 'px !important; left: 0;',
           ' height:', Math.min(bottomHeight, 600), 'px !important; display: block !important; border-radius: 0;',
         '}',
         'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo, body.size_small.no_setting_panel.videoExplorer #content.w_adjusted #leftPanel .sideIchibaPanel {',
@@ -7041,22 +7044,22 @@
         ((xdiff >= 400) ?
           [
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoTitleContainer{',
-              'margin-left: 154px; border-radius: 0 0 ; background: #999;',
+              'margin-left: 154px; border-radius: 0 0 ;background: #ddd; border: solid; border-color: #ccc; border-width: 1px 1px 0;',
             '}',
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoThumbnailContainer{',
               'position: absolute; max-width: 150px; top: 0; ',
             '}',
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoInfo{',
-              'background: #999; margin-left: 154px; border-radius: 0 0;',
+              'background: #ddd; margin-left: 154px; border-radius: 0 0; border: solid; border-color: #ccc; border-width: 0 1px 1px;',
             '}',
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoDetails{',
               'margin-left: 154px; height: 100%; ',
             '}',
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoOwnerInfoContainer{',
-              'position: absolute; width: 150px; top: 0;',
+              'position: absolute; width: 150px; top: 0; border: 1px solid #ccc;',
             '}',
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .userIconContainer, body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .ch_profile{',
-              'background: #ccc; max-width: 150px; float: none; border-radius: 0;',
+              'background: #ddd; max-width: 150px; float: none; border-radius: 0;',
             '}',
             'body.videoExplorer:not(.content-fix) .w_adjusted .videoDetails, ',
             'body.videoExplorer:not(.content-fix) .w_adjusted #videoExplorerMenu {',
@@ -7229,10 +7232,7 @@
         body.videoExplorer #content.w_adjusted .videoExplorerMenuInner
           { position: static !important; top: 0 !important; left: 0 !important; }
 
-        body.videoExplorer #bottomContentTabContainer.w_adjusted { background: #333; }
-        body.videoExplorer #content.w_adjusted .sidePanel .panelClickHandler {
-          display: none !important;
-        }
+        body.videoExplorer #bottomContentTabContainer.w_adjusted { background: #ccc; }
         body:not(.videoExplorer)      .videoExplorerMenu { display: none; }
 
         body.videoExplorer #content.w_adjusted #nicoplayerContainer {
@@ -7503,21 +7503,21 @@
 
       $('#videoExplorer, #content, #footer').addClass('w_adjusted');
       // コメントパネルが白いままになるバグを対策 (TODO:もういらなくなった事が確認できたら消す)
-//      var refreshCommentPanelTimer = null;
-//      var refreshCommentPanelHeight = function() { return;// もうやらなくても大丈夫になったかも？
-//        if (!WatchController.isSearchMode()) {
-//          return;
-//        }
-//        if (refreshCommentPanelTimer !== null) {
-//          clearTimeout(refreshCommentPanelTimer);
-//          refreshCommentPanelTimer = null;
-//        }
-//        refreshCommentPanelTimer =
-//          setTimeout(function() {
-//            watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
-//          }, 1000);
-//      }
-//     $('#playerTabWrapper').on('mouseenter.watchItLater', refreshCommentPanelHeight);
+      var refreshCommentPanelTimer = null;
+      var refreshCommentPanelHeight = function() {
+        if (!WatchController.isSearchMode()) {
+          return;
+        }
+        if (refreshCommentPanelTimer !== null) {
+          clearTimeout(refreshCommentPanelTimer);
+          refreshCommentPanelTimer = null;
+        }
+        refreshCommentPanelTimer =
+          setTimeout(function() {
+            watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
+          }, 1000);
+      }
+     $('#playerTabWrapper').on('mouseenter.watchItLater', refreshCommentPanelHeight);
 
       // TODO: ニコメンド編集ボタンが押されたら検索画面解除
       // TODO:ユーザーの動画一覧を開いた時、マイリスト一つだけだった場合はそれを開く処理の復活
@@ -8079,12 +8079,6 @@
         })($, conf, w, playlist);
 
 
-      // location.hashまでサーバーに送信してしまうので除去する
-//      watch.PlayerInitializer.watchPageController.getURLParams_org = watch.PlayerInitializer.watchPageController.getURLParams;
-//      watch.PlayerInitializer.watchPageController.getURLParams = $.proxy(function(url) {
-//        return this.getURLParams_org(url.replace(/#.*$/, ''));
-//      }, watch.PlayerInitializer.watchPageController);
-
       var hashlist = LocationHashParser.getValue('playlist');
       if (hashlist && hashlist.i && hashlist.i.length > 0) {
         try {
@@ -8253,40 +8247,58 @@
           ];
           var css = [
             'body.videoExplorer #content.w_adjusted #playerTabWrapper { width: ', targetWidth,'px;}\n',
-            //'#playerTabWrapper.w_wide, body.videoExplorer #content.w_adjusted #playerTabWrapper { width: ', targetWidth,'px;}\n',
-            //'body:not(.videoExplorer) #playerTabWrapper.w_wide { right: -140px;}\n'
+            '.w_wide #playerTabWrapper { width: ', targetWidth,'px;}\n',
+            //'body:not(.videoExplorer) .w_wide #playerTabWrapper.w_wide { right: -140px;}\n'
+            'body:not(.videoExplorer) .w_wide #playerAlignmentArea             { width: 1100px; }\n', //  960 + 140
+            'body:not(.videoExplorer) .w_wide #playerAlignmentArea.size_normal { width: 1326px; }\n'  // 1186 + 140
           ];
           for (var v in elms) {
             var $e = $(elms[v]), newWidth = $e.width() + px;
             css.push([
-              //'#playerTabWrapper.w_wide ', elms[v],
-              //' , body.videoExplorer #content.w_adjusted ',
-              'body.videoExplorer #content.w_adjusted ',
+              '.w_wide #playerTabWrapper ', elms[v],
+              ' , body.videoExplorer #content.w_adjusted ',
               elms[v], ' { width: ', newWidth,'px !important;}\n'
             ].join(''));
           }
           wideCss = addStyle(css.join(''), 'wideCommentPanelCss');
+          console.log(css.join(''));
         },
         toggleWide = function(v) {
-          $rightPanel.toggleClass('w_wide', v).css('right', '');
+          //$rightPanel.toggleClass('w_wide', v).css('right', '');
+          $('#content').toggleClass('w_wide', v);
           EventDispatcher.dispatch('onWindowResize');
         };
 
       var wideCommentPanelCss = Util.here(function() {/*
         body.videoExplorer #content.w_adjusted #playerTabWrapper { width: 420px;}
-        body.videoExplorer #content.w_adjusted #playerTabWrapper { width: 420px !important;}
-        body.videoExplorer #content.w_adjusted #commentDefaultHeader { width: 408px !important;}
-        body.videoExplorer #content.w_adjusted #playerCommentPanel .commentTable { width: 406px !important;}
-        body.videoExplorer #content.w_adjusted #playerCommentPanel .commentTable .commentTableContainer { width: 406px !important;}
-      */});
+        .w_wide #playerTabWrapper { width: 420px;}
+        body:not(.videoExplorer) .w_wide #playerAlignmentArea             { width: 1100px; }
+        body:not(.videoExplorer) .w_wide #playerAlignmentArea.size_normal { width: 1326px; }
+        .w_wide #playerTabWrapper #playerTabWrapper,
+        body.videoExplorer #content.w_adjusted #playerTabWrapper
+        { width: 420px !important;}
+        .w_wide #playerTabWrapper #commentDefaultHeader,
+        body.videoExplorer #content.w_adjusted #commentDefaultHeader
+        { width: 408px !important;}
+        .w_wide #playerTabWrapper #playerCommentPanel .commentTable,
+        body.videoExplorer #content.w_adjusted #playerCommentPanel .commentTable
+        { width: 406px !important;}
+        .w_wide #playerTabWrapper #playerCommentPanel .commentTable .commentTableContainer,
+        body.videoExplorer #content.w_adjusted #playerCommentPanel .commentTable .commentTableContainer
+        { width: 406px !important;}
+     */});
       addStyle(wideCommentPanelCss, 'wideCommentPanelCss');
+
+      EventDispatcher.addEventListener('on.config.wideCommentPanel', toggleWide);
+      toggleWide(!!conf.wideCommentPanel);
 
       EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
 
         //EventDispatcher.dispatch('onWindowResize');
+        //createWideCommentPanelCss(420);
 
         var $div = $([
-            '<div id="sharedNgSettingContainer" style="display: none;">NG共有レベル: ',
+            '<div id="sharedNgSettingContainer" style="display: none;">NG共有: ',
               '<select id="sharedNgSetting">',
                 '<option value="HIGH">高</option>',
                 '<option value="MIDDLE">中</option>',
@@ -8468,15 +8480,13 @@
         .sidePanel.w_review #videoReview .inner { width: 260px; }
         .sidePanel.w_review .commentContent { width: 238px; }
         .sidePanel.w_review .commentContentBody { width: 192px; }
-        {*
-          .sidePanel.w_review.w_wide #videoReview { width: 400px; }
-          .sidePanel.w_review.w_wide textarea.newVideoReview { width: 377px; }
-          .sidePanel.w_review.w_wide #videoReviewHead { width: 383px; }
-          .sidePanel.w_review.w_wide #videoReview .stream { width: 400px; }
-          .sidePanel.w_review.w_wide #videoReview .inner { width: 400px; }
-          .sidePanel.w_review.w_wide .commentContent { width: 378px; }
-          .sidePanel.w_review.w_wide .commentContentBody { width: 332px; }
-        *}
+        .w_wide .sidePanel.w_review #videoReview { width: 400px; }
+        .w_wide .sidePanel.w_review textarea.newVideoReview { width: 377px; }
+        .w_wide .sidePanel.w_review #videoReviewHead { width: 383px; }
+        .w_wide .sidePanel.w_review #videoReview .stream { width: 400px; }
+        .w_wide .sidePanel.w_review #videoReview .inner { width: 400px; }
+        .w_wide .sidePanel.w_review .commentContent { width: 378px; }
+        .w_wide .sidePanel.w_review .commentContentBody { width: 332px; }
         body.videoExplorer .sidePanel.w_review #videoReview { width: 400px; }
         body.videoExplorer .sidePanel.w_review textarea.newVideoReview { width: 377px; }
         body.videoExplorer .sidePanel.w_review #videoReviewHead { width: 383px; }
@@ -9637,7 +9647,7 @@
         $popup   = $('#popupMarquee'),
         $inner   = $popup.find('.popupMarqueeContent'),
         closeTimer = null,
-        popupDuration = 4000;
+        popupDuration = 6000;
 
       var
         resetCloseTimer = function() {
@@ -9730,9 +9740,14 @@
         if (name === 'noNicoru') {
           $('body').toggleClass('w_noNicoru', newValue);
         } else
-        if (name === 'flatDesignMode') {
-          $('#content').toggleClass('w_flat', newValue);
+        if (name === 'playerBgStyle') {
+          $('#content')
+            .toggleClass('w_flat_gray',  newValue === 'gray')
+            .toggleClass('w_flat_white', newValue === 'white');
         } else
+//        if (name === 'flatDesignMode') {
+//          $('#content').toggleClass('w_flat', newValue);
+//        } else
         if (name === 'compactVideoInfo') {
           $('#content, #outline').toggleClass('w_compact', newValue);
         }
@@ -9742,7 +9757,8 @@
 
       if (conf.noNicoru) $('body').addClass('w_noNicoru');
 
-      if (conf.flatDesignMode) $('#content').addClass('w_flat');
+//      if (conf.flatDesignMode) $('#content').addClass('w_flat');
+      if (conf.playerBgStyle !== '') $('#content').addClass('w_flat_' + conf.playerBgStyle);
 
       if (conf.compactVideoInfo) $('#content, #outline').addClass('w_compact');
       onWatchInfoReset(watchInfoModel);
@@ -9752,6 +9768,10 @@
       $('#videoHeaderMenu .searchText input').attr({'accesskey': '@', 'placeholder': '検索ワードを入力'}).on('focus', function() {
         WatchController.scrollTop(0, 400);
       });
+
+      // TODO: 過去ログを開くタイミングでこれをやる
+      // $('.logDateSelect .logTime input')[0].setAttribute('type', 'time');
+
 
       if (conf.debugMode) {
         watch.PopupMarqueeInitializer.popupMarqueeViewController.itemList.addEventListener('popup', function(body) {
