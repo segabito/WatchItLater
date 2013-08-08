@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130807
+// @version        1.130809
 // ==/UserScript==
 
 /**
@@ -30,16 +30,20 @@
  * ・検索画面にコミュニティ動画一覧を表示 (チャンネルより難しい。力技でなんとかする)
  * ・シークバーのサムネイルを並べて表示するやつ   (単体スクリプトのほうがよさそう)
  * ・キーワード検索/タグ検索履歴の改修
- * ・検索画面でのコメントパネル表示をもっと賢くする
  * ・ユーザーの投稿動画一覧に「xxさんのニコレポ」という架空のマイリストフォルダを出す
  * ・動画ランキングを「ニコニコ動画さん」という架空ユーザーの公開マイリストにする
  * ・「ニコニコチャンネルさん」という架空ユーザーを作って各ジャンルの新着を架空マイリストにする
  * ・横スクロールを賢くする
- * ・マイリスト外すUIととりまい外すUIが統一されてないのをどうにかする
  * ・お気に入りユーザーの時は「@ジャンプ」許可
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130809
+// - マイリストの動画一覧をタイトル/説明文で絞り込み検索出来るようにした。(ランキングやとりマイでも使用可能)
+// - 見ている動画が今開いているマイリストにあるかどうかをわかりやすく
+// - 検索モードのコメントパネルの出し方を変更。 ホバーをやめてボタンでトグルにした
+// - とりマイとマイリストのUIを統一
 
 // * ver 1.130807
 // - ニコレポの表示を修正。同じ動画はなるべくまとめる (マイリストコメント付やレビューはまとめない)
@@ -648,7 +652,7 @@
       }
       {* 右に表示する動画情報 *}
       #playerTabWrapper.sidePanel .sideVideoInfo, #playerTabWrapper.sidePanel .sideIchibaPanel, #playerTabWrapper.sidePanel .sideReviewPanel  {
-        padding: 0px 0px 0 0px; width: 280px; height: 100%;
+        padding: 0px 0px 0 0px; width: 276px; height: 100%;
         position: absolute; top: 0; right:0;
       }
       body:not(.full_with_browser) .w_wide #playerTabWrapper .sideVideoInfo,
@@ -657,7 +661,7 @@
       .videoExplorer #playerTabWrapper .sideVideoInfo,
       .videoExplorer #playerTabWrapper .sideIchibaPanel,
       .videoExplorer #playerTabWrapper .sideReviewPanel {
-        width: 420px; z-index: 10030;
+        width: 418px; z-index: 10030;
       }
       #playerTabWrapper.w_videoInfo #appliPanel, #playerTabWrapper.w_ichiba #appliPanel, #playerTabWrapper.w_review #appliPanel  {
         top: -9999px;
@@ -835,9 +839,10 @@
         padding: 5px 10px 0; right: -408px; top: 0; width: 350px; height: 34px;
                 transform: rotate(90deg);         transform-origin: 0 0 0;
         -webkit-transform: rotate(90deg); -webkit-transform-origin: 0 0 0;
+        z-index: 1000;
       }
       .full_with_browser #sidePanelTabContainer { background: #000; }
-      body:not(.videoExplorer) #sidePanelTabContainer.left {
+      body:not(.videoExplorer):not(.full_with_browser) #sidePanelTabContainer.left {
         background: #000 {* firefoxはこれがないと欠ける *}; right: auto; left: -375px; padding: 0; height: 25px;
                 transform: rotate(-90deg);         transform-origin: 100% 0 0;
         -webkit-transform: rotate(-90deg); -webkit-transform-origin: 100% 0 0;
@@ -860,7 +865,7 @@
         display: inline-block; font-size: 13px; padding: 5px 10px 8px;
         border-radius: 8px 8px 0px 0px;
       }
-      #sidePanelTabContainer.left .tab {
+      body:not(.videoExplorer):not(.full_with_browser) #sidePanelTabContainer.left .tab {
         display: inline-block; font-size: 13px; padding: 5px 10px 0px;
       }
       #leftPanel.videoInfo .tab.videoInfo, #leftPanel.ichiba .tab.ichiba {
@@ -1483,7 +1488,9 @@
       }
       .videoExplorerContent .contentItemList .nicorepoResult .itemVideoDescription, .videoExplorerContent .contentItemList .nicorepoResult .videoTitle{
       }
-      #videoExplorer.w_mylist .videoExplorerBody.enableMylistDeleteButton.isMine .videoExplorerContent .contentItemList .item:hover .deleteFromMyMylist {
+      #videoExplorer.w_deflist .videoExplorerBody.isMine.enableMylistDeleteButton .item:hover .deleteFromMyMylist,
+      #videoExplorer.w_mylist  .videoExplorerBody.isMine.enableMylistDeleteButton .item:hover .deleteFromMyMylist
+      {
         display: inline-block;
       }
 
@@ -1871,7 +1878,7 @@
       body.full_with_browser.w_fullScreenMenu .videoHeaderOuter {
         position: absolute; z-index: 1000; width: 100%;
       }
-      body.full_with_browser.w_fullScreenMenu #videoTagContainer { width: 100%; }
+      body.full_with_browser.w_fullScreenMenu #videoTagContainer { width: 100%; display: block; }
 
       .popupMarqueeContent {
         background: black;
@@ -3854,7 +3861,9 @@
       },
       clearMylistCache: function(id) {
         if (id) {
-          watch.VideoExplorerInitializer.mylistVideoAPILoader._cache.deleteElement({'id': id.toString()});
+          watch.VideoExplorerInitializer.mylistVideoAPILoader._cache.deleteElement(
+            'http://riapi.nicovideo.jp/api/watch/mylistvideo?id=' + id.toString()
+          );
         } else {
           watch.VideoExplorerInitializer.mylistVideoAPILoader._cache.clearCache();
         }
@@ -6667,103 +6676,293 @@
       }, 100);
     }
 
+    var WatchingVideoView = function() { this.initialize.apply(this, arguments); };
+    WatchingVideoView.prototype = {
+      _params: null,
+      _$view: null,
+      _watchInfoModel: null,
+      _type: null,
+      initialize: function(params) {
+        this._content           = params.content;
+        this._watchInfoModel    = params.watchInfoModel;
+        this._$view             = params.$view;
+        this._mylistController  = params.mylistController;
+        this._type              = params.type;
 
-    var isMylistHacked = false;
-    function initMylist($) {
-      if (isMylistHacked) { return; }
-      isMylistHacked = true;
-      var currentMylistId = 0;
+        this._$title  = this._$view.find('.title');
+        this._$thumb  = this._$view.find('.thumbnail');
+        this._$add    = this._$view.find('.add');
+        this._$remove = this._$view.find('.remove');
+
+        this._$add   .on('click', $.proxy(this._onAddClick,    this));
+        this._$remove.on('click', $.proxy(this._onRemoveClick, this));
+
+        EventDispatcher.addEventListener('onWatchInfoReset', $.proxy(this.onVideoChange, this));
+      },
+      getView: function() {
+        return this._$view;
+      },
+      detach: function() {
+        this._$view.detach();
+      },
+      update: function() {
+        $('.videoExplorerBody').toggleClass('containsWatchingVideo', this._content.containsWatchId());
+      },
+      onVideoChange: function() {
+        this._$title.html(this._watchInfoModel.title);
+        this._$thumb.attr('src', this._watchInfoModel.thumbnail);
+        if (this._content.isActive()) {
+          this.update();
+        }
+      },
+      _setIsUpdating: function() {
+        this._$view.addClass('updating');
+        setTimeout($.proxy(this._clearIsUpdating, this), 3000);
+      },
+      _clearIsUpdating: function() {
+        this._$view.removeClass('updating');
+      },
+      _getIsUpdating: function() {
+        return this._$view.hasClass('updating');
+      },
+      _onAddClick: function() {
+        var watchId = WatchController.getWatchId();
+        this._setIsUpdating();
+        if (this._type === 'deflist') {
+          this._mylistController.addDefListItem(watchId,              $.proxy(this._onMylistUpdate, this));
+        } else {
+          var mylistId = this._content.getMylistId();
+          this._mylistController.addMylistItem (watchId, mylistId,    $.proxy(this._onMylistUpdate, this));
+        }
+      },
+      _onRemoveClick: function() {
+        var watchId = WatchController.getWatchId();
+        this._setIsUpdating();
+        if (this._type === 'deflist') {
+          this._mylistController.deleteDefListItem(watchId,           $.proxy(this._onMylistUpdate, this));
+        } else {
+          var mylistId = this._content.getMylistId();
+          this._mylistController.deleteMylistItem (watchId, mylistId, $.proxy(this._onMylistUpdate, this));
+        }
+      },
+      _onMylistUpdate: function(status, result) {
+        if (status === 'ok') {
+          if (this._type === 'deflist') {
+            WatchController.clearDeflistCache();
+          }
+          setTimeout(
+            $.proxy(function() {
+              this._content.clear();
+              this._content.refresh({page: 1});
+              this._clearIsUpdating();
+            }, this)
+          , 100);
+        } else {
+          Popup.alert('更新に失敗: ' + result.error.description);
+        }
+      }
+    }; // end WatchingVideoView.prototype
+
+    var GrepOptionView = function() { this.initialize.apply(this, arguments); };
+    GrepOptionView.prototype = {
+      _params: null,
+      _$view:  null,
+      initialize: function(params) {
+        this._content = params.content;
+        this._$view   = params.$view;
+        this._$form  = this._$view.find('form');
+        this._$input = this._$view.find('.grepInput').attr('list', params.listName);
+
+        this._$list = $('<datalist />').attr('id', params.listName);
+        $('body').append(this._$list);
+
+        this._$form.on('submit', $.proxy(this._onFormSubmit, this));
+        this._$input.on('click', $.proxy(function(e) {
+          e.stopPropagation();
+        }, this))   .on('focus', $.proxy(function(e) {
+          WatchApp.ns.util.WindowUtil.scrollFitMinimum('#playlist', 600);
+        }, this));
+        this._$view .on('click', $.proxy(function(e) {
+          this._$input.focus();
+        }, this));
+      },
+      getView: function() {
+        return this._$view;
+      },
+      detach: function() {
+        this._$view.detach();
+      },
+      clear: function() {
+        this._$input.val('');
+      },
+      update: function() {
+        var list = this._content.getRawList();
+        var tmp = [];
+        for (var i = list.length -1; i >= 0; i--) {
+          tmp.push('<option>');
+          tmp.push(list[i].title); // 既にエスケープされてる
+          tmp.push('</option>');
+        }
+        this._$list.html(tmp.join(''));
+
+        if (this._getWord().length > 0) {
+          setTimeout($.proxy(function() { this._$input.focus(); }, this), 100);
+        }
+      },
+      _getWord: function() {
+        return this._$input.val();
+      },
+      _onFormSubmit: function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var word = this._getWord();
+        if (word.length > 0) {
+          this._content.setFilter(this._getFilter());
+        } else {
+          this._content.setFilter(null);
+        }
+
+        this._content.refresh({page: 1});
+      },
+      _getFilter: function() {
+        var to_h = function(str) {
+          return str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(s) {
+             return String.fromCharCode(s.charCodeAt(0) - 65248);
+          }).toLowerCase();
+        };
+        var word = to_h(this._getWord());
+
+        return function(item) {
+          var title = to_h(item.title);
+          var desc  = item.description_full || item.description_short || '';
+          var mc    = item.mylist_comment   || ''
+          var result = title.indexOf(word) >= 0 || to_h(desc).indexOf(word) >= 0 || to_h(mc).indexOf(word) >= 0;
+          return result;
+        };
+      }
+    }; // end GrepOptionView.prototype
+
+    function initMylistContent($, conf, w) {
       var ContentType = WatchApp.ns.components.videoexplorer.model.ContentType;
+      var ContentView = WatchApp.ns.components.videoexplorer.view.content.MylistVideoContentView;
       var vec      = watch.VideoExplorerInitializer.videoExplorerController;
       var explorer = vec.getVideoExplorer();
       var myUserId = WatchController.getMyUserId();
-
-      // アイコン表示のテンプレートを拡張
-      var menu =
-        '<div class="thumbnailHoverMenu">' +
-        '<button class="showLargeThumbnail" onclick="WatchItLater.onShowLargeThumbnailClick(this);" title="大きいサムネイルを表示">＋</button>' +
-        '<button class="deleteFromMyMylist" onclick="WatchItLater.onDeleteFromMyMylistClick(this);">マイリスト外す</button>' +
-        '</div>', $menu = $(menu);
-
-      var $template = $('<div/>').html(watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html());
-        $template.find('.column1 .thumbnailContainer').append($menu);
-        $template.find('.column4 .balloon').before($menu.clone());
-        $template.find('.column1')
-          .find('.descriptionShort').after($('<p class="itemMylistComment mylistComment"/>'))
-          .end().find('.createdTime').after($('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>'));
-        //console.log($template.html());
-        watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html($template.html());
-
-      var
-        onShowLargeThumbnailClick = function (elm) {
-         var
-           $videoItem = $(elm).parent().parent(),
-           src        = $videoItem.find('.thumbnail').attr('src');
-         if (!src) { return; }
-         showLargeThumbnail(src);
-        },
-        onDeleteFromMyMylistClick = function(elm) {
-          var
-            $videoItem = $(elm).parent().parent(),
-            watchId    = $videoItem.find('.link').attr('href').split('/').reverse()[0];
-          if (currentMylistId <= 0 || !Mylist.isMine(currentMylistId)) {
-            return;
-          }
-          setTimeout(function() {
-            try {
-              Mylist.deleteMylistItem(watchId, currentMylistId, function(status, result) {
-                if (status !== "ok") {
-                  Popup.alert('削除に失敗: ' + result.error.description);
-                } else {
-                  $videoItem.parent().animate({opacity: 0.3}, 500);
-                }
-              });
-            } catch (e) {
-              if (e.message) { Popup.alert(e.message); }
-              else {
-                if (conf.debugMode) console.log(e);
-                throw e;
-              }
-            }
-          }, 0);
-        };
-      WatchItLater.onDeleteFromMyMylistClick = onDeleteFromMyMylistClick;
-      WatchItLater.onShowLargeThumbnailClick = onShowLargeThumbnailClick;
-
-
       var content = explorer.getContentList().getContent(ContentType.MYLIST_VIDEO);
       var loader  = content._mylistVideoAPILoader;
       var pager   = content._pager;
+      var watchingVideoView = new WatchingVideoView({
+        content: content,
+        watchInfoModel: watchInfoModel,
+        mylistController: Mylist,
+        type: 'mylist',
+        $view: $([
+          '<div class="watchingVideo">',
+            '<img class="thumbnail">',
+            '視聴中の動画',
+            '<p class="title"></p>',
+            '<span class="contains"    >この動画はリストに登録されています</span>',
+            '<span class="not_contains">この動画はリストにありません</span>',
+            '<span class="edit">',
+              '<button class="add"   >登録</button>',
+              '<button class="remove">外す</button>',
+            '</span>',
+          '</div>',
+          ''].join(''))
+      });
+
+      var grepOptionView = new GrepOptionView({
+        content: content,
+        listName: 'suggestMylistTitle',
+        $view: $([
+          '<div class="grepOption">',
+            '<form>',
+              '<input type="search" class="grepInput" autocomplete="on" placeholder="マイリストをタイトル・説明文で絞り込む(G)" accesskey="g">',
+            '</form>',
+          '</div>',
+        ].join(''))
+      });
+
 
       pager._pageItemCount = 100;
 
-      // マイリストデータ取得時の処理フック。 viewでやる物はいずれ分けたい
-      content.refresh_org = content.refresh;
-      content.refresh = $.proxy(function(params, callback) {
-        currentMylistId = 0;
-        $('.videoExplorerBody').removeClass('dummyMylist').removeClass('mylist').removeClass('isMine');
-        this.refresh_org(params, callback);
+      content._isOwnerNicorepo = false;
+      content._isRanking       = false;
+      content.getIsMine          = $.proxy(function() {
+        // getUserId()はstringだけどwatchInfoModelから取ってるmyUserIdはnumber
+        return parseInt(this.getUserId(), 10) === myUserId && parseInt(this.getMylistId(), 10) > 0;
+      }, content);
+      content.getIsDummy         = $.proxy(function() {
+        return parseInt(this.getMylistId(), 10) <= 0
+      }, content);
+      content.getIsOwnerNicorepo = $.proxy(function() { return this._isOwnerNicorepo; }, content);
+      content.getIsRanking       = $.proxy(function() { return this._isRanking;       }, content);
+
+      // grep対応のための拡張
+      content._rawList = [];
+      content.getRawList    = $.proxy(function() { return this._rawList; }, content);
+      content._filter = null;
+      content.setFilter     = $.proxy(function(filter) { this._filter = filter; }, content);
+      content.getFilter     = $.proxy(function()       { return this._filter; }, content);
+
+      content.clear_org = content.clear;
+      content.clear = $.proxy(function() {
+        this.setFilter(null);
+        this.clear_org();
+        grepOptionView.clear();
       }, content);
 
       content.onLoad_org = content.onLoad;
-      content.onLoad = $.proxy(function(a, b) {
-        this.onLoad_org(a, b);
-        var mylistOwnerUserId = parseInt(this.getUserId(), 10);
-        $('.videoExplorerBody').toggleClass('isMine', mylistOwnerUserId === myUserId && currentMylistId > 0);
+      content.onLoad = $.proxy(function(err, result) {
+        this._isOwnerNicorepo = result.isOwnerNicorepo;
+        this._isRanking       = result.isRanking;
+        var filter = this.getFilter();
+
+        if (err === null && result.list && result.list.length) {
+          if (!result.rawList) result.rawList = result.list.concat();
+          if (filter) {
+            var list = [];
+
+            for (var i = result.rawList.length - 1; i >= 0; i--) {
+              var item = result.rawList[i];
+              if (!item.title) continue;
+              if (filter(item)) {
+                list.push(item);
+              }
+            }
+            result.list    = list;
+          }
+        } else
+        if (result.rawList) {
+          result.list = result.rawList.concat();
+        }
+
+        this._rawList = result.rawList || [];
+        this.onLoad_org(err, result);
       }, content);
+
+      content.containsWatchId = $.proxy(function(watchId) {
+        var list = this.getRawList();
+        if (!watchId) { watchId = WatchController.getWatchId(); }
+
+        for (var i = list.length - 1; i >= 0; i--) {
+          if (list[i].id === watchId) { return true; }
+        }
+        return false;
+      }, content);
+
 
       loader.load_org = loader.load;
       loader.load = $.proxy(function(params, callback) {
+        var isOwnerNicorepo = false, isRanking = false;
+        var id = params.id;
+
         var applyFilter = function(err, result) {
-          if (err === null) {
-            //
-          }
+          result.isOwnerNicorepo = isOwnerNicorepo;
+          result.isRanking       = isRanking;
           callback(err, result);
         };
-        var id= params.id;
-        currentMylistId = id;
         if (id < 0) {
-          //console.log('mylist hack!!!', id, typeof id, VideoRanking.getGenreName(id));
           var onload  = function(result) {
             // 投稿者ニコレポが0件で、投稿動画一覧を公開していたらそっちを開くタイマーをセット
             if (result.list.length < 1 &&
@@ -6773,25 +6972,17 @@
                 WatchController.openVideoOwnersVideo();
               }, 500);
             }
-            // callback(null, result);
             applyFilter(null, result);
           };
           var onerror = function(result) { callback('error', result); };
            // マイリストIDに負の数字(通常ないはず)が来たら乗っ取るサイン
            // そもそもマイリストIDはstringのようなので数字にこだわる必要なかったかも
-            $('.videoExplorerBody')
-              .addClass('dummyMylist')
-              .removeClass('mylist')
-              .removeClass('isMine')
-              .removeClass('ownerNicorepo')
-              .removeClass('ranking');
 
           try {
             if (typeof VideoRanking.getGenreName(id) === 'string') {
-              if (conf.debugMode)console.log('load VideoRanking:', VideoRanking.getGenreName(id));
-              VideoRanking.load(onload, {
-                id: id //, sort: params.sort || '4'
-              });
+              //if (conf.debugMode)console.log('load VideoRanking: ', VideoRanking.getGenreName(id));
+              isRanking = true;
+              VideoRanking.load(onload, {id: id});
               return;
             }
             // TODO: マジックナンバーを
@@ -6818,6 +7009,7 @@
                 NicorepoVideo.loadMylist(onload);
                 break;
               case NicorepoVideo.REPO_OWNER:
+                isOwnerNicorepo = true;
                 NicorepoVideo.loadOwner(onload);
                 break;
               default:
@@ -6831,82 +7023,259 @@
                 message: e.message
             });
             } else {
-             if (conf.debugMode) { console.log(e); console.trace(); }
+             console.log(e); console.trace();
              onerror({message: 'エラーが発生しました:' + id, status: 'fail'});
             }
           }
         } else {
-          $('.videoExplorerBody')
-            .removeClass('dummyMylist')
-            .removeClass('ranking')
-            .removeClass('ownerNicorepo')
-            .addClass('mylist');
-            //.toggleClass('isMine', Mylist.isMine(id));
-          this.load_org(params, callback);
+          this.load_org(params, applyFilter);
         }
       }, loader);
 
 
-      // フォルダ表示の拡張
-      var itemView = WatchApp.ns.components.videoexplorer.view.content.item.AbstractVideoContentItemView;
-      itemView.prototype._setView_org = itemView.prototype._setView;
-      itemView.prototype._setView = function($item) {
-        this._setView_org($item);
-        this._$createdTime     = $item.find('.column4 .createdTime span');
-        this._$createdTimeFull = $item.find('.column1 .createdTime span');
-      };
-      itemView.prototype._setItem_org = itemView.prototype._setItem;
-      itemView.prototype._setItem = function(item) {
-        this._setItem_org(item);
-      };
-      itemView.prototype.update_org = itemView.prototype.update;
-      itemView.prototype.update = function() {
-        // 動画情報表示をゴリゴリいじる場所
-        var item = this._item, $item = this._$item;
-        this.update_org(item);
-
-        this._$createdTimeFull.html(
-          WatchApp.ns.util.DateFormat.strftime(
-            "%Y年%m月%d日 %H:%M:%S",
-            new Date(item.getFirstRetrieve().replace(/-/g, '/'))
-          )
-        );
-
-        this._$item.find('.deleteFromMyMylist').data('watchId', this._item.getId());
-        if (item._mylistComment) { // マイリストコメント
-          $item.find('.itemMylistComment').css({display: 'block'});
+      var __css__ = Util.here(function() {/*
+        #videoExplorer .watchingVideo         { display: none; }
+        #videoExplorer .watchingVideo.updating * {
+          cursor: wait; opacity: 0.5;
+        }
+        #videoExplorer .watchingVideo button {
+          padding: 2px 8px; margin: auto 16px;
+        }
+        #videoExplorer .isMine .watchingVideo {
+          display: block; background: #f4f4f4; border: 1px solid #ccc;
+          margin: auto; width: 500px; min-height: 72px; padding: 16px;
         }
 
-        if (item._seed && item._seed._info) {
-          var info = item._seed._info;
-          if (info.nicorepo_owner) { // ニコレポ
-            $item.addClass(info.nicorepo_className).addClass('nicorepoResult');
-            var owner = info.nicorepo_owner;
-            var $iconContainer = $item.find('.nicorepoOwnerIconContainer'), $icon = $iconContainer.find('img'), $link = $iconContainer.find('a');
-            $icon.attr('src', owner.icon);
-            $link.attr({'href': owner.page, 'data-ownerid': owner.id, 'title': owner.name + ' さん'});
-            if (info.nicorepo_className.indexOf('log-user-') >= 0) {
-              $link.attr(
-                'onclick',
-                'if (arguments[0].button > 0) return; arguments[0].preventDefault();' +
-                'WatchApp.ns.init.VideoExplorerInitializer.videoExplorerController.showOtherUserVideos(this.dataset.ownerid, this.title);'
-              );
+        #videoExplorer .watchingVideo .thumbnail {
+          float: left; width: 96px; margin-right: 16px;
+        }
+
+
+        #videoExplorer .watchingVideo .title {
+          font-weight: bolder;
+        }
+        #videoExplorer .watchingVideo .title:before { content: ''; }
+        #videoExplorer .watchingVideo .title:after  { content: ' '; }
+
+        #videoExplorer                        .watchingVideo .contains     { display: none;   }
+        #videoExplorer .containsWatchingVideo .watchingVideo .contains     { display: inline; }
+        #videoExplorer                        .watchingVideo .not_contains { display: inline; }
+        #videoExplorer .containsWatchingVideo .watchingVideo .not_contains { display: none;   }
+
+        #videoExplorer         .watchingVideo .edit { display: none; }
+        #videoExplorer .isMine .watchingVideo .edit { display: inline-block; }
+
+        #videoExplorer                        .watchingVideo .add { display: inline-block; }
+        #videoExplorer .containsWatchingVideo .watchingVideo .add { display: none; }
+
+        #videoExplorer                        .watchingVideo .remove{ display: none; }
+        #videoExplorer .containsWatchingVideo .watchingVideo .remove{ display: inline-block; }
+
+        .isMine .editFavorite {
+          display: none; {* 自分のマイリストにはお気に入り登録ボタンを出さない *}
+        }
+        .watchingVideo button {
+          cursor: pointer;
+        }
+
+        .grepOption {
+          padding: 16px;
+          width: 500px;
+          margin: 16px auto;
+          background: #f4f4f4; border: 1px solid #ccc;
+        }
+        .grepOption input {
+          font-size: 120%;
+          width: 100%;
+        }
+      */});
+      addStyle(__css__, 'mylistContentCss');
+
+      var
+        overrideContentView = function(proto, watchingVideoView, grepOptionView) {
+          var updateCssClass = function(content) {
+            $('.videoExplorerBody')
+              .toggleClass('dummyMylist',   content.getIsDummy())
+              .toggleClass('isMine',        content.getIsMine())
+              .toggleClass('ownerNicorepo', content.getIsOwnerNicorepo())
+              .toggleClass('ranking',       content.getIsRanking())
+              ;
+          };
+
+          proto.detach_org = proto.detach;
+          proto.detach = function() {
+            this.detach_org();
+            watchingVideoView.detach();
+            grepOptionView.detach();
+          };
+
+          proto.onUpdate_org = proto.onUpdate;
+          proto.onUpdate = function() {
+            this.onUpdate_org();
+            updateCssClass(this._content);
+            watchingVideoView.update();
+            grepOptionView.update();
+            this._$content.find('.mylistSortOrder').before(watchingVideoView.getView());
+            this._$content.find('.mylistSortOrder').before(grepOptionView.getView());
+          };
+
+          proto.onError_org = proto.onError;
+          proto.onError = function() {
+            this.onError_org();
+            updateCssClass(this._content);
+            watchingVideoView.update();
+            grepOptionView.update();
+            this._$content.find('.mylistSortOrder').before(grepOptionView.getView());
+          };
+
+        };
+
+      overrideContentView(ContentView.prototype, watchingVideoView, grepOptionView);
+    } // end initMylistContent
+
+    function initDeflistContent() {
+      var ContentType = WatchApp.ns.components.videoexplorer.model.ContentType;
+      var ContentView = WatchApp.ns.components.videoexplorer.view.content.DeflistVideoContentView;
+      var vec         = watch.VideoExplorerInitializer.videoExplorerController;
+      var explorer    = vec.getVideoExplorer();
+      var content     = explorer.getContentList().getContent(ContentType.DEFLIST_VIDEO);
+      var loader      = content._deflistVideoAPILoader;
+      var pager       = content._pager;
+      var watchingVideoView = new WatchingVideoView({
+        content: content,
+        watchInfoModel: watchInfoModel,
+        mylistController: Mylist,
+        type: 'deflist',
+        $view: $([
+          '<div class="watchingVideo">',
+            '<img class="thumbnail">',
+            '視聴中の動画',
+            '<p class="title"></p>',
+            '<span class="contains"    >この動画はとりあえずマイリストに登録されています</span>',
+            '<span class="not_contains">この動画はとりあえずマイリストにありません</span>',
+            '<span class="edit">',
+              '<button class="add"   >登録</button>',
+              '<button class="remove">外す</button>',
+            '</span>',
+          '</div>',
+          ''].join(''))
+      });
+      var grepOptionView = new GrepOptionView({
+        content: content,
+        listName: 'suggestDeflistTitle',
+        $view: $([
+          '<div class="grepOption">',
+            '<form>',
+              '<input type="search" class="grepInput" autocomplete="on" placeholder="とりマイをタイトル・説明文で絞り込む(G)" accesskey="g">',
+            '</form>',
+          '</div>',
+        ].join(''))
+      });
+
+
+
+      pager._pageItemCount = 100;
+
+      content.refresh_org = content.refresh;
+      content.refresh = $.proxy(function(params, callback) {
+        if (conf.debugMode) console.log('deflist refresh! ', params, callback);
+        if (!this.isActive()) {
+          WatchController.clearDeflistCache();
+        }
+        this.refresh_org(params, callback);
+      }, content);
+
+      content.getIsMine = function() { return true; };
+
+      // grep対応のための拡張
+      content._rawList = [];
+      content.getRawList    = $.proxy(function() { return this._rawList; }, content);
+      content._filter = null;
+      content.setFilter     = $.proxy(function(filter) { this._filter = filter; }, content);
+      content.getFilter     = $.proxy(function()       { return this._filter; }, content);
+
+      content.onLoad_org = content.onLoad;
+      content.onLoad = $.proxy(function(err, result) {
+        var filter = this.getFilter();
+        if (err === null && result.list && result.list.length) {
+          if (!result.rawList) result.rawList = result.list.concat();
+          if (filter) {
+            var list = [];
+
+            for (var i = result.rawList.length - 1; i >= 0; i--) {
+              var item = result.rawList[i];
+              if (!item.title) continue;
+              if (filter(item)) {
+                list.push(item);
+              }
             }
-            if (info.nicorepo_log.length > 1) {
-              $item.find('.descriptionShort').html(info.nicorepo_log.join('<br>'));
-            }
-            // ニコレポは再生数が取れないので-で埋める
-            this._$viewCount   .html('-');
-            this._$commentCount.html('-');
-            this._$mylistCount .html('-');
+            result.list    = list;
           }
+        } else
+        if (result.rawList) {
+          result.list = result.rawList.concat();
         }
-        if (item._seed && typeof item._seed.description_full === 'string' && item._seed.description_full.length > 150) {
-          this._$descriptionShort.attr('title', item._seed.description_full);
-        }
-      };
 
-    } // end initMylist
+        this._rawList         = result.rawList || [];
+        this.onLoad_org(err, result);
+      }, content);
+
+      content.clear_org = content.clear;
+      content.clear = $.proxy(function() {
+        this.setFilter(null);
+        this.clear_org();
+        grepOptionView.clear();
+      }, content);
+
+      content.containsWatchId = $.proxy(function(watchId) {
+        var list = this.getRawList();
+        if (!watchId) { watchId = WatchController.getWatchId(); }
+
+        for (var i = list.length - 1; i >= 0; i--) {
+          if (list[i].id === watchId) { return true; }
+        }
+        return false;
+      }, content);
+
+      var
+        overrideContentView = function(proto, watchingVideoView) {
+          var updateCssClass = function(content) {
+            $('.videoExplorerBody').toggleClass('isMine', true);
+          };
+
+          proto.detach_org = proto.detach;
+          proto.detach = function() {
+            this.detach_org();
+            watchingVideoView.detach();
+            grepOptionView.detach();
+          };
+
+          proto.onUpdate_org = proto.onUpdate;
+          proto.onUpdate = function() {
+            this.onUpdate_org();
+            updateCssClass(this._content);
+            watchingVideoView.update();
+            grepOptionView.update();
+            this._$content.find('.deflistSortOrder').before(watchingVideoView.getView());
+            this._$content.find('.deflistSortOrder').before(grepOptionView.getView());
+          };
+
+          proto.onError_org = proto.onError;
+          proto.onError = function() {
+            this.onError_org();
+            updateCssClass(this._content);
+            watchingVideoView.update();
+            grepOptionView.update();
+            this._$content.find('.deflistSortOrder').before(grepOptionView.getView());
+          };
+
+        };
+
+      overrideContentView(ContentView.prototype, watchingVideoView);
+    } // end initDeflistContent
+
+
+
 
     function showLargeThumbnail(baseUrl) {
       var largeUrl = baseUrl, size;
@@ -6974,7 +7343,9 @@
         $ve = $('#videoExplorer')
           .removeClass('w_user').removeClass('w_upload').removeClass('w_mylist')
           .removeClass('w_deflist').removeClass('w_related').removeClass('w_search'),
-        $body = $ve.find('.videoExplorerBody').removeClass('isMine');
+        $body = $ve.find('.videoExplorerBody')
+          .removeClass('isMine').removeClass('dummyMylist')
+          .removeClass('isRanking').removeClass('isOwnerNicorepo');
         className = 'w_user';
       switch (type) {
         case ContentType.USER_VIDEO:
@@ -7013,10 +7384,10 @@
      *  検索中の動画サイズを無理矢理でっかくするよ。
      */
     var videoExplorerStyle = null, lastAvailableWidth = 0, lastBottomHeight = 0;
-    function adjustSmallVideoSize(force) {
+    function adjustVideoExplorerSize(force) {
       if (force !== true && (!conf.videoExplorerHack || !WatchController.isSearchMode())) { return; }
       $('#leftVideoInfo').find('.videoDetails').attr('style', '');
-      $('#videoExplorer, #content, #bottomContentTabContainer').addClass('w_adjusted');
+      $('#videoExplorer, #content, #bottomContentTabContainer').toggleClass('w_adjusted', conf.videoExplorerHack);
       var
         rightAreaWidth = $('.videoExplorerBody').outerWidth(),
         availableWidth = $(window).innerWidth() - rightAreaWidth,
@@ -7050,12 +7421,12 @@
         '{',
           'width: ', availableWidth, 'px !important; height: ', availableHeight, 'px !important;padding: 0; margin: 0; ',
         '}\n',
-       'body.videoExplorer #content.w_adjusted .videoExplorerMenu { ',
+        'body.videoExplorer #content.w_adjusted .videoExplorerMenu { ',
           'position: absolute; width: 300px;',
-          'margin-top: ',  availableHeight, 'px !important; left: ', (xdiff - 2), 'px; ',
+          'margin-top: ', availableHeight, 'px !important; left: ', (xdiff - 2), 'px; ',
           'max-height: ', bottomHeight + 'px; overflow-y: auto; overflow-x: hidden; height: auto;',
         '}\n',
-        'body.videoExplorer #videoExplorer.w_adjusted              { margin-left: ', availableWidth,  'px !important; background: #f4f4f4;}\n',
+        'body.videoExplorer #videoExplorer.w_adjusted { margin-left: ', availableWidth,  'px !important; background: #f4f4f4;}\n',
         'body.videoExplorer #content.w_adjusted #playlist { margin-left: ', xdiff, 'px; }\n',
         'body.videoExplorer #videoExplorer.w_adjusted { min-height: ', (windowHeight + 200) ,'px !important; }\n',
 
@@ -7085,9 +7456,7 @@
         'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo, body.size_small.no_setting_panel.videoExplorer #content.w_adjusted #leftPanel .sideIchibaPanel {',
           'width: ', Math.max((xdiff -  4), 130), 'px; border-radius: 0;',
         '}',
-//        'body.videoExplorer #content.w_adjusted .nicommendContentsOuter {',
-//          'width: ', Math.max((xdiff - 18), 130), 'px !important;',
-//        '}',
+
         ((xdiff >= 400) ?
           [
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoTitleContainer{',
@@ -7114,18 +7483,6 @@
               // (四行以上あるときは表示しきれないが)
               'padding-bottom: 72px; ',
             '}',
-            ( bottomHeight >= 250 ?
-              [
-//                'body.videoExplorer.content-fix #content.w_adjusted #leftPanel .sideVideoInfo .videoOwnerInfoContainer {',
-//                  'position: fixed; top: auto !important; bottom: 2px;',
-//                '}',
-//                'body.videoExplorer.content-fix #content.w_adjusted #leftPanel .sideVideoInfo .videoThumbnailContainer{',
-//                  'position: fixed; top: auto; bottom: ', (bottomHeight - 106),'px',
-//                '}'
-              ].join('') :
-              [
-              ].join('')
-            )
           ].join('') :
           (
             (xdiff >= 154) ?
@@ -7147,15 +7504,18 @@
           )
         ),
           'body.videoExplorer #bottomContentTabContainer.w_adjusted .videoExplorerFooterAdsContainer { width: 520px; }\n',
-          'body.videoExplorer #content.w_adjusted #playerTabWrapper:not(:hover) .leftPanelAdCloseButton { display: none; opacity: 0; }\n',
-          'body.videoExplorer #content.w_adjusted #playerTabWrapper:not(:hover) .playerTabAds { display: none; opacity: 0; }\n',
-          'body.videoExplorer #content.w_adjusted #playerTabWrapper:hover:not(.w_active),',
-          'body.videoExplorer #content.w_adjusted #playerTabWrapper.w_active {',
-            'right: -',(commentPanelWidth), 'px !important; top: 0 !important; height: ', availableHeight, 'px !important; background: transparent; border: 0;  margin-top: 0px;',
+
+          'body.videoExplorer #content.w_adjusted #playerTabWrapper {',
+            'height: ', (availableHeight), 'px !important;',
           '}',
-         'body.videoExplorer #content.w_adjusted #playerTabWrapper:hover:not(.w_active) #playerCommentPanel,',
+
+          'body.videoExplorer #content.w_adjusted #playerTabWrapper .sidePanelInner {',
+            'height: ', (availableHeight - 2), 'px;',
+          '}',
+          'body.videoExplorer #content.w_adjusted #playerTabWrapper.w_active {',
+            'right: -',(commentPanelWidth - 2), 'px !important; top: 0 !important;  background: transparent; border: 0;  margin-top: 0px;',
+          '}',
           'body.videoExplorer #content.w_adjusted #playerTabWrapper.w_active             #playerCommentPanel {',
-            'height: ', (availableHeight - 18 /* padding+borderの10x2pxを引く */), 'px !important; ',
             'display: block; background: #dfdfdf; border: 1px solid;',
           '}',
       ''].join('');
@@ -7166,7 +7526,7 @@
         videoExplorerStyle = addStyle(dynamic_css, 'videoExplorerStyle');
       }
 
-    } // end adjustSmallVideoSize
+    } // end adjustVideoExplorerSize
 
     function setupVideoExplorerStaticCss() {
       var __css__ = Util.here(function() {/*
@@ -7290,16 +7650,11 @@
           z-index: 100;
         }
         body.videoExplorer #content.w_adjusted #playerTabWrapper {
-          top: 0px !important; height: 50px !important; background: #dfdfdf; border-radius: 4px;
+          top: 0px !important; {*height: 50px !important;*} background: #dfdfdf; border-radius: 4px;
           z-index: 99;
-          transition: right 0.3s ease-out 0.5s; margin-top: 114px;
+          transition: right 0.3s ease-out;
         }
-        body.videoExplorer #content.w_adjusted #playerTabWrapper.w_touch:not(.w_active) {
-          right: -60px !important;
-        }
-        body.videoExplorer #content.w_adjusted #playerTabWrapper:not(.w_touch) {
-          right: -16px !important;
-        }
+
 
         body.size_small.no_setting_panel.videoExplorer #content #videoExplorerExpand { {*「閉じる」ボタン *}
           position: static; top: auto; left: auto; margin-top: 0;',
@@ -7324,6 +7679,13 @@
           text-decoration: none; padding: 0 12px; color: #000; box-sizing: border-box;
           line-height: 26px; -webkit-box-sizing: border-box; -moz-box-sizing: border-box;
         }
+        .videoExplorerMenu .itemList>li:first {
+          position: relative;
+        }
+
+        #videoExplorer .videoExplorerMenu .closeVideoExplorer, #videoExplorer .quickSearchInput {
+          display: none;
+        }
 
         #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .contentItemList .video .column1 .videoInformationOuter .title
         {
@@ -7336,6 +7698,45 @@
 
         .videoExplorer #playlist {
           transition: margin-left 0.4s ease 0.4s;
+        }
+
+        #playerAlignmentArea .toggleCommentPanel {
+          display: none;
+          position: absolute;
+          right: -129px;
+          bottom: 70px;
+          width: 100px;
+          height: 30px;
+          cursor: pointer;
+          background: #ccc;
+          border-radius: 16px 16px 0 0;
+          border: solid 1px black;
+          -webkit-transform: rotate(90deg); -webkit-transform-origin: 0 0 0;
+                  transform: rotate(90deg);         transform-origin: 0 0 0;
+                  transition: 0.4s ease-in-out;
+          -webkit-transition: 0.4s ease-in-out;
+        }
+        body.videoExplorer .w_adjusted #playerAlignmentArea .toggleCommentPanel { display: block; }
+        #playerAlignmentArea .toggleCommentPanel:before {
+          content: '￪ ';
+        }
+        #playerAlignmentArea .toggleCommentPanel:hover {
+          {*box-shadow: 2px -2px 2px #888;*}
+        }
+        #playerAlignmentArea .toggleCommentPanel.w_active {
+          right: -418px;
+          bottom: -27px;
+          border-radius: 0 0 16px 16px;
+          -webkit-transform: rotate(360deg);
+                  transform: rotate(360deg);
+                  transition: none;
+          -webkit-transition: 0.4s ease-in-out;
+        }
+        #playerAlignmentArea .toggleCommentPanel.w_active:hover {
+          {*box-shadow: 2px 2px 2px #888;*}
+        }
+        #playerAlignmentArea .toggleCommentPanel.w_active:before {
+          content: '← ';
         }
      */});
       return addStyle(__css__, 'videoExplorerStyleStatic');
@@ -7397,7 +7798,7 @@
             .on('click',     update)
             .on('mousedown', update)
             .on('mouseup',   update)
-            .attr({'autocomplete': 'on', 'list': 'quickSearchSuggestList', 'placeholder': '検索ワードを入力'});
+            .attr({'autocomplete': 'on', 'list': 'quickSearchSuggestList', 'placeholder': '検索ワードを入力(Q)'});
          // try {
          //   //$elm.attr('type', 'search');
          //   //$elm[0].setAttribute('type', 'search');//.attr('type', 'search');
@@ -7427,9 +7828,10 @@
         searchType      = 'tag',
         $menu           = $('.videoExplorerMenu'),
         $searchInput    = $('<input class="quickSearchInput" type="search" name="q" accesskey="q" required="required" />')
-          .attr({'title': '検索ワードを入力', 'placeholder': '検索ワードを入力'}),
+          .attr({'title': '検索ワードを入力', 'placeholder': '検索ワードを入力(Q)'}),
         $closeExplorer  = $('<div class="closeVideoExplorer"><a href="javascript:;">▲ 画面を戻す</a></div>'),
-        $inputForm      = $('<form />').append($searchInput);
+        $inputForm      = $('<form />').append($searchInput),
+        $toggleCommentPanel = $('<button class="toggleCommentPanel">コメント</button>');
 
       // init search menu
       $searchInput.on('keyup', function(e) {
@@ -7472,11 +7874,11 @@
           loadMylistList();
 
 
-          if (conf.videoExplorerHack) {
+//          if (conf.videoExplorerHack) {
             $('.videoExplorerMenu')
-              .find('.itemList>li:first').css('position', 'relative').append($inputForm)
+              .find('.itemList>li:first')/*.css('position', 'relative')*/.append($inputForm)
               .end().find('.errorMessage').after($closeExplorer);
-          }
+//          }
         };
       controller._refreshMenu_org = controller._refreshMenu;
       controller._refreshMenu = $.proxy(function() {
@@ -7486,13 +7888,12 @@
       }, controller);
 
       EventDispatcher.addEventListener('onVideoExplorerOpened', function(content) {
-        if (conf.videoExplorerHack) {
-          $('#content').append($('.videoExplorerMenu'));
           setTimeout(function() {
-            playerConnector.updatePlayerConfig({playerViewSize: ''}); // ノーマル画面モード
+            if (conf.videoExplorerHack) {
+              playerConnector.updatePlayerConfig({playerViewSize: ''}); // ノーマル画面モード
+            }
             $('.videoExplorerMenu').addClass('initialized');
           }, 500);
-        }
         attachMenuItems();
 
       });
@@ -7506,12 +7907,12 @@
         }
       });
       EventDispatcher.addEventListener('onVideoExplorerOpening', function(content) {
-        //adjustSmallVideoSize();
+        //adjustVideoExplorerSize();
       });
       EventDispatcher.addEventListener('onVideoExplorerClosing', function(content) {
         detachMenuItems();
         if (conf.videoExplorerHack) {
-          //adjustSmallVideoSize();
+          //adjustVideoExplorerSize();
           //$('#videoExplorerContentWrapper').before($('.videoExplorerMenu'));
         }
       });
@@ -7532,8 +7933,8 @@
       });
 
 
-      EventDispatcher.addEventListener('onWindowResize',     adjustSmallVideoSize);
-      EventDispatcher.addEventListener('onVideoInitialized', adjustSmallVideoSize);
+      EventDispatcher.addEventListener('onWindowResize',     adjustVideoExplorerSize);
+      EventDispatcher.addEventListener('onVideoInitialized', adjustVideoExplorerSize);
 
 
       var duration_match = /^([0-9]+):([0-9]+)/;
@@ -7557,11 +7958,27 @@
         });
       };
 
+      initVideoExplorerItemContent();
+//      if (!conf.videoExplorerHack) { return; }
 
-      if (!conf.videoExplorerHack) { return; }
+      $('#playerAlignmentArea').append($toggleCommentPanel);
+      $toggleCommentPanel.on('click', function() {
+        $('#playerTabWrapper').toggleClass('w_active');
+        $toggleCommentPanel.toggleClass('w_active', $('#playerTabWrapper').hasClass('w_active'));
+      });
 
-      $('#videoExplorer, #content, #footer').addClass('w_adjusted');
-      //adjustSmallVideoSize(true);
+      var toggleVideoExplorerHack = function(v) {
+        $('#videoExplorer, #content, #footer').toggleClass('w_adjusted', v);
+        if (v) {
+          $('#content').append($('.videoExplorerMenu'));
+          adjustVideoExplorerSize(true);
+        } else {
+          $('.videoExplorerContentWrapper').before($('.videoExplorerMenu'));
+        }
+      };
+      EventDispatcher.addEventListener('on.config.videoExplorerHack', toggleVideoExplorerHack);
+      toggleVideoExplorerHack(conf.videoExplorerHack);
+      adjustVideoExplorerSize(true);
 
       // コメントパネルが白いままになるバグを対策 (TODO:もういらなくなった事が確認できたら消す)
       var refreshCommentPanelTimer = null;
@@ -7583,6 +8000,124 @@
       // TODO: ニコメンド編集ボタンが押されたら検索画面解除
       EventDispatcher.addEventListener('onVideoExplorerUpdated', function(req) { });
     } // end initVideoExplorer
+
+    function initVideoExplorerItemContent() {
+      var ContentType = WatchApp.ns.components.videoexplorer.model.ContentType;
+      var vec         = watch.VideoExplorerInitializer.videoExplorerController;
+      var contentList = WatchApp.ns.init.VideoExplorerInitializer.videoExplorer.getContentList();
+      var explorer    = vec.getVideoExplorer();
+      var myUserId    = WatchController.getMyUserId();
+
+      // 動画情報表示のテンプレートを拡張
+      var menu =
+        '<div class="thumbnailHoverMenu">' +
+        '<button class="showLargeThumbnail" onclick="WatchItLater.onShowLargeThumbnailClick(this);" title="大きいサムネイルを表示">＋</button>' +
+        '<button class="deleteFromMyMylist" onclick="WatchItLater.onDeleteFromMyMylistClick(this);">マイリスト外す</button>' +
+        '</div>', $menu = $(menu);
+
+      var $template = $('<div/>').html(watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html());
+        $template.find('.column1 .thumbnailContainer').append($menu);
+        $template.find('.column4 .balloon').before($menu.clone());
+        $template.find('.column1')
+          .find('.descriptionShort').after($('<p class="itemMylistComment mylistComment"/>'))
+          .end().find('.createdTime').after($('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>'));
+        watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html($template.html());
+        $template = null;
+
+      var
+        onDeleteFromMyMylistClick = function(elm) {
+          var
+            $videoItem = $(elm).parent().parent(),
+            watchId    = $videoItem.find('.link').attr('href').split('/').reverse()[0],
+            ac         = contentList.getActiveContent(),
+            type       = contentList.getActiveContentType(),
+            onUpdate   = function(status, result) {
+              if (status !== "ok") {
+                Popup.alert('削除に失敗: ' + result.error.description);
+              } else {
+                $videoItem.parent().animate({opacity: 0.3}, 500);
+              }
+            };
+
+          if (type === ContentType.MYLIST_VIDEO) {
+            if (!ac.getIsMine()) { return; }
+            Mylist.deleteMylistItem(watchId, ac.getMylistId(), onUpdate, 0);
+          } else
+          if (type === ContentType.DEFLIST_VIDEO) {
+            Mylist.deleteDefListItem(watchId, onUpdate, 0);
+          }
+        },
+        onShowLargeThumbnailClick = function (elm) {
+          var
+            $videoItem = $(elm).parent().parent(),
+            src        = $videoItem.find('.thumbnail').attr('src');
+          if (!src) { return; }
+          showLargeThumbnail(src);
+        };
+      WatchItLater.onDeleteFromMyMylistClick = onDeleteFromMyMylistClick;
+      WatchItLater.onShowLargeThumbnailClick = onShowLargeThumbnailClick;
+
+      // 動画情報表示の拡張
+      var ItemView = WatchApp.ns.components.videoexplorer.view.content.item.AbstractVideoContentItemView;
+      ItemView.prototype._setView_org = ItemView.prototype._setView;
+      ItemView.prototype._setView = function($item) {
+        this._setView_org($item);
+        this._$createdTime     = $item.find('.column4 .createdTime span');
+        this._$createdTimeFull = $item.find('.column1 .createdTime span');
+      };
+      ItemView.prototype._setItem_org = ItemView.prototype._setItem;
+      ItemView.prototype._setItem = function(item) {
+        this._setItem_org(item);
+      };
+      ItemView.prototype.update_org = ItemView.prototype.update;
+      ItemView.prototype.update = function() {
+        // 動画情報表示をゴリゴリいじる場所
+        var item = this._item, $item = this._$item;
+        this.update_org(item);
+
+        this._$createdTimeFull.html(
+          WatchApp.ns.util.DateFormat.strftime(
+            "%Y年%m月%d日 %H:%M:%S",
+            new Date(item.getFirstRetrieve().replace(/-/g, '/'))
+          )
+        );
+
+        this._$item.find('.deleteFromMyMylist').data('watchId', this._item.getId());
+        if (item._mylistComment) { // マイリストコメント
+          $item.find('.itemMylistComment').css({display: 'block'});
+        }
+
+        if (item._seed && item._seed._info) {
+          var info = item._seed._info;
+          if (info.nicorepo_owner) { // ニコレポ
+            $item.addClass(info.nicorepo_className).addClass('nicorepoResult');
+            var owner = info.nicorepo_owner;
+            var $iconContainer = $item.find('.nicorepoOwnerIconContainer'), $icon = $iconContainer.find('img'), $link = $iconContainer.find('a');
+            $icon.attr('src', owner.icon);
+            $link.attr({'href': owner.page, 'data-ownerid': owner.id, 'title': owner.name + ' さん'});
+            if (info.nicorepo_className.indexOf('log-user-') >= 0) {
+              $link.attr(
+                'onclick',
+                'if (arguments[0].button > 0) return; arguments[0].preventDefault();' +
+                'WatchApp.ns.init.VideoExplorerInitializer.videoExplorerController.showOtherUserVideos(this.dataset.ownerid, this.title);'
+              );
+            }
+            if (info.nicorepo_log.length > 1) {
+              $item.find('.descriptionShort').html(info.nicorepo_log.join('<br>'));
+            }
+            // ニコレポは再生数が取れないので-で埋める
+            this._$viewCount   .html('-');
+            this._$commentCount.html('-');
+            this._$mylistCount .html('-');
+          }
+        }
+        if (item._seed && typeof item._seed.description_full === 'string' && item._seed.description_full.length > 150) {
+          this._$descriptionShort.attr('title', item._seed.description_full);
+        }
+      };
+
+    } // end initVideoExplorerItemContent
+
 
 
     var lastVideoOwnerJson = '';
@@ -8664,12 +9199,12 @@
       $(window).resize(onWindowResize);
 
       Mylist.onDefMylistUpdate(function() {
-        WatchController.clearDeflistCache();
+        //WatchController.clearDeflistCache();
       });
       Mylist.onMylistUpdate(function(info) {
-        if (info.action === 'add') {
+//        if (info.action === 'add') {
           WatchController.clearMylistCache(info.groupId);
-        }
+//        }
       });
 
       $(window).on('beforeunload.watchItLater', function(e) {
@@ -9147,24 +9682,6 @@
       pager._pageItemCount = 100;
     }
 
-    function initDeflistContent() {
-      var ContentType = WatchApp.ns.components.videoexplorer.model.ContentType;
-      var vec         = watch.VideoExplorerInitializer.videoExplorerController;
-      var explorer    = vec.getVideoExplorer();
-      var content     = explorer.getContentList().getContent(ContentType.DEFLIST_VIDEO);
-      var pager       = content._pager;
-
-      pager._pageItemCount = 100;
-
-      content.refresh_org = content.refresh;
-      content.refresh = $.proxy(function(params, callback) {
-        if (conf.debugMode) console.log('deflist refresh! ', params, callback);
-        if (!this.isActive()) {
-          WatchController.clearDeflistCache();
-        }
-        this.refresh_org(params, callback);
-      }, content);
-    }
 
     var isSquareCssInitialized = false;
     function initSquareThumbnail() {
@@ -9490,7 +10007,10 @@
         {
           transition: width 0.4s ease, height 0.4s ease;
         }
-      */});
+        #playerAlignmentArea .toggleCommentPanel {
+        {*transition: 0.4s ease-in-out;*}
+        }
+       */});
       if (conf.debugMode) addStyle(__debug_css__, 'watchItLater_debug_css');
     } // end initOtherCss
 
@@ -9964,22 +10484,27 @@
     initMouse();
     initTouch();
     initEvents();
+
     initSearchContent();
     initUserVideoContent();
+    initMylistContent($, conf, w);
     initUploadedVideoContent();
     initDeflistContent();
+    initVideoExplorer($, conf, w);
+
     initRightPanel($rightPanel);
     initLeftPanel($leftPanel);
     initVideoReview($, conf, w);
+
     initHidariue();
     initVideoCounter();
     initScreenMode();
     initPlaylist($, conf, w);
+
     initPageBottom($, conf, w);
-    initVideoExplorer($, conf, w);
     initPageHeader($, conf, w);
     initVideoTagContainer();
-    initMylist($);
+
     initNicoS($, conf, w);
     initOtherCss();
     initStageVideo($, conf, w);
