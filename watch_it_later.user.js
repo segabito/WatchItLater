@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130809
+// @version        1.130810
 // ==/UserScript==
 
 /**
@@ -38,6 +38,10 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130810
+// - 細かな処理タイミングの調整
+// - 検索モードで画面を大きくする設定の変更がリロード不要になった
 
 // * ver 1.130809
 // - マイリストの動画一覧をタイトル/説明文で絞り込み検索出来るようにした。(ランキングやとりマイでも使用可能)
@@ -1986,7 +1990,7 @@
       },
 
       {title: '検索モードの設定', className: 'videoExplorer'},
-      {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack', reload: true,
+      {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack',
         description: '便利ですがちょっと重いです。\n大きめのモニターだと快適ですが、小さいといまいちかも',
         values: {'する': true, 'しない': false}},
       {title: 'お気に入りタグを表示', varName: 'enableFavTags', reload: true,
@@ -2517,11 +2521,7 @@
           $('.videoExplorerMenu').append($history);
         }
         if (!uniq[text]) {
-          var a = $(dom).clone().css({marginRight: '8px', fontSize: '80%'}).click(function(e) {
-            if (e.button !== 0 || e.metaKey) return;
-            WatchController.nicoSearch(text);
-            e.preventDefault();
-          });
+          var a = $(dom).clone().css({marginRight: '8px', fontSize: '80%'}).click(Util.Closure.openSearch(text));
           dic.style.marginRight = '0';
           $history.find('.title').after(a).after(dic);
         }
@@ -2876,7 +2876,7 @@
             var result = JSON.parse(resp.responseText);
             if (typeof callback === "function") callback(result.status, result);
             dispatchEvent('mylistUpdate', {action: 'add', groupId: groupId, watchId: watchId});
-            //self.clearMylistCache(groupId);
+            self.clearMylistCache(groupId);
           },
           error: function() {
             Popup.alert('ネットワークエラー');
@@ -3758,7 +3758,6 @@
    *  クロスドメインを越えられない環境ではこっちを使うしかない
    */
   (function(){ // mylist window
-    var $$ = w.$$;
     if (w.location.href.indexOf('/mylist_add/') < 0 || w.name === 'nicomylistadd') return;
 
       var $ = w.jQuery;
@@ -3825,7 +3824,10 @@
 
   var WatchController = (function(w) {
     var WatchApp = w.WatchApp;
-    if (!w.WatchApp) return;
+    if (!w.WatchApp) return {
+      isZeroWatch: function() { return false; },
+      isQWatch: function() { return false; }
+    };
     var
       watch          = (WatchApp && WatchApp.ns.init) || {},
       watchInfoModel = (watch.CommonModelInitializer && watch.CommonModelInitializer.watchInfoModel) || {},
@@ -3833,13 +3835,17 @@
       videoExplorerController = watch.VideoExplorerInitializer.videoExplorerController,
       videoExplorer           = videoExplorerController.getVideoExplorer(),
       videoExplorerContentType = WatchApp.ns.components.videoexplorer.model.ContentType,
-      $ = w.$, WatchJsApi = w.WatchJsApi, exp = null;
+      $ = w.$, WatchJsApi = w.WatchJsApi;
+    //  var flashVars = pim.playerInitializeModel.flashVars;
     return {
       isZeroWatch: function() {
         return (WatchApp && WatchJsApi) ? true : false;
       },
       isQwatch: function() {
         return this.isZeroWatch();
+      },
+      getWatchInfoModel: function() {
+        return watchInfoModel;
       },
       nicoSearch: function(word, search_type) {
         if (!search_type) {
@@ -3988,11 +3994,11 @@
           return result;
         }
       },
-      getWatchId: function() {
-        return watchInfoModel.id;
-      },
-      getVideoId: function() {
+      getWatchId: function() {// スレッドIDだったりsmXXXXだったり
         return watchInfoModel.v;
+      },
+      getVideoId: function() {// smXXXXXX, soXXXXX など
+        return watchInfoModel.id;
       },
       getMyNick: function() {
         return watch.CommonModelInitializer.viewerInfoModel.nickname;
@@ -4144,7 +4150,6 @@
         }
       },
       allowStageVideo: function(v) {
-        var exp = w.document.getElementById('external_nicoplayer');
         if (v === 'toggle') {
           return this.allowStageVideo(!this.allowStageVideo());
         } else
@@ -4278,7 +4283,7 @@
           id:         this.getOwnerId(),
           isFavorite: this.isFavoriteOwner(),
           isVideoPublic: this.isVideoPublic()
-        }
+        };
       },
       isSearchMode: function() {
         return videoExplorer.isOpen(); ////return $('body').hasClass('videoExplorer');
@@ -4306,7 +4311,7 @@
   })(w);
   WatchItLater.WatchController = WatchController;
 
-  var Util = (function() {
+  var Util = (function(WatchItLater, WatchController) {
     var Cache = {
       storage: {},
       get: function(key) {
@@ -4333,16 +4338,77 @@
         return data;
       }
     };
+    var
+      isMetaKey = function(e) {
+        if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) { return true; }
+        return false;
+      },
+      prevent = function(e) {
+        e.preventDefault(); e.stopPropagation();
+      };
+
+    var Closure = {
+      openVideoOwnersVideo: function() {
+        return function(e) {
+          if (isMetaKey(e)) { return; }
+          prevent(e);
+          WatchController.openVideoOwnersVideo();
+        };
+      },
+      openVideoOwnersNicorepo: function() {
+        return function(e) {
+          if (isMetaKey(e)) { return; }
+          prevent(e);
+          WatchController.showMylist(NicorepoVideo.REPO_OWNER);
+        };
+      },
+      openDefMylist: function() {
+        return function(e) {
+          if (isMetaKey(e)) { return; }
+          prevent(e);
+          WatchController.showDefMylist();
+        };
+      },
+      openMylist: function(id) {
+        return function(e) {
+          if (isMetaKey(e)) { return; }
+          prevent(e);
+          WatchController.showMylist(id);
+        };
+      },
+      openSearch: function(word, type) {
+        return function(e) {
+          if (isMetaKey(e)) { return; }
+          if (WatchController.isZeroWatch()) {
+            prevent(e);
+            WatchController.nicoSearch(word, type);
+          }
+        };
+      },
+      seekVideo: function(vpos) {
+        return function(e) {
+          if (isMetaKey(e)) { return; }
+          prevent(e);
+          WatchController.vpos(vpos);
+        };
+      },
+      showLargeThumbnail: function(url) {
+        return function() {
+          WatchController.showLargeThumbnail(url);
+        };
+      }
+    };
 
 
     var self = {
       Cache: Cache,
+      Closure: Closure,
       here: function(func) { // えせヒアドキュメント
         return func.toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
       }
     };
     return self;
-  })();
+  })(WatchItLater, WatchController);
   WatchItLater.Util = Util;
 
   var NicoNews = (function() {
@@ -4684,9 +4750,9 @@
             callback('fail', 'HTTP status:' + result.status);
             return;
           }
+          var data;
           try {
             var lines = result.responseText.split('\n'), head = JSON.parse(lines[0]);
-            var data;
             if (head.values[0].total > 0) {
               data = [head];
               for (var i = 1, len = lines.length; i < len - 1; i++) {
@@ -5720,11 +5786,8 @@
       pac   = watch.PlayerInitializer.playerAreaConnector,
       vs    = watch.VideoExplorerInitializer.videoExplorerController.getVideoExplorer(),
       videoExplorer  = vs,
-      $leftPanel     = $('<div id="leftPanel" />').addClass('sidePanel'),
-      $rightPanel = $('#playerTabWrapper').addClass('sidePanel');
-    var watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
+      watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
 
-  //  var flashVars = pim.playerInitializeModel.flashVars;
 
     /**
      *  ゆっくり再生(スロー再生)メニュー
@@ -5867,6 +5930,7 @@
       AnchorHoverPopup.hidePopup();
       resizeWatchTimer = setTimeout(function() {
         EventDispatcher.dispatch('onWindowResize');
+        resizeWatchTimer = null;
       }, 1000);
     }
 
@@ -5903,6 +5967,7 @@
       search();
       w.ichiba.showConsole();
     }
+    WatchController.openIchibaSearch = ichibaSearch;
 
     function initVideoCounter() {
       EventDispatcher.addEventListener('onWatchInfoReset', function(watchInfoModel){
@@ -6080,16 +6145,9 @@
 
 
     // - 左パネル乗っ取る
-    var leftInfoPanelInitialized = false, $leftPanelTemplate = null;
-    function initLeftPanel($sidePanel) {
+    var $leftPanelTemplate = null;
+    function initLeftPanel($, conf, w) {
 
-      if (leftInfoPanelInitialized) {
-        $('#playerContainer').append($sidePanel);
-        return;
-      }
-      leftInfoPanelInitialized = true;
-
-      $('#playerContainer').append($sidePanel);
       var $tab = $([
           '<ul id="leftPanelTabContainer">',
           '<li class="tab ichiba"    data-selection="ichiba"   >市場</li>',
@@ -6097,9 +6155,11 @@
           '</ul>'].join(''));
 
       var
+        $sidePanel     = $('<div id="leftPanel" />').addClass('sidePanel'),
         $infoPanel   = $('<div/>').attr({'id': 'leftVideoInfo',    'class': 'sideVideoInfo   sidePanelInner'}),
         $ichibaPanel = $('<div/>').attr({'id': 'leftIchibaPanel',  'class': 'sideIchibaPanel sidePanelInner'});
       $sidePanel.append($tab).append($infoPanel).append($ichibaPanel);
+      $('#playerTabWrapper').after($sidePanel);
 
       var
         onTabSelect = function(e) {
@@ -6135,16 +6195,247 @@
       $tab.on('click', onTabSelect).on('touchend', onTabSelect);
       changeTab(conf.lastLeftTab);
 
-      var $infoPanelTemplate = $sideInfoPanelTemplate;
-
       EventDispatcher.addEventListener('onVideoInitialized', function() {
-        sidePanelRefresh($infoPanel, $ichibaPanel, $sidePanel, $infoPanelTemplate.clone());
+        sidePanelRefresh($infoPanel, $ichibaPanel, $sidePanel, $sideInfoPanelTemplate.clone());
         if ($ichibaPanel.is(':visible')) {
           resetIchiba(true);
         }
       });
 
     } // end of initLeftPanel
+
+    function initRightPanel($, conf, w) {
+      var $rightPanel = $('#playerTabWrapper').addClass('sidePanel');
+      initRightPanelJack($rightPanel);
+      initRightPanelTabHook();
+      var $playerTabWrapper = $rightPanel, wideCss = null;
+      var
+        createWideCommentPanelCss = function (targetWidth) {
+          var px = targetWidth - $rightPanel.outerWidth();
+          var elms = [
+            '#playerTabWrapper', //'#playerTabWrapper',
+            '#commentDefaultHeader',
+            '#playerCommentPanel .commentTable',
+            '#playerCommentPanel .commentTable .commentTableContainer'
+          ];
+          var css = [
+            'body.videoExplorer #content.w_adjusted #playerTabWrapper { width: ', targetWidth,'px; }\n',
+            'body:not(.full_with_browser) .w_wide #playerTabWrapper { width: ', targetWidth,'px; }\n',
+            //'body:not(.videoExplorer) .w_wide #playerTabWrapper.w_wide { right: -140px;}\n'
+            'body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea             { width: 1100px; }\n', //  960 + 140
+            'body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea.size_normal { width: 1326px; }\n\n'  // 1186 + 140
+          ];
+          for (var v in elms) {
+            var $e = $(elms[v]), newWidth = $e.width() + px;
+            css.push([
+              '.w_wide #playerTabWrapper ', elms[v],
+              ' , body.videoExplorer #content.w_adjusted ',
+              elms[v], '\n{ width: ', newWidth,'px !important; }\n\n'
+            ].join(''));
+          }
+          wideCss = addStyle(css.join(''), 'wideCommentPanelCss');
+          console.log(css.join(''));
+        },
+        toggleWide = function(v) {
+          $('#content').toggleClass('w_wide', v);
+          EventDispatcher.dispatch('onWindowResize');
+        };
+
+      var wideCommentPanelCss = Util.here(function() {/*
+        body.videoExplorer #content.w_adjusted #playerTabWrapper { width: 420px; }
+        body:not(.full_with_browser) .w_wide #playerTabWrapper   { width: 420px; }
+
+        body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea             { width: 1100px; }
+        body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea.size_normal { width: 1326px; }
+
+        body:not(.full_with_browser) .w_wide #playerTabWrapper #playerTabWrapper,
+        body.videoExplorer #content.w_adjusted #playerTabWrapper
+        { width: 420px !important; }
+
+        body:not(.full_with_browser) .w_wide #playerTabWrapper #commentDefaultHeader,
+        body.videoExplorer #content.w_adjusted #commentDefaultHeader
+        { width: 408px !important; }
+
+        body:not(.full_with_browser) .w_wide #playerTabWrapper #playerCommentPanel .commentTable,
+        body.videoExplorer #content.w_adjusted #playerCommentPanel .commentTable
+        { width: 406px !important; }
+
+        body:not(.full_with_browser) .w_wide #playerTabWrapper #playerCommentPanel .commentTable .commentTableContainer,
+        body.videoExplorer #content.w_adjusted #playerCommentPanel .commentTable .commentTableContainer
+        { width: 406px !important; }
+     */});
+      addStyle(wideCommentPanelCss, 'wideCommentPanelCss');
+
+      EventDispatcher.addEventListener('on.config.wideCommentPanel', toggleWide);
+      toggleWide(!!conf.wideCommentPanel);
+
+      EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
+
+        //EventDispatcher.dispatch('onWindowResize');
+        //createWideCommentPanelCss(420);
+
+        var $div = $([
+            '<div id="sharedNgSettingContainer" style="display: none;">NG共有: ',
+              '<select id="sharedNgSetting">',
+                '<option value="HIGH">高</option>',
+                '<option value="MIDDLE">中</option>',
+                '<option value="LOW">低</option>',
+                '<option value="NONE">無</option>',
+              '</select>',
+            '</div>',
+          ''].join('')), $ngs = $div.find('select');
+
+        $ngs
+          .val(watch.PlayerInitializer.nicoPlayerConnector.playerConfig.get().ngScoringFilteringLevel)
+          .on('change', function() {
+            var val = this.value;
+            watch.PlayerInitializer.nicoPlayerConnector.playerConfig.set({ngScoringFilteringLevel: this.value});
+          });
+        $('#commentDefaultHeader').append($div);
+
+        EventDispatcher.addEventListener('on.config.enableSharedNgSetting', function(newValue, oldValue) {
+          if (newValue) {
+            $div.show();
+          } else {
+            $div.hide();
+          }
+        });
+        if (conf.enableSharedNgSetting) { $div.show(); }
+      });
+
+    } // end initRightPanel
+
+    function initRightPanelTabHook() {
+      var playerTab = WatchApp.ns.init.PlayerInitializer.playerTab;
+      // 終了時にニコメンドが勝手に開かなくするやつ
+      // 連続再生中はニコメンドパネルが開かない事を利用する
+      playerTab.playlist_org = playerTab.playlist;
+      playerTab.playlist = {
+        isContinuous: function() {
+          if (conf.playerTabAutoOpenNicommend === 'disable') {
+            if (conf.debugMode) console.log('ニコメンドキャンセル: "disabled"');
+            // 'disable'の時は常に「連続再生中」という嘘を返す事でパネルオープンを止める
+            return true;
+          } else
+          if (conf.playerTabAutoOpenNicommend === 'auto' && WatchController.isNicommendEmpty()) {
+            if (conf.debugMode) console.log('ニコメンドキャンセル: "auto"');
+            // 'auto' の時は、ニコメンドが空の時だけキャンセルする
+            return true;
+          } else
+          if (conf.playerTabAutoOpenNicommend === 'enable') {
+            return playerTab.playlist_org.isContinuous();
+          }
+        }
+      };
+    } //
+
+    // - 右パネル乗っ取る
+    var rightInfoPanelInitialized = false;
+    function initRightPanelJack($sidePanel) {
+      if (!conf.rightPanelJack) { return; }
+      if (rightInfoPanelInitialized) { return; }
+      rightInfoPanelInitialized = true;
+
+      var $tab = $([
+          '<ul id="sidePanelTabContainer">',
+            '<li class="tab comment"   data-selection="w_comment"  >コメント</li>',
+            '<li class="tab videoInfo" data-selection="w_videoInfo">動画情報</li>',
+            '<li class="tab ichiba"    data-selection="w_ichiba"   >ニコニコ市場</li>',
+            '<li class="tab review"    data-selection="w_review"   >レビュー</li>',
+          '</ul>'].join(''));
+
+      var $infoPanel   = $('<div/>').attr({'id': 'rightVideoInfo',   'class': 'sideVideoInfo   sidePanelInner'});
+      var $ichibaPanel = $('<div/>').attr({'id': 'rightIchibaPanel', 'class': 'sideIchibaPanel sidePanelInner'});
+      var $reviewPanel = $('<div/>').attr({'id': 'rightReviewPanel', 'class': 'sideReviewPanel sidePanelInner'});
+      $sidePanel.append($tab).append($infoPanel).append($ichibaPanel).append($reviewPanel);
+
+      var
+        onTabSelect = function(e) {
+          e.preventDefault();
+          AnchorHoverPopup.hidePopup();
+          var selection = $(e.target).attr('data-selection');
+          if (typeof selection === 'string') {
+            if (WatchController.isSearchMode()) {
+              conf.setValue('lastRightTabInExplorer', selection);
+            } else {
+              conf.setValue('lastRightTab',           selection);
+            }
+            changeTab(selection);
+          }
+        },
+        $videoReview = $('#videoReview'),
+        toggleReview = function(f) {
+          if (f) {
+            $reviewPanel.append($videoReview);
+          } else {
+            $('#playerBottomAd').after($videoReview);
+          }
+        },
+        changeTab = function(selection) {
+          if ($sidePanel.hasClass('w_review') && selection !== 'w_review') {
+            toggleReview(false);
+          }
+          $sidePanel.removeClass('w_videoInfo w_comment w_ichiba w_review').addClass(selection);
+          if (selection === 'w_ichiba') {
+            resetIchiba(false);
+          } else
+          if (selection === 'w_review') {
+            toggleReview(true);
+          } else
+          if (selection === 'w_comment') {
+            setTimeout(function() {
+              watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
+            }, 500);
+          }
+          return changeTab;
+        },
+        lastIchibaVideoId = '', resetIchiba = function(force) {
+          var videoId = watchInfoModel.id;
+          if (lastIchibaVideoId === videoId && !force) {
+            return;
+          }
+          lastIchibaVideoId = videoId;
+          resetSideIchibaPanel($ichibaPanel, true);
+        },
+        resetScroll = function() {
+          $(this).animate({scrollTop: 0}, 600);
+        };
+
+      $infoPanel  .on('dblclick', resetScroll);
+      $ichibaPanel.on('dblclick', resetScroll);
+      $reviewPanel.on('dblclick', resetScroll);
+
+      $tab.on('click', onTabSelect).on('touchend', onTabSelect);
+      changeTab(conf.lastRightTab);
+
+      var $infoPanelTemplate = $sideInfoPanelTemplate;
+
+      EventDispatcher.addEventListener('onVideoExplorerOpening', function() {
+        changeTab('w_comment');
+      });
+      EventDispatcher.addEventListener('onVideoExplorerClosing', function() {
+        changeTab(conf.lastRightTab);
+      });
+
+      EventDispatcher.addEventListener('onWindowResize', function() {
+        var $body = $('body'), $right = $('#playerTabWrapper');
+        if (WatchController.isSearchMode() || $body.hasClass('full_with_browser')) { return; }
+        var w = $('#external_nicoplayer').outerWidth(), margin = 84;
+        w += $right.is(':visible') ? $right.outerWidth() : 0;
+        $('#sidePanelTabContainer').toggleClass('left', (window.innerWidth - w - margin < 0));
+      });
+
+      EventDispatcher.addEventListener('onVideoInitialized', function() {
+        sidePanelRefresh($infoPanel, $ichibaPanel, $sidePanel, $infoPanelTemplate.clone());
+        if ($ichibaPanel.is(':visible')) {
+          resetIchiba(true);
+        }
+        setTimeout(function() {
+          $sidePanel.toggleClass('reviewEmpty', $('#videoReview').find('.stream').length < 1);
+        }, 2000);
+      });
+    } // end of initRightPanelJack
+
 
     function assignVideoCountToDom($tpl, count) {
       var addComma = WatchApp.ns.util.StringUtil.addComma;
@@ -6209,7 +6500,9 @@
         }
       });
 
-      $videoDescription.find('.descriptionThumbnail img').on('click', function() { showLargeThumbnail(this.src); });
+      $videoDescription.find('.descriptionThumbnail img').on(
+        'click',
+        function() { showLargeThumbnail(this.src); });
 
       var $videoOwnerInfoContainer = $template.find('.videoOwnerInfoContainer');
       var $userIconContainer       = $template.find('.userIconContainer');
@@ -6224,20 +6517,12 @@
               .attr({'src': channelInfo.iconUrl}).end()
             .find('.channelIconLink')
               .attr({'href': chUrl})
-              .on('click', function(e) {
-                if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) { return; }
-                e.preventDefault();
-                WatchController.openChannelOwnersVideo();
-             }).end()
+              .on('click', Util.Closure.openVideoOwnersVideo()).end()
             .find('.channelNameInner')
               .text(channelInfo.name).end()
             .find('.showOtherVideos')
               .attr({'href': chUrl})
-              .on('click', function(e) {
-                if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) { return; }
-                e.preventDefault();
-                WatchController.openChannelOwnersVideo();
-             });
+              .on('click', Util.Closure.openVideoOwnersVideo());
          }
         $userIconContainer.remove();
       } else {
@@ -6249,20 +6534,12 @@
               .attr({'src': uploaderInfo.iconUrl}).end()
             .find('.userIconLink')
               .attr({'href': userPage})
-              .on('click', function(e) {
-                if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) { return; }
-                e.preventDefault();
-                WatchController.showMylist(NicorepoVideo.REPO_OWNER);
-              }).end()
+              .on('click', Util.Closure.openVideoOwnersNicorepo()).end()
             .find('.userNameInner')
               .text(uploaderInfo.nickname).end()
             .find('.showOtherVideos')
               .attr({'href': userPage + '/video'})
-              .on('click', function(e) {
-                if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) { return; }
-                e.preventDefault();
-                WatchController.openUpNushiVideo();
-              }).end()
+              .on('click', Util.Closure.openVideoOwnersVideo()   ).end()
             .toggleClass('isUserVideoPublic', uploaderInfo.isUserVideoPublic);
           $channelIconContainer.remove();
         } else {
@@ -6287,6 +6564,9 @@
 
       setTimeout(function() {
         $sideInfoPanel.addClass('show');
+        $sideInfoPanel = $ichibaPanel = $sidePanel = $template =
+        $videoDetails = $videoDescription = $videoOwnerInfoContainer = $userIconContainer =
+        $channelIconContainer = null;
       }, 100);
 
     } // end of sidePanelRefresh
@@ -6309,20 +6589,19 @@
         if (elm.tagName === 'A') {
           if (elm.className === 'otherSite') return;
           var $elm = $(elm);
+
           if (elm.textContent.indexOf('mylist/') === 0) {
-            $elm.addClass('mylist').attr('target', null).on('click.leftInfo', function(e) {
-              if (e.metaKey || e.shiftKey || e.altKey || e.ctrlKey || e.button !== 0) return;
-              e.preventDefault();
-              WatchController.showMylist(this.text.split('/').reverse()[0]);
-            });
+            var mylistId = elm.textContent.split('/').reverse()[0];
+
+            $elm.addClass('mylist').attr('target', null).on(
+              'click.sideInfo', Util.Closure.openMylist(mylistId));
           } else
           if (elm.className === 'seekTime') {
-            $elm.attr('href', location.href + '?from=' + $elm.text().substr(1)).on('click.leftInfo', function(e) {
-              if (e.metaKey || e.shiftKey || e.altKey || e.ctrlKey || e.button !== 0) return;
-              e.preventDefault();
-              var data = $(this).attr('data-seekTime').split(":");
-              WatchController.vpos((data[0] * 60 + parseInt(data[1], 10)) * 1000);
-            });
+            var data = $elm.attr('data-seekTime').split(":"),
+                vpos = (data[0] * 60 + parseInt(data[1], 10)) * 1000;
+
+            $elm.attr('href', location.href + '?from=' + $elm.text().substr(1)).on(
+              'click.leftInfo', Util.Closure.seekVideo(vpos));
           }
         }
       });
@@ -6333,6 +6612,7 @@
       var videoId = watchInfoModel.id;
 
       $ichibaPanel.scrollTop(0);
+      $ichibaPanel.find('*').unbind();
       $ichibaPanel.empty();
       var $inner  = $('<div class="ichibaPanelInner" />');
       var $header = $('<div class="ichibaPanelHeader"><p class="logo">ニコニコ市場出張所</p></div>');
@@ -6455,15 +6735,7 @@
                 .attr({href: '/mylist/' + mylist.id, title: title})
                 .text(mylist.name)
                 .addClass('favoriteMylist')
-                .click(
-                  (function(id) {
-                    return function(e) {
-                      if (e.button !== 0 || e.metaKey) return;
-                      e.preventDefault();
-                      WatchController.showMylist(id);
-                    };
-                  })(mylist.id)
-                );
+                .click(Util.Closure.openMylist(mylist.id));
               $ul.append($li.addClass(mylist.iconType).append($a));
             }
             $ul.append($reload);
@@ -6515,11 +6787,7 @@
               .attr({href: '/tag/' + encodeURIComponent(tag.name + ' ' + conf.defaultSearchOption) + sortOrder})
               .text(tag.name)
               .addClass('favoriteTag')
-              .click(function(e) {
-                if (e.button !== 0 || e.metaKey) return;
-                e.preventDefault();
-                WatchController.nicoSearch($(this).text());
-              });
+              .click(Util.Closure.openSearch(tag.name));
             $ul.append($li.append($a));
           }
           $toggle.fadeIn(500);
@@ -6564,11 +6832,7 @@
                 .text('とりあえずマイリスト')
                 .addClass('mylistList')
                 .addClass('defMylist')
-                .click(function(e) {
-                  if (e.button !== 0 || e.metaKey) return;
-                  e.preventDefault();
-                  WatchController.showDefMylist();
-              })
+                .click(Util.Closure.openDefMylist())
             )
           );
           var items = [
@@ -6586,11 +6850,7 @@
                 .text(item.title)
                 .addClass('mylistList')
                 .addClass('defMylist')
-                .click(function(e) {
-                  if (e.button !== 0 || e.metaKey) return;
-                  e.preventDefault();
-                  WatchController.showMylist(item.id);
-                })
+                .click(Util.Closure.openMylist(item.id))
             );
           }
           for (var v in items) {
@@ -6602,15 +6862,7 @@
               .attr({href: '/my/mylist/#/' + mylist.id})
               .text(mylist.name)
               .addClass('mylistList')
-              .click(
-                (function(id) {
-                  return function(e) {
-                    if (e.button !== 0 || e.metaKey) return;
-                    e.preventDefault();
-                    WatchController.showMylist(id);
-                  };
-                })(mylist.id)
-              );
+              .click(Util.Closure.openMylist(mylist.id));
             $ul.append($li.append($a));
           }
           $toggle.fadeIn(500);
@@ -6636,11 +6888,7 @@
               .text(name)
               .addClass('videoRanking')
               .addClass(genre)
-              .click(function(e) {
-                if (e.button !== 0 || e.metaKey) return;
-                e.preventDefault();
-                WatchController.showMylist(id);
-              });
+              .click(Util.Closure.openMylist(id));
           return $('<li/>').addClass(category).append($a);
         }
 
@@ -6710,7 +6958,9 @@
       },
       onVideoChange: function() {
         this._$title.html(this._watchInfoModel.title);
-        this._$thumb.attr('src', this._watchInfoModel.thumbnail);
+        this._$thumb
+          .attr('src', this._watchInfoModel.thumbnail)
+          .off('click').on('click', Util.Closure.showLargeThumbnail(this._watchInfoModel.thumbnail));
         if (this._content.isActive()) {
           this.update();
         }
@@ -6750,16 +7000,15 @@
           if (this._type === 'deflist') {
             WatchController.clearDeflistCache();
           }
-          setTimeout(
-            $.proxy(function() {
-              this._content.clear();
-              this._content.refresh({page: 1});
-              this._clearIsUpdating();
-            }, this)
-          , 100);
         } else {
           Popup.alert('更新に失敗: ' + result.error.description);
         }
+        this._content.setFilter(null);
+        setTimeout(
+          $.proxy(function() {
+            this._content.refresh({page: 1});
+            this._clearIsUpdating();
+          }, this), 500);
       }
     }; // end WatchingVideoView.prototype
 
@@ -6835,7 +7084,7 @@
         return function(item) {
           var title = to_h(item.title);
           var desc  = item.description_full || item.description_short || '';
-          var mc    = item.mylist_comment   || ''
+          var mc    = item.mylist_comment   || '';
           var result = title.indexOf(word) >= 0 || to_h(desc).indexOf(word) >= 0 || to_h(mc).indexOf(word) >= 0;
           return result;
         };
@@ -6859,7 +7108,6 @@
         $view: $([
           '<div class="watchingVideo">',
             '<img class="thumbnail">',
-            '視聴中の動画',
             '<p class="title"></p>',
             '<span class="contains"    >この動画はリストに登録されています</span>',
             '<span class="not_contains">この動画はリストにありません</span>',
@@ -6877,7 +7125,7 @@
         $view: $([
           '<div class="grepOption">',
             '<form>',
-              '<input type="search" class="grepInput" autocomplete="on" placeholder="マイリストをタイトル・説明文で絞り込む(G)" accesskey="g">',
+              '<input type="search" class="grepInput" autocomplete="on" placeholder="タイトル・説明文で絞り込む(G)" accesskey="g">',
             '</form>',
           '</div>',
         ].join(''))
@@ -6889,11 +7137,11 @@
       content._isOwnerNicorepo = false;
       content._isRanking       = false;
       content.getIsMine          = $.proxy(function() {
-        // getUserId()はstringだけどwatchInfoModelから取ってるmyUserIdはnumber
+        // getUserId()はstringだけどwatchInfoModelから取ってるmyUserIdはnumber HAHAHA
         return parseInt(this.getUserId(), 10) === myUserId && parseInt(this.getMylistId(), 10) > 0;
       }, content);
       content.getIsDummy         = $.proxy(function() {
-        return parseInt(this.getMylistId(), 10) <= 0
+        return parseInt(this.getMylistId(), 10) <= 0;
       }, content);
       content.getIsOwnerNicorepo = $.proxy(function() { return this._isOwnerNicorepo; }, content);
       content.getIsRanking       = $.proxy(function() { return this._isRanking;       }, content);
@@ -6902,7 +7150,9 @@
       content._rawList = [];
       content.getRawList    = $.proxy(function() { return this._rawList; }, content);
       content._filter = null;
-      content.setFilter     = $.proxy(function(filter) { this._filter = filter; }, content);
+      content.setFilter     = $.proxy(function(filter) {
+        this._filter = filter;
+      }, content);
       content.getFilter     = $.proxy(function()       { return this._filter; }, content);
 
       content.clear_org = content.clear;
@@ -6916,8 +7166,8 @@
       content.onLoad = $.proxy(function(err, result) {
         this._isOwnerNicorepo = result.isOwnerNicorepo;
         this._isRanking       = result.isRanking;
-        var filter = this.getFilter();
 
+        var filter = this.getFilter();
         if (err === null && result.list && result.list.length) {
           if (!result.rawList) result.rawList = result.list.concat();
           if (filter) {
@@ -6925,12 +7175,13 @@
 
             for (var i = result.rawList.length - 1; i >= 0; i--) {
               var item = result.rawList[i];
-              if (!item.title) continue;
-              if (filter(item)) {
-                list.push(item);
+              if (item.title && filter(item)) {
+                list.unshift(item);
               }
             }
             result.list    = list;
+          } else {
+            result.list = result.rawList.concat();
           }
         } else
         if (result.rawList) {
@@ -7035,19 +7286,20 @@
 
       var __css__ = Util.here(function() {/*
         #videoExplorer .watchingVideo         { display: none; }
+        #videoExplorer .watchingVideo .title  { display: none; }
         #videoExplorer .watchingVideo.updating * {
           cursor: wait; opacity: 0.5;
         }
         #videoExplorer .watchingVideo button {
-          padding: 2px 8px; margin: auto 16px;
+          padding: 2px 12px; margin: 12px 24px;
         }
         #videoExplorer .isMine .watchingVideo {
           display: block; background: #f4f4f4; border: 1px solid #ccc;
-          margin: auto; width: 500px; min-height: 72px; padding: 16px;
+          margin: auto; width: 500px; min-height: 48px; padding: 16px;
         }
 
         #videoExplorer .watchingVideo .thumbnail {
-          float: left; width: 96px; margin-right: 16px;
+        float: left; width: 72px; margin-right: 24px; cursor: pointer;
         }
 
 
@@ -7149,10 +7401,9 @@
         $view: $([
           '<div class="watchingVideo">',
             '<img class="thumbnail">',
-            '視聴中の動画',
             '<p class="title"></p>',
-            '<span class="contains"    >この動画はとりあえずマイリストに登録されています</span>',
-            '<span class="not_contains">この動画はとりあえずマイリストにありません</span>',
+            '<span class="contains"    >この動画はリストに登録されています</span>',
+            '<span class="not_contains">この動画はリストにありません</span>',
             '<span class="edit">',
               '<button class="add"   >登録</button>',
               '<button class="remove">外す</button>',
@@ -7191,8 +7442,10 @@
       content._rawList = [];
       content.getRawList    = $.proxy(function() { return this._rawList; }, content);
       content._filter = null;
-      content.setFilter     = $.proxy(function(filter) { this._filter = filter; }, content);
-      content.getFilter     = $.proxy(function()       { return this._filter; }, content);
+      content.setFilter     = $.proxy(function(filter) {
+        this._filter = filter;
+      }, content);
+      content.getFilter     = $.proxy(function() { return this._filter; }, content);
 
       content.onLoad_org = content.onLoad;
       content.onLoad = $.proxy(function(err, result) {
@@ -7204,19 +7457,20 @@
 
             for (var i = result.rawList.length - 1; i >= 0; i--) {
               var item = result.rawList[i];
-              if (!item.title) continue;
-              if (filter(item)) {
-                list.push(item);
+              if (item.title && filter(item)) {
+                list.unshift(item);
               }
             }
             result.list    = list;
+          } else {
+            result.list = result.rawList.concat();
           }
         } else
         if (result.rawList) {
           result.list = result.rawList.concat();
         }
-
         this._rawList         = result.rawList || [];
+
         this.onLoad_org(err, result);
       }, content);
 
@@ -7295,7 +7549,7 @@
         ''].join('');
       Popup.show(html);
     } //
-
+    WatchController.showLargeThumbnail = showLargeThumbnail;
 
     function onVideoStopped() {
       EventDispatcher.dispatch('onVideoStopped');
@@ -7311,7 +7565,6 @@
       if (videoExplorerOpenCount++ === 0) {
         EventDispatcher.dispatch('onFirstVideoExplorerOpened', content);
       }
-      $('#playerTabWrapper').after($leftPanel);
       EventDispatcher.dispatch('onVideoExplorerOpened', content);
 
       AnchorHoverPopup.hidePopup().updateNow();
@@ -7345,7 +7598,7 @@
           .removeClass('w_deflist').removeClass('w_related').removeClass('w_search'),
         $body = $ve.find('.videoExplorerBody')
           .removeClass('isMine').removeClass('dummyMylist')
-          .removeClass('isRanking').removeClass('isOwnerNicorepo');
+          .removeClass('isRanking').removeClass('isOwnerNicorepo'),
         className = 'w_user';
       switch (type) {
         case ContentType.USER_VIDEO:
@@ -7386,14 +7639,14 @@
     var videoExplorerStyle = null, lastAvailableWidth = 0, lastBottomHeight = 0;
     function adjustVideoExplorerSize(force) {
       if (force !== true && (!conf.videoExplorerHack || !WatchController.isSearchMode())) { return; }
-      $('#leftVideoInfo').find('.videoDetails').attr('style', '');
       $('#videoExplorer, #content, #bottomContentTabContainer').toggleClass('w_adjusted', conf.videoExplorerHack);
+
       var
-        rightAreaWidth = $('.videoExplorerBody').outerWidth(),
+        rightAreaWidth = $('.videoExplorerBody').outerWidth(), // 592
         availableWidth = $(window).innerWidth() - rightAreaWidth,
         commentInputHeight = $('#playerContainer').hasClass('oldTypeCommentInput') ? 36 : 0,
         controlPanelHeight = $('#playerContainer').hasClass('controll_panel') ? 46 : 0;
-
+      //console.log('rightAreaWidth', rightAreaWidth, 'availableWidth', availableWidth);
       if (availableWidth <= 0) { return; }
 
       var
@@ -7530,6 +7783,15 @@
 
     function setupVideoExplorerStaticCss() {
       var __css__ = Util.here(function() {/*
+        body.videoExplorerOpening {
+          overflow-y: scroll;
+        }
+        body.videoExplorerOpening .videoExplorerMenu {
+          display: none;
+        }
+        body.videoExplorerOpening #playerTabWrapper {
+          visibility: hidden;
+        }
         #videoExplorer {
           transition: margin-left 0.4s ease 0.4s; overflow-x: hidden;
         }
@@ -7703,11 +7965,12 @@
         #playerAlignmentArea .toggleCommentPanel {
           display: none;
           position: absolute;
-          right: -129px;
+          right: -119px;
           bottom: 70px;
           width: 100px;
           height: 30px;
           cursor: pointer;
+          outline: none;
           background: #ccc;
           border-radius: 16px 16px 0 0;
           border: solid 1px black;
@@ -7722,18 +7985,22 @@
         }
         #playerAlignmentArea .toggleCommentPanel:hover {
           {*box-shadow: 2px -2px 2px #888;*}
+          right: -129px;
         }
         #playerAlignmentArea .toggleCommentPanel.w_active {
           right: -418px;
-          bottom: -27px;
+          bottom: -29px;
           border-radius: 0 0 16px 16px;
+          z-index: 10000;
           -webkit-transform: rotate(360deg);
                   transform: rotate(360deg);
-                  transition: none;
           -webkit-transition: 0.4s ease-in-out;
+                  transition: none;
+                {*transition: 0.4s ease-in-out;*}
         }
         #playerAlignmentArea .toggleCommentPanel.w_active:hover {
           {*box-shadow: 2px 2px 2px #888;*}
+          right: -418px;
         }
         #playerAlignmentArea .toggleCommentPanel.w_active:before {
           content: '← ';
@@ -7874,11 +8141,9 @@
           loadMylistList();
 
 
-//          if (conf.videoExplorerHack) {
-            $('.videoExplorerMenu')
-              .find('.itemList>li:first')/*.css('position', 'relative')*/.append($inputForm)
-              .end().find('.errorMessage').after($closeExplorer);
-//          }
+          $('.videoExplorerMenu')
+            .find('.itemList>li:first')/*.css('position', 'relative')*/.append($inputForm)
+            .end().find('.errorMessage').after($closeExplorer);
         };
       controller._refreshMenu_org = controller._refreshMenu;
       controller._refreshMenu = $.proxy(function() {
@@ -7888,14 +8153,16 @@
       }, controller);
 
       EventDispatcher.addEventListener('onVideoExplorerOpened', function(content) {
-          setTimeout(function() {
-            if (conf.videoExplorerHack) {
-              playerConnector.updatePlayerConfig({playerViewSize: ''}); // ノーマル画面モード
-            }
-            $('.videoExplorerMenu').addClass('initialized');
-          }, 500);
-        attachMenuItems();
+        setTimeout(function() {
+          if (conf.videoExplorerHack) {
+           // adjustVideoExplorerSize();
+            watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
+            playerConnector.updatePlayerConfig({playerViewSize: ''}); // ノーマル画面モード
+          }
+        }, 100);
 
+        $('body').removeClass('videoExplorerOpening');
+        $('.videoExplorerMenu').addClass('initialized');
       });
       EventDispatcher.addEventListener('onVideoExplorerRefreshEnd', function(content) {
         if (content.getType() === ContentType.USER_VIDEO) {
@@ -7907,14 +8174,10 @@
         }
       });
       EventDispatcher.addEventListener('onVideoExplorerOpening', function(content) {
-        //adjustVideoExplorerSize();
+        $('body').addClass('videoExplorerOpening');
+        adjustVideoExplorerSize(true);
       });
       EventDispatcher.addEventListener('onVideoExplorerClosing', function(content) {
-        detachMenuItems();
-        if (conf.videoExplorerHack) {
-          //adjustVideoExplorerSize();
-          //$('#videoExplorerContentWrapper').before($('.videoExplorerMenu'));
-        }
       });
 
       EventDispatcher.addEventListener('onBeforeVideoExplorerMenuClear', function() {
@@ -7933,9 +8196,12 @@
       });
 
 
-      EventDispatcher.addEventListener('onWindowResize',     adjustVideoExplorerSize);
-      EventDispatcher.addEventListener('onVideoInitialized', adjustVideoExplorerSize);
-
+      EventDispatcher.addEventListener('onFirstVideoExplorerOpened', function() {
+        //setTimeout(function() {
+          EventDispatcher.addEventListener('onWindowResize',     adjustVideoExplorerSize);
+          EventDispatcher.addEventListener('onVideoInitialized', adjustVideoExplorerSize);
+        //}, 1000);
+      });
 
       var duration_match = /^([0-9]+):([0-9]+)/;
       controller._item2playlistItem = function (item) {
@@ -7959,43 +8225,34 @@
       };
 
       initVideoExplorerItemContent();
-//      if (!conf.videoExplorerHack) { return; }
 
       $('#playerAlignmentArea').append($toggleCommentPanel);
       $toggleCommentPanel.on('click', function() {
+        AnchorHoverPopup.hidePopup();
         $('#playerTabWrapper').toggleClass('w_active');
         $toggleCommentPanel.toggleClass('w_active', $('#playerTabWrapper').hasClass('w_active'));
+        setTimeout(function() {
+          watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
+        }, 1000);
+      }).on('mouseover', function() {
+        AnchorHoverPopup.hidePopup();
       });
 
       var toggleVideoExplorerHack = function(v) {
         $('#videoExplorer, #content, #footer').toggleClass('w_adjusted', v);
         if (v) {
           $('#content').append($('.videoExplorerMenu'));
-          adjustVideoExplorerSize(true);
+          if (WatchController.isSearchMode()) {
+            playerConnector.updatePlayerConfig({playerViewSize: ''}); // ノーマル画面モード
+            adjustVideoExplorerSize(true);
+          }
         } else {
           $('.videoExplorerContentWrapper').before($('.videoExplorerMenu'));
         }
       };
       EventDispatcher.addEventListener('on.config.videoExplorerHack', toggleVideoExplorerHack);
       toggleVideoExplorerHack(conf.videoExplorerHack);
-      adjustVideoExplorerSize(true);
-
-      // コメントパネルが白いままになるバグを対策 (TODO:もういらなくなった事が確認できたら消す)
-      var refreshCommentPanelTimer = null;
-      var refreshCommentPanelHeight = function() {
-        if (!WatchController.isSearchMode()) {
-          return;
-        }
-        if (refreshCommentPanelTimer !== null) {
-          clearTimeout(refreshCommentPanelTimer);
-          refreshCommentPanelTimer = null;
-        }
-        refreshCommentPanelTimer =
-          setTimeout(function() {
-            watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
-          }, 1000);
-      }
-     $('#playerTabWrapper').on('mouseenter.watchItLater', refreshCommentPanelHeight);
+      //adjustVideoExplorerSize(true);
 
       // TODO: ニコメンド編集ボタンが押されたら検索画面解除
       EventDispatcher.addEventListener('onVideoExplorerUpdated', function(req) { });
@@ -8009,22 +8266,24 @@
       var myUserId    = WatchController.getMyUserId();
 
       // 動画情報表示のテンプレートを拡張
-      var menu =
-        '<div class="thumbnailHoverMenu">' +
-        '<button class="showLargeThumbnail" onclick="WatchItLater.onShowLargeThumbnailClick(this);" title="大きいサムネイルを表示">＋</button>' +
-        '<button class="deleteFromMyMylist" onclick="WatchItLater.onDeleteFromMyMylistClick(this);">マイリスト外す</button>' +
-        '</div>', $menu = $(menu);
-
-      var $template = $('<div/>').html(watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html());
-        $template.find('.column1 .thumbnailContainer').append($menu);
-        $template.find('.column4 .balloon').before($menu.clone());
-        $template.find('.column1')
-          .find('.descriptionShort').after($('<p class="itemMylistComment mylistComment"/>'))
-          .end().find('.createdTime').after($('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>'));
-        watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html($template.html());
-        $template = null;
-
       var
+        overrideItemTemplate = function() {
+          var menu =
+            '<div class="thumbnailHoverMenu">' +
+            '<button class="showLargeThumbnail" onclick="WatchItLater.onShowLargeThumbnailClick(this);" title="大きいサムネイルを表示">＋</button>' +
+            '<button class="deleteFromMyMylist" onclick="WatchItLater.onDeleteFromMyMylistClick(this);">マイリスト外す</button>' +
+            '</div>', $menu = $(menu);
+
+          var $template = $('<div/>').html(watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html());
+            $template.find('.column1 .thumbnailContainer').append($menu);
+            $template.find('.column4 .balloon').before($menu.clone());
+            $template.find('.column1')
+              .find('.descriptionShort').after($('<p class="itemMylistComment mylistComment"/>'))
+              .end().find('.createdTime').after($('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>'));
+            watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html($template.html());
+            $template = $menu = null;
+
+        },
         onDeleteFromMyMylistClick = function(elm) {
           var
             $videoItem = $(elm).parent().parent(),
@@ -8054,6 +8313,7 @@
           if (!src) { return; }
           showLargeThumbnail(src);
         };
+      overrideItemTemplate();
       WatchItLater.onDeleteFromMyMylistClick = onDeleteFromMyMylistClick;
       WatchItLater.onShowLargeThumbnailClick = onShowLargeThumbnailClick;
 
@@ -8115,6 +8375,7 @@
           this._$descriptionShort.attr('title', item._seed.description_full);
         }
       };
+      ItemView = null;
 
     } // end initVideoExplorerItemContent
 
@@ -8126,7 +8387,7 @@
       EventDispatcher.dispatch('onWatchInfoReset', watchInfoModel);
       var owner = WatchController.getOwnerInfo(), owner_json = JSON.stringify(owner);
       if (lastVideoOwnerJson !== owner_json) {
-        lastVideoOwnerJson = owner_json
+        lastVideoOwnerJson = owner_json;
         EventDispatcher.dispatch('onVideoOwnerChanged', owner);
       }
     }
@@ -8470,7 +8731,7 @@
 
             if (uniq[id] || typeof id !== 'string') { continue; }
             uniq[id] = true;
-            if (id == watchInfoModel.v) {
+            if (id === watchInfoModel.v) {
               currentIndex = i;
               newItems.push(currentItem);
             } else {
@@ -8747,6 +9008,10 @@
 
       $('#playlist .browserFullOption').on('click.bugfix', resetView);
 
+      $('.generationMessage, .prevArrow, .nextArrow, .playbackOption').on('mouseover', function() {
+        AnchorHoverPopup.hidePopup();
+      });
+
       playlist.addEventListener('changePlaybackMode', function(mode) {
         if (conf.debugMode) console.log('changePlaybackMode', mode, conf.hashPlaylistMode);
         if (mode === 'normal' && conf.hashPlaylistMode < 2) {
@@ -8828,240 +9093,6 @@
       EventDispatcher.addEventListener('onVideoInitialized', onTagReset);
       watch.TagInitializer.tagList.addEventListener('reset', onTagReset);
     } // end initVideoTagContainer
-
-    function initRightPanel($rightPanel) {
-      initRightPanelJack($rightPanel);
-      initRightPanelTabHook();
-      var $playerTabWrapper = $rightPanel, $playerTabWrapper = $rightPanel, wideCss = null;
-      var
-        createWideCommentPanelCss = function (targetWidth) {
-          var px = targetWidth - $rightPanel.outerWidth();
-          var elms = [
-            '#playerTabWrapper', //'#playerTabWrapper',
-            '#commentDefaultHeader',
-            '#playerCommentPanel .commentTable',
-            '#playerCommentPanel .commentTable .commentTableContainer'
-          ];
-          var css = [
-            'body.videoExplorer #content.w_adjusted #playerTabWrapper { width: ', targetWidth,'px; }\n',
-            'body:not(.full_with_browser) .w_wide #playerTabWrapper { width: ', targetWidth,'px; }\n',
-            //'body:not(.videoExplorer) .w_wide #playerTabWrapper.w_wide { right: -140px;}\n'
-            'body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea             { width: 1100px; }\n', //  960 + 140
-            'body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea.size_normal { width: 1326px; }\n\n'  // 1186 + 140
-          ];
-          for (var v in elms) {
-            var $e = $(elms[v]), newWidth = $e.width() + px;
-            css.push([
-              '.w_wide #playerTabWrapper ', elms[v],
-              ' , body.videoExplorer #content.w_adjusted ',
-              elms[v], '\n{ width: ', newWidth,'px !important; }\n\n'
-            ].join(''));
-          }
-          wideCss = addStyle(css.join(''), 'wideCommentPanelCss');
-          console.log(css.join(''));
-        },
-        toggleWide = function(v) {
-          //$rightPanel.toggleClass('w_wide', v).css('right', '');
-          $('#content').toggleClass('w_wide', v);
-          EventDispatcher.dispatch('onWindowResize');
-        };
-
-      var wideCommentPanelCss = Util.here(function() {/*
-        body.videoExplorer #content.w_adjusted #playerTabWrapper { width: 420px; }
-        body:not(.full_with_browser) .w_wide #playerTabWrapper   { width: 420px; }
-
-        body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea             { width: 1100px; }
-        body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea.size_normal { width: 1326px; }
-
-        body:not(.full_with_browser) .w_wide #playerTabWrapper #playerTabWrapper,
-        body.videoExplorer #content.w_adjusted #playerTabWrapper
-        { width: 420px !important; }
-
-        body:not(.full_with_browser) .w_wide #playerTabWrapper #commentDefaultHeader,
-        body.videoExplorer #content.w_adjusted #commentDefaultHeader
-        { width: 408px !important; }
-
-        body:not(.full_with_browser) .w_wide #playerTabWrapper #playerCommentPanel .commentTable,
-        body.videoExplorer #content.w_adjusted #playerCommentPanel .commentTable
-        { width: 406px !important; }
-
-        body:not(.full_with_browser) .w_wide #playerTabWrapper #playerCommentPanel .commentTable .commentTableContainer,
-        body.videoExplorer #content.w_adjusted #playerCommentPanel .commentTable .commentTableContainer
-        { width: 406px !important; }
-     */});
-      addStyle(wideCommentPanelCss, 'wideCommentPanelCss');
-
-      EventDispatcher.addEventListener('on.config.wideCommentPanel', toggleWide);
-      toggleWide(!!conf.wideCommentPanel);
-
-      EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
-
-        //EventDispatcher.dispatch('onWindowResize');
-        //createWideCommentPanelCss(420);
-
-        var $div = $([
-            '<div id="sharedNgSettingContainer" style="display: none;">NG共有: ',
-              '<select id="sharedNgSetting">',
-                '<option value="HIGH">高</option>',
-                '<option value="MIDDLE">中</option>',
-                '<option value="LOW">低</option>',
-                '<option value="NONE">無</option>',
-              '</select>',
-            '</div>',
-          ''].join('')), $ngs = $div.find('select');
-
-        $ngs
-          .val(watch.PlayerInitializer.nicoPlayerConnector.playerConfig.get().ngScoringFilteringLevel)
-          .on('change', function() {
-            var val = this.value;
-            watch.PlayerInitializer.nicoPlayerConnector.playerConfig.set({ngScoringFilteringLevel: this.value});
-          });
-        $('#commentDefaultHeader').append($div);
-
-        EventDispatcher.addEventListener('on.config.enableSharedNgSetting', function(newValue, oldValue) {
-          if (newValue) {
-            $div.show();
-          } else {
-            $div.hide();
-          }
-        });
-        if (conf.enableSharedNgSetting) { $div.show(); }
-      });
-
-    } // end initRightPanel
-
-    function initRightPanelTabHook() {
-      var playerTab = WatchApp.ns.init.PlayerInitializer.playerTab;
-      // 終了時にニコメンドが勝手に開かなくするやつ
-      // 連続再生中はニコメンドパネルが開かない事を利用する
-      playerTab.playlist_org = playerTab.playlist;
-      playerTab.playlist = {
-        isContinuous: function() {
-          if (conf.playerTabAutoOpenNicommend === 'disable') {
-            if (conf.debugMode) console.log('ニコメンドキャンセル: "disabled"');
-            // 'disable'の時は常に「連続再生中」という嘘を返す事でパネルオープンを止める
-            return true;
-          } else
-          if (conf.playerTabAutoOpenNicommend === 'auto' && WatchController.isNicommendEmpty()) {
-            if (conf.debugMode) console.log('ニコメンドキャンセル: "auto"');
-            // 'auto' の時は、ニコメンドが空の時だけキャンセルする
-            return true;
-          } else
-          if (conf.playerTabAutoOpenNicommend === 'enable') {
-            return playerTab.playlist_org.isContinuous();
-          }
-        }
-      };
-    } //
-
-    // - 右パネル乗っ取る
-    var rightInfoPanelInitialized = false;
-    function initRightPanelJack($sidePanel) {
-      if (!conf.rightPanelJack) { return; }
-      if (rightInfoPanelInitialized) { return; }
-      rightInfoPanelInitialized = true;
-
-      var $tab = $([
-          '<ul id="sidePanelTabContainer">',
-            '<li class="tab comment"   data-selection="w_comment"  >コメント</li>',
-            '<li class="tab videoInfo" data-selection="w_videoInfo">動画情報</li>',
-            '<li class="tab ichiba"    data-selection="w_ichiba"   >ニコニコ市場</li>',
-            '<li class="tab review"    data-selection="w_review"   >レビュー</li>',
-          '</ul>'].join(''));
-
-      var $infoPanel   = $('<div/>').attr({'id': 'rightVideoInfo',   'class': 'sideVideoInfo   sidePanelInner'});
-      var $ichibaPanel = $('<div/>').attr({'id': 'rightIchibaPanel', 'class': 'sideIchibaPanel sidePanelInner'});
-      var $reviewPanel = $('<div/>').attr({'id': 'rightReviewPanel', 'class': 'sideReviewPanel sidePanelInner'});
-      $sidePanel.append($tab).append($infoPanel).append($ichibaPanel).append($reviewPanel);
-
-      var
-        onTabSelect = function(e) {
-          e.preventDefault();
-          AnchorHoverPopup.hidePopup();
-          var selection = $(e.target).attr('data-selection');
-          if (typeof selection === 'string') {
-            if (WatchController.isSearchMode()) {
-              conf.setValue('lastRightTabInExplorer', selection);
-            } else {
-              conf.setValue('lastRightTab',           selection);
-            }
-            changeTab(selection);
-          }
-        },
-        $videoReview = $('#videoReview'),
-        toggleReview = function(f) {
-          if (f) {
-            $reviewPanel.append($videoReview);
-          } else {
-            $('#playerBottomAd').after($videoReview);
-          }
-        },
-        changeTab = function(selection) {
-          if ($sidePanel.hasClass('w_review') && selection !== 'w_review') {
-            toggleReview(false);
-          }
-          $sidePanel.removeClass('w_videoInfo w_comment w_ichiba w_review').addClass(selection);
-          if (selection === 'w_ichiba') {
-            resetIchiba(false);
-          } else
-          if (selection === 'w_review') {
-            toggleReview(true);
-          } else
-          if (selection === 'w_comment') {
-            setTimeout(function() {
-              watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
-            }, 500);
-          }
-          return changeTab;
-        },
-        lastIchibaVideoId = '', resetIchiba = function(force) {
-          var videoId = watchInfoModel.id;
-          if (lastIchibaVideoId === videoId && !force) {
-            return;
-          }
-          lastIchibaVideoId = videoId;
-          resetSideIchibaPanel($ichibaPanel, true);
-        },
-        resetScroll = function() {
-          $(this).animate({scrollTop: 0}, 600);
-        };
-
-      $infoPanel  .on('dblclick', resetScroll);
-      $ichibaPanel.on('dblclick', resetScroll);
-      $reviewPanel.on('dblclick', resetScroll);
-
-      $tab.on('click', onTabSelect).on('touchend', onTabSelect);
-      changeTab(conf.lastRightTab);
-
-      var $infoPanelTemplate = $sideInfoPanelTemplate;
-
-      EventDispatcher.addEventListener('onVideoExplorerOpening', function() {
-        changeTab('w_comment');
-      });
-      EventDispatcher.addEventListener('onVideoExplorerClosing', function() {
-        changeTab(conf.lastRightTab);
-      });
-
-      EventDispatcher.addEventListener('onWindowResize', function() {
-        var $body = $('body'), $right = $('#playerTabWrapper');
-        if (WatchController.isSearchMode() || $body.hasClass('full_with_browser')) { return; }
-        var w = $('#external_nicoplayer').outerWidth(), margin = 84;
-        //w += $left.is(':visible')  ? $left.outerWidth()  : 0;
-        w += $right.is(':visible') ? $right.outerWidth() : 0;
-        $('#sidePanelTabContainer').toggleClass('left', (window.innerWidth - w - margin < 0));
-      });
-
-      EventDispatcher.addEventListener('onVideoInitialized', function() {
-        sidePanelRefresh($infoPanel, $ichibaPanel, $sidePanel, $infoPanelTemplate.clone());
-        if ($ichibaPanel.is(':visible')) {
-          resetIchiba(true);
-        }
-        setTimeout(function() {
-          $sidePanel.toggleClass('reviewEmpty', $('#videoReview').find('.stream').length < 1);
-        }, 2000);
-      });
-    } // end of initRightPanelJack
-
 
 
 
@@ -9362,11 +9393,7 @@
             $a = $('<a/>')
               .html(text)
               .attr('href', 'http://search.nicovideo.jp/video/tag/' + encodeURIComponent(text))
-              .on('click', function(e) {
-                if (e.button !== 0 || e.metaKey || e.shiftKey || e.ctrlKey || e.altKey) return;
-                e.preventDefault();
-                WatchController.nicoSearch(text);
-              }),
+              .on('click', Util.Closure.openSearch(text)),
             $tag = $('<li/>').append($a);
           return $tag;
         }
@@ -10003,7 +10030,8 @@
         updateDynamicCss();
       });
       var __debug_css__ = Util.here(function() {/*
-        #playerContainerWrapper, #external_nicoplayer
+        .videoExplorer        #playerContainerWrapper, .videoExplorer        #external_nicoplayer,
+        .videoExplorerOpening #playerContainerWrapper, .videoExplorerOpening #external_nicoplayer
         {
           transition: width 0.4s ease, height 0.4s ease;
         }
@@ -10208,7 +10236,7 @@
         if (typeof callback === 'function') {
           callback(map);
         }
-      }
+      };
     } // end of initHeatMap
 
     /**
@@ -10263,7 +10291,7 @@
           $popup.removeClass('hide').removeClass('show');
           setTimeout(function() {
             $popup.removeClass('hide').addClass('show');
-          }, 100)
+          }, 100);
           setCloseTimer();
         },
         disappear      = function() {
@@ -10470,8 +10498,8 @@
             console.log('testSearchSuggest.load', err, result);
             console.log(expect(err));
             expect(err).toBeNull('err === null');
-            expect(result.candidates).toBeTruthy('suggestの中身がある')
-            expect(result.candidates.length).toBeTruthy('suggestのlengthがある')
+            expect(result.candidates).toBeTruthy('suggestの中身がある');
+            expect(result.candidates.length).toBeTruthy('suggestのlengthがある');
           });
         }
       });
@@ -10492,8 +10520,8 @@
     initDeflistContent();
     initVideoExplorer($, conf, w);
 
-    initRightPanel($rightPanel);
-    initLeftPanel($leftPanel);
+    initRightPanel($, conf, w);
+    initLeftPanel($, conf, w);
     initVideoReview($, conf, w);
 
     initHidariue();
