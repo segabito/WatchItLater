@@ -2831,6 +2831,43 @@
       if (!this.deleteDefListItem(watchId, _add)) _add();
     };
 
+    pt.updateMylistItem = function(watchId, groupId, callback, description) {
+      var self = this;
+      this.loadMylist(groupId, function() {
+        var item = self.findMylistByWatchId(watchId, groupId);
+        if (!item) {
+          Popup.alert('マイリスト中に該当する動画がみつかりませんでした');
+          return;
+        }
+        var
+          itemId = item.item_id,
+          url = 'http://' + host + '/api/mylist/update',
+          data = ['item_id=', itemId,
+                  '&group_id=', groupId,
+                  '&item_type=', 0, // video=0 seiga=5
+                  '&description=', (typeof description === 'string') ? encodeURIComponent(description) : '',
+                  '&token=', token
+          ].join(''),
+          req = {
+            method: 'POST',
+            data: data,
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            url: url,
+            onload: function(resp) {
+              var result = JSON.parse(resp.responseText);
+              if (typeof callback === "function") callback(result.status, result);
+              dispatchEvent('mylistUpdate', {action: 'update', groupId: groupId, watchId: watchId});
+            },
+            error: function() {
+              Popup.alert('ネットワークエラー');
+            }
+          };
+
+        GM_xmlhttpRequest(req);
+      });
+    };
+
+
     pt.deleteMylistItem = function(watchId, groupId, callback) {
       var self = this;
       this.loadMylist(groupId, function() {
@@ -2865,6 +2902,7 @@
         GM_xmlhttpRequest(req);
       });
     };
+
 
     /**
      *  マイリスト登録パネルを返す
@@ -3203,6 +3241,7 @@
     };
     return self;
   })(conf, w);
+  WatchItLater.Mylist = Mylist;
 
 
   var FavMylists = (function() {
@@ -10755,6 +10794,40 @@
             expect(err).toBeNull('err === null');
             expect(result.candidates).toBeTruthy('suggestの中身がある');
             expect(result.candidates.length).toBeTruthy('suggestのlengthがある');
+          });
+        },
+        testUpdateMylistComment: function() {
+          //
+          var Mylist = WatchItLater.Mylist, randomMessage = 'RND: ' + Math.random();
+          console.log('先頭のマイリストの先頭のアイテムのdescriptionを更新するテスト => ', randomMessage)
+
+          Mylist.loadMylistList(function(mylistList) {
+            expect(mylistList.length > 0).toBeTruthy('マイリスト一覧');
+            console.log('先頭のマイリスト', mylistList[0].id, mylistList[0].name);
+
+            var groupId = mylistList[0].id;
+            if (mylistList.length < 0) { return; }
+
+            Mylist.loadMylist(mylistList[0].id, function(mylist) {
+              expect(mylistList.length > 0).toBeTruthy('マイリストアイテム一覧');
+              var item = mylist[0];
+              var watchId = item.item_data.watch_id;
+              console.log('先頭のアイテム', watchId, item.item_data.title);
+
+              console.log('***', watchId, groupId, randomMessage);
+              Mylist.updateMylistItem(watchId, groupId, function(result) {
+                expect(result).toEqual('ok', 'updateMylistItem() result=ok');
+                setTimeout(function() {
+                  Mylist.reloadMylist(groupId, function(newlist) {
+                    console.log('reloadMylist', groupId, newlist);
+                    expect(newlist[0].description).toEqual(randomMessage, 'マイリストコメントが更新できている => ' + newlist[0].description);
+
+                  });
+                }, 500);
+
+              }, randomMessage);
+
+            });
           });
         }
       });
