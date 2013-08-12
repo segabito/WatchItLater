@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130812
+// @version        1.130813
 // ==/UserScript==
 
 /**
@@ -37,6 +37,10 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130813
+// - 隠し機能 にシークコマンドをつけた
+// - ショートカットキー「停止/再生」
 
 // * ver 1.130812
 // - マイリストの絞り込み条件に「チャンネル・コミュニティ・マイメモリーのみ」を追加
@@ -209,6 +213,7 @@
       flatDesignMode: '',  // 'on' グラデーションや角丸をなくす。 7/25からQwatchがフラットデザインになったので不要になった
       playerBgStyle: '',  // ￪ の後継パラメータ 'gray' 'white' ''
 
+      shortcutTogglePlay:         {char: 'P', shift: false, ctrl: false, alt: true,  enable: false}, // 停止/再生
       shortcutDefMylist:          {char: 'M', shift: true,  ctrl: false, alt: false, enable: false}, // とりマイ登録のショートカット
       shortcutMylist:             {char: 'M', shift: false, ctrl: true , alt: false, enable: false}, // マイリスト登録のショートカット
       shortcutOpenSearch:         {char: 'S', shift: true,  ctrl: false, alt: false, enable: false}, // 検索オープンのショートカット
@@ -221,7 +226,7 @@
       shortcutDeepenedComment:    {char: 'B', shift: true,  ctrl: false, alt: false, enable: false}, // コメント背面表示
       shortcutToggleStageVideo:   {char: 'H', shift: true,  ctrl: false, alt: false, enable: false}, // ハードウェアアクセラレーション(StageVideo)のショートカット
 
-
+      shortcutInvisibleInput:     {char: 'C', shift: false, ctrl: false,  alt: true, enable: true}, // 停止/再生
 
       watchCounter: 0, // お前は今までに見た動画の数を覚えているのか？をカウントする
       forceEnableStageVideo: false,
@@ -2002,6 +2007,7 @@
       {title: 'マウスのボタン＋ホイールでどこでも音量調整', varName: 'mouseClickWheelVolume',
         description: 'とっさに音量を変えたい時に便利',
         values: {'左ボタン＋ホイール': 1, '右ボタン＋ホイール': 2, '使わない': 0}},
+      {title: '停止/再生',                            varName: 'shortcutTogglePlay',        type: 'keyInput'},
       {title: 'とりあえずマイリスト登録',       varName: 'shortcutDefMylist',          type: 'keyInput'},
       {title: 'マイリスト登録',                 varName: 'shortcutMylist',             type: 'keyInput',
         description: '右下で選択中のマイリストに登録'},
@@ -4298,6 +4304,14 @@
         return data;
       }
     };
+    var Browser = {
+      isWebkit: function() {
+        return navigator.userAgent.toLowerCase().indexOf('webkit') >= 0;
+      },
+      isFx: function() {
+        return navigator.userAgent.toLowerCase().indexOf('firefox') >= 0;
+      }
+    };
     var
       isMetaKey = function(e) {
         if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) { return true; }
@@ -4363,6 +4377,7 @@
     var self = {
       Cache: Cache,
       Closure: Closure,
+      Browser: Browser,
       here: function(func) { // えせヒアドキュメント
         return func.toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
       }
@@ -9320,7 +9335,7 @@
 
       $('#outline .outer').before($div);
 
-      var $container = $('<div class="bottomConfButtonContainer" />'), $conf = $('<button title="WatchItLaterの設定(P)">設定</button>');
+      var $container = $('<div class="bottomConfButtonContainer" />'), $conf = $('<button title="WatchItLaterの設定">設定</button>');
       var $explorerConf = $('<button><span class="open">｀・ω・´</span><span class="close">´・ω・`</span></button>');
       var toggleConf = function(e) {
         e.stopPropagation();
@@ -9329,7 +9344,7 @@
       };
       $container.append($conf);
       $conf.addClass('openConfButton');
-      $conf.on('click', toggleConf).attr('accesskey', 'p');
+      $conf.on('click', toggleConf);//.attr('accesskey', 'p');
       $('#outline .outer').before($container);
 
       $('.videoExplorerBody').append($explorerConf);
@@ -9851,6 +9866,9 @@
 
     function initShortcutKey() {
       var list = [
+        {name: 'shortcutTogglePlay',        exec: function(e) {
+          WatchController.togglePlay();
+        }},
         {name: 'shortcutDefMylist',          exec: function(e) {
           WatchController.addDefMylist();
         }},
@@ -9890,6 +9908,9 @@
         }},
         {name: 'shortcutToggleStageVideo',   exec: function(e) {
           WatchController.toggleStageVideo();
+        }},
+        {name: 'shortcutInvisibleInput',   exec: function(e) {
+          $('.invisibleCommentInput').focus();
         }}
       ];
       for (var v in list) {
@@ -10168,14 +10189,14 @@
       var isAutoPause = function() { return !!$autoPause.attr('checked'); };
 
       var mylistList = [];
-      var onMylistUpdate = function(status, result) {
+      var
+        onMylistUpdate = function(status, result) {
          if (status === "ok") {
            Popup.show('マイリストに追加しました');
          } else {
            Popup.alert('マイリスト追加に失敗: ' + result.error.description);
          }
-      };
-      var addMylist = function(n, d) {
+      }, addMylist = function(n, d) {
          var num = parseInt(n, 36);
          var description = d || '';
          if (num === 0) {
@@ -10184,8 +10205,7 @@
          if (mylistList[num]) {
            Mylist.addMylistItem (WatchController.getWatchId(), mylistList[num].id, onMylistUpdate, description);
          }
-      };
-      var showMylist = function(n) {
+      }, showMylist = function(n) {
          var num = parseInt(n, 36);
          if (num === 0) {
            WatchController.showDefMylist();
@@ -10193,6 +10213,24 @@
          if (mylistList[num]) {
            WatchController.showMylist(mylistList[num].id);
          }
+      }, seekVideo = function(v) {
+        var vpos = WatchController.vpos(), currentVpos = vpos;
+        if (v.match(/^([\-+]\d+)/)) {
+          vpos += parseInt(RegExp.$1, 10) * 1000;
+        } else
+        if (v.match(/^\d+$/)) {
+          vpos  = parseInt(v, 10) * 1000;
+        } else
+        if (v.match(/^(\d+):(\d+)$/)) {
+          vpos = parseInt(RegExp.$1, 10) * 60 * 1000 + parseInt(RegExp.$2, 10) * 1000;
+        }
+
+        vpos = Math.max(vpos, 0);
+
+        if (vpos != currentVpos) {
+          console.log('seek video', vpos / 1000);
+          WatchController.vpos(vpos);
+        }
       };
 
       var isPlaying = false;
@@ -10227,7 +10265,7 @@
           if (val.match(/^:m([0-9a-p])(.*)/)) {
             addMylist(RegExp.$1, RegExp.$2);
           } else
-          if (val.match(/^'([0-9a-p])/)) {
+          if (val.match(/^:o([0-9a-p])/)) {
             showMylist(RegExp.$1);
           } else
           if (val.match(/^:s[ 　\s](.+)/)) {
@@ -10235,6 +10273,9 @@
           } else
           if (val.match(/^:t[ 　\s](.+)/)) {
             WatchController.nicoSearch(RegExp.$1, 'tag');
+          } else
+          if (val.match(/^:v[ 　\s]([0-9:+\-]+)$/)) {
+            seekVideo(RegExp.$1);
           } else {
             WatchController.postComment(val);
           }
@@ -10246,15 +10287,31 @@
       Mylist.loadMylistList(function(list) {
         mylistList = list.concat();
         mylistList.unshift({description: '', id: '', name: 'とりあえずマイリスト'});
+        var isFx = Util.Browser.isFx();
 
         var tmp = [];
         for (var i = 0, len = mylistList.length; i < len; i++) {
-          tmp.push('<option value=":m' + i.toString(36) + '">「' + mylistList[i].name + '」に追加</option>'); // エスケープされてる
-          tmp.push('<option value="\'' + i.toString(36) + '">「' + mylistList[i].name + '」を開く</option>'); // エスケープされてる
+          var c = i.toString(36);
+          // それぞれのブラウザで補完しやすい形式に
+          if (isFx) { // Fx
+            tmp.push('<option value=":m' + c + '">:m'+c+'\t 「' + mylistList[i].name + '」に追加</option>');
+            tmp.push('<option value=":o' + c + '">:o'+c+'\t 「' + mylistList[i].name + '」を開く</option>');
+          } else {    // Chrome
+            tmp.push('<option value=":m' + c + '">「' + mylistList[i].name + '」に追加</option>');
+            tmp.push('<option value=":o' + c + '">「' + mylistList[i].name + '」を開く</option>');
+          }
         }
-        tmp.push('<option value=":s ">キーワード検索</option>');
-        tmp.push('<option value=":t ">タグ検索</option>');
-        $dataList.html(tmp.join('\n'));
+        tmp.sort();
+        if (isFx) {
+          tmp.push('<option value=":s ">:s [キーワード検索]</option>');
+          tmp.push('<option value=":t ">:t [タグ検索]</option>');
+          tmp.push('<option value=":v ">:v [シーク(秒)]</option>');
+         } else {
+          tmp.push('<option value=":s ">キーワード検索</option>');
+          tmp.push('<option value=":t ">タグ検索</option>');
+          tmp.push('<option value=":v ">シーク(秒)</option>');
+         }
+       $dataList.html(tmp.join('\n'));
       });
 
 
