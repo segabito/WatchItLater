@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130813
+// @version        1.130814
 // ==/UserScript==
 
 /**
@@ -1324,7 +1324,7 @@
       }
       {* 半透明だとflashの上に来ると描画されないので強制的に黒にする(Chromeは平気) *}
       body.full_with_browser #popupMarquee.popupMarqueeBottomLeft {
-        background: #000 !important;left: 8px; bottom: 8px; width: 400px; opacity: 1;
+        background: #000 !important; width: 400px; opacity: 1;
       }
       body.full_with_browser #playerContainer {
         margin-left: 0 !important;
@@ -2286,21 +2286,49 @@
       },
       spec: {},
       run: function(name) {
+        var def = (new $.Deferred()), promise = def.promise();
+        var con = function(name) {
+          return function() {
+            var d = new $.Deferred;
+            setTimeout(function() {
+              console.log('%c RUN: ' + name, 'background: #8ff;');
+              d.resolve();
+            }, 100);
+            return d.promise();
+          };
+        };
+        var wrap = function(self, name) {
+          return function() {
+            var d = new $.Deferred;
+            setTimeout(function() {
+              try {
+              $.proxy(self.spec[name], self)(d);
+              } catch (e) {
+                console.log(e);
+                d.reject();
+              }
+            }, 0);
+            return d.promise();
+          };
+        };
+        var onFail = function(e) {
+          console.log('%c fail : ','background: red;', e);
+        };
+
         if (name) {
-          console.log('%c run : ' + name, 'background: #8ff;');
-          $.proxy(this.spec[name], this)();
-          return;
-        }
-        for(var v in this.spec) {
-          if (!v.match(/^test/)) continue;
-          try {
-            $.proxy(this.spec[v], this)();
-          } catch (e) {
-            console.log('%cException: test=' + v + ';', 'color: white; background: red;', e);
-            console.trace();
+          promise = promise.pipe(con(name)).pipe(wrap(this, name), onFail);
+        } else {
+          for(var v in this.spec) {
+            if (!v.match(/^test/)) continue;
+            promise = promise.pipe(con(v)) .pipe(wrap(this,    v), onFail);
           }
         }
-      }
+        promise.pipe(
+          function() { console.log('%cテスト完了', 'background: #8ff'); },
+          function() { console.log('%cテスト失敗', 'background: #f00'); }
+        );
+        def.resolve();
+     }
     }
   };
   w.WatchItLater = WatchItLater;
@@ -2654,7 +2682,7 @@
 
     pt.loadMylistList = function(callback) {
       if (initialized) {
-          callback(mylistlist.concat());
+          setTimeout(function() { callback(mylistlist.concat()); }, 0);
       } else {
           onInitialized.push(callback);
       }
@@ -2692,7 +2720,7 @@
 
     pt.loadMylist = function(groupId, callback) {
       if (mylistItems[groupId]) {
-        callback(mylistItems[groupId]);
+        setTimeout(function() {callback(mylistItems[groupId]); }, 0);
         return;
       }
       var url = 'http://' + host + '/api/mylist/list?group_id=' + groupId;
@@ -4411,11 +4439,24 @@
         };
       }
     };
+    var Deferred = {
+      wait: function(msec) {
+       return function() {
+          var args = Array.prototype.slice.call(arguments, 0);
+          var d = new $.Deferred();
+          setTimeout(function() {
+            d.resolve.apply(d, args);
+          }, msec);
+          return d.promise();
+        };
+      }
+    };
 
 
     var self = {
       Cache: Cache,
       Closure: Closure,
+      Deferred: Deferred,
       Browser: Browser,
       here: function(func) { // えせヒアドキュメント
         return func.toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
@@ -8563,7 +8604,7 @@
 
       function toggleTrueBrowserFull(v) {
         v = (typeof v === 'boolean') ? v : !$('body').hasClass('trueBrowserFull');
-        $('body').toggleClass('trueBrowserFull', v).toggleClass('full_and_mini', v);
+        $('body').toggleClass('trueBrowserFull', v);//.toggleClass('full_and_mini', v);
         conf.setValue('enableTrueBrowserFull', v);
         try { $('#external_nicoplayer')[0].setIsForceExpandStageVideo(v || conf.forceExpandStageVideo);} catch(e) {console.log(e);}
         if (!v) {
@@ -10705,13 +10746,14 @@
     function initTest(test) {
       var expect = test.expect;
       WatchApp.mixin(WatchItLater.test.spec, {
-        testChannelVideo: function() {
+        testChannelVideo: function(def) {
           ChannelVideoList.load(function(result) {
             console.log('ChannelVideoList.load', result);
             expect(result.name).toEqual('ニコニコアプリちゃんねるの動画', 'チャンネル名');
+            def.resolve();
           }, {id: '55', ownerName: 'ニコニコアプリちゃんねる'});
         },
-        testNewNicoSearch: function() {
+        testNewNicoSearch: function(def) {
           var size = 15;
           var search = new NewNicoSearch({});
           search.load({query: 'vocaloid', size: size}, function(err, result) {
@@ -10729,9 +10771,10 @@
             expect(result[2].values[0].cmsid).toBeTruthy('ヒットした内容にデータが含まれる');
 
             expect(result[3].type).toEqual('hits',  'type === stats'); // データの終了？
+            def.resolve();
           });
         },
-        testNewNicoSearchWrapperQuery: function() {
+        testNewNicoSearchWrapperQuery: function(def) {
           var wrapper = new NewNicoSearchWrapper({search: {}});
           var params = {
             searchWord: 'VOCALOID',
@@ -10757,9 +10800,9 @@
           expect(query.filters.length >= 2).toBeTrue('filters.lengthが2以上');
           expect(filters.indexOf('"field":"start_time"') >= 0).toBeTrue('filtersにstart_timeが含まれる');
           expect(filters.indexOf('"field":"length_seconds"') >= 0).toBeTrue('filtersにlength_secondsが含まれる');
-
+          def.resolve();
         },
-        testNewNicoSearchWrapper: function() {
+        testNewNicoSearchWrapper: function(def) {
           console.log('testNewNicoSearchWrapper');
           var search = new NewNicoSearch({});
           var wrapper = new NewNicoSearchWrapper({search: search});
@@ -10772,9 +10815,11 @@
             expect(result.list.length).toEqual(100, 'sizeで指定した件数が入っている');
             expect(result.list[0].type).toEqual(0, 'type === 0');
             expect(/^\d+:\d+/.test(result.list[0].length)).toBeTrue('動画長がmm:dd形式で入ってる');
+            def.resolve();
+
           });
         },
-        testNicoSearchRelatedTag: function() {
+        testNicoSearchRelatedTag: function(def) {
           var related = new NicoSearchRelatedTag({});
           related.load('voiceroid', function(err, result) {
             console.log('testNicoSearchRelatedTag.load', err, result);
@@ -10784,9 +10829,10 @@
             expect(result.values).toBeTruthy('データが入っている');
             expect(typeof result.values[0]._rowid).toEqual('number', 'データに_rowidが入っている');
             expect(typeof result.values[0].tag)   .toEqual('string', 'データにtagが入っている');
+            def.resolve();
           });
         },
-        testSearchSuggest: function() {
+        testSearchSuggest: function(def) {
           var suggest = new NicoSearchSuggest({});
           suggest.load('MMD', function(err, result) {
             console.log('testSearchSuggest.load', err, result);
@@ -10794,44 +10840,67 @@
             expect(err).toBeNull('err === null');
             expect(result.candidates).toBeTruthy('suggestの中身がある');
             expect(result.candidates.length).toBeTruthy('suggestのlengthがある');
+            def.resolve();
           });
         },
-        testUpdateMylistComment: function() {
-          //
-          var Mylist = WatchItLater.Mylist, randomMessage = 'RND: ' + Math.random();
-          console.log('先頭のマイリストの先頭のアイテムのdescriptionを更新するテスト => ', randomMessage)
+        testUpdateMylistComment: function(def) {
+          // 一個以上マイリストがあって先頭のマイリストになにか登録されている必要がある
+          var Mylist = WatchItLater.Mylist;
+          var randomMessage = 'RND: ' + Math.random();
 
-          Mylist.loadMylistList(function(mylistList) {
-            expect(mylistList.length > 0).toBeTruthy('マイリスト一覧');
-            console.log('先頭のマイリスト', mylistList[0].id, mylistList[0].name);
-
-            var groupId = mylistList[0].id;
-            if (mylistList.length < 0) { return; }
-
-            Mylist.loadMylist(mylistList[0].id, function(mylist) {
-              expect(mylistList.length > 0).toBeTruthy('マイリストアイテム一覧');
-              var item = mylist[0];
-              var watchId = item.item_data.watch_id;
-              console.log('先頭のアイテム', watchId, item.item_data.title);
-
-              console.log('***', watchId, groupId, randomMessage);
+          var d = new $.Deferred;
+          d.promise()
+            .pipe(function() {
+              var d = new $.Deferred();
+              Mylist.loadMylistList(function(mylistList) {
+                expect(mylistList.length > 0).toBeTruthy('マイリスト一覧が1件以上');
+                console.log('先頭のマイリスト', mylistList[0].id, mylistList[0].name);
+                var groupId = mylistList[0].id;
+                if (mylistList.length <= 0) {
+                  d.reject();
+                  return;
+                }
+                d.resolve(groupId);
+              });
+              return d.promise();
+            })
+            .pipe(function(groupId) {
+              var d = new $.Deferred();
+              Mylist.reloadMylist(groupId, function(mylist) {
+                expect(mylist.length > 0).toBeTruthy('マイリストアイテムが一個以上');
+                var item = mylist[0];
+                var watchId = item.item_data.watch_id;
+                console.log('マイリスト先頭のアイテム', watchId, item.item_data.title);
+                d.resolve(watchId, groupId);
+              });
+              return d.promise();
+            })
+            .pipe(function(watchId, groupId) {
+              var d = new $.Deferred();
               Mylist.updateMylistItem(watchId, groupId, function(result) {
                 expect(result).toEqual('ok', 'updateMylistItem() result=ok');
-                setTimeout(function() {
-                  Mylist.reloadMylist(groupId, function(newlist) {
-                    console.log('reloadMylist', groupId, newlist);
-                    expect(newlist[0].description).toEqual(randomMessage, 'マイリストコメントが更新できている => ' + newlist[0].description);
-
-                  });
-                }, 500);
-
+                d.resolve(watchId, groupId);
               }, randomMessage);
-
+              return d.promise();
+            })
+            .pipe(Util.Deferred.wait(500))
+            .pipe(function(watchId, groupId) {
+              var d = new $.Deferred();
+              Mylist.reloadMylist(groupId, function(newlist) {
+                console.log('reloadMylist', groupId, newlist);
+                expect(newlist[0].description)
+                  .toEqual(randomMessage, 'マイリストコメントが更新できている => ' + newlist[0].description);
+                d.resolve();
+              });
+              return d.promise();
+            }).pipe(function() {
+              def.resolve();
             });
-          });
+          d.resolve();
         }
-      });
-    }
+      }); // end WatchApp.mixin
+
+    } // end initTest
 
     LocationHashParser.initialize();
     initIframe($, conf, w);
