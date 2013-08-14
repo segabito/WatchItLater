@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130814
+// @version        1.130815
 // ==/UserScript==
 
 /**
@@ -37,6 +37,9 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130815
+// - 大画面サイズを可変にするやつ
 
 // * ver 1.130813
 // - 隠し機能 にシークコマンドをつけた
@@ -193,10 +196,11 @@
       enableFullScreenMenu: true, // 全画面時にホイールでメニューを出す
       enableHeatMap: false, //
       heatMapDisplayMode: 'hover', // 'always' 'hover'
-      replacePopupMarquee: true, // 'always' 'hover'
+      replacePopupMarquee: false, //
       enableRelatedTag: true, // 関連タグを表示するかどうか
       playerTabAutoOpenNicommend: 'enable', // 終了時にニコメンドを自動で開くかどうか 'enable' 'auto' 'disable'
       autoPauseInvisibleInput: true, //
+      customPlayerSize: '', //
 
       searchEngine:              'normal', // 'normal' 'sugoi'
       searchStartTimeRange:      '', //
@@ -1915,6 +1919,8 @@
       {title: 'コメントの盛り上がりをグラフ表示', varName: 'enableHeatMap', reload: true,
         description: '動画のどのあたりが盛り上がっているのか、わかりやすくなります',
         values: {'する': true, 'しない': false}},
+      {title: '大画面の大きさを変える', varName: 'customPlayerSize', reload: true,
+        values: {'フルHD': '1080p', 'HD': '720p',  '自動(推奨)': 'auto', '変えない': ''}},
       {title: 'プレイリスト消えないモード(実験中)', varName: 'storagePlaylistMode', reload: true,
         description: '有効にすると、リロードしてもプレイリストが消えなくなります。',
         values:
@@ -2259,6 +2265,7 @@
         ConfigPanel.open();
       }
     },
+    debug: {},
     test: {
       assert: function(v, m) {
         if (v === true) {
@@ -9305,12 +9312,14 @@
     } // end initVideoReview
 
     function initNews() {
-      if (conf.hideNicoNews) {
-        $('#content').addClass('noNews');
-      }
-      EventDispatcher.addEventListener('on.config.hideNicoNews', function(value) {
-        $('#content').toggleClass('noNews', value);
-      });
+      var toggleNoNews = function() {
+        $('#content').toggleClass('noNews', conf.hideNicoNews || conf.customPlayerSize !== '');
+      };
+
+      toggleNoNews();
+
+      EventDispatcher.addEventListener('on.config.hideNicoNews',     toggleNoNews);
+      EventDispatcher.addEventListener('on.config.customPlayerSize', toggleNoNews);
       if (conf.enableNewsHistory) { NicoNews.initialize(w); }
     } //
 
@@ -10197,6 +10206,140 @@
       if (conf.debugMode) addStyle(__debug_css__, 'watchItLater_debug_css');
     } // end initOtherCss
 
+    function initCustomPlayerSize($, conf, w) {
+      var tpl = Util.here(function() {/*
+        body.size_normal.w_size_custom:not(.videoExplorer):not(.full_with_browser) #playerAlignmentArea
+        { width: {$alignmentAreaWidth}px; }
+        body.size_normal.w_size_custom:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea
+        { width: {$alignmentAreaWideWidth}px; }
+
+        body.size_normal.w_size_custom:not(.videoExplorer):not(.full_with_browser) #nicoplayerContainer {
+          height: {$playerHeight}px !important;
+        }
+        body.size_normal.w_size_custom:not(.videoExplorer):not(.full_with_browser) #playerNicoplayer
+        { width: {$playerWidth}px !important;}
+
+        body.size_normal.w_size_custom:not(.videoExplorer):not(.full_with_browser) #external_nicoplayer
+        { width: {$playerWidth}px !important; height: {$playerHeight}px !important; }
+
+        body.size_normal.w_size_custom:not(.videoExplorer):not(.full_with_browser) #nicoHeatMapContainer {
+          width: {$playerWidth}px !important;
+        }
+        body.size_normal.w_size_custom:not(.videoExplorer):not(.full_with_browser) #nicoHeatMap {
+          transform: scaleX({$heatMapScale}); -webkit-transform: scaleX({$heatMapScale});
+        }
+       */});
+      var SIZE_SET = {
+        '1080p':  [1920, 1080],
+        'HDPLUS2': [1600,  900],
+        'HDPLUS': [1400,  810],
+        'WXGA':   [1366,  768],
+        '720p':   [1280,  720],
+        'WSVGA':  [1024,  600],
+        'QHD':    [ 960,  540],
+      };
+
+      var CONTROL_HEIGHT = 46, INPUT_HEIGHT = 36, PLAYER_TAB_WIDTH = 280 + 10, PLAYER_TAB_WIDTH_WIDE = 420 + 10;
+      var HORIZONTAL_MARGIN = 1.05;
+      var getTargetSize = function(targetWidth, targetHeight) {
+        var plWidth  = targetWidth * HORIZONTAL_MARGIN;
+        var plHeight = targetHeight + CONTROL_HEIGHT + INPUT_HEIGHT;
+        var alWidth  = plWidth + PLAYER_TAB_WIDTH;
+        var alWidthW = plWidth + PLAYER_TAB_WIDTH_WIDE;
+        return {
+          playerWidth: plWidth,
+          playerHeight: plHeight,
+          alignmentAreaWidth: alWidth,
+          alignmentAreaWideWidth: alWidthW,
+          heatMapScale: plWidth / 100
+        };
+      };
+      var getAutoSize = function() {
+        var iw = $(window).innerWidth(), ih = $(window).innerHeight();
+        var hh = (WatchController.isFixedHeader() ? $("#siteHeader").outerHeight() : 0);
+        iw -= conf.wideCommentPanel ? PLAYER_TAB_WIDTH_WIDE : PLAYER_TAB_WIDTH;
+        ih -= hh;
+        for (var v in SIZE_SET) {
+          var w = SIZE_SET[v][0], h = SIZE_SET[v][1];
+          if (w * HORIZONTAL_MARGIN <= iw && h <= ih) {
+            return {w: w, h: h, name: v};
+          }
+        };
+        return null;
+      };
+      var getCustomCss = function() {
+        var size = '';
+        if (SIZE_SET[conf.customPlayerSize]) {
+          var s = SIZE_SET[conf.customPlayerSize];
+          size = {w: s[0], h: s[1]};
+        } else {
+          size = getAutoSize();
+        }
+        if (!size) return {css: '', size: {}};
+        var ts = getTargetSize(size.w, size.h);
+        var css = tpl;
+        for (var v in ts) {
+          css = css.split('{$' + v + '}').join(ts[v]);
+        }
+        return {css: css, size: size};
+      };
+      var customStyleElement = null;
+      var updateStyle = function() {
+        var customCss = getCustomCss(), css = customCss.css;
+        if (customStyleElement) {
+          customStyleElement.innerHTML = css;
+        } else {
+          customStyleElement = addStyle(css, 'customPlayerSize');
+        }
+      };
+      var toggleCustomSize = function(v) {
+        if (typeof v === 'boolean') {
+          $('body').toggleClass('w_size_custom', v);
+        } else {
+          $('body').toggleClass('w_size_custom');
+        }
+      }
+      var clearStyle = function() {
+        if (customStyleElement) {
+          customStyleElement.innerHTML = '';
+          toggleCustomSize(false);
+        }
+      };
+       if (conf.customPlayerSize !== '') {
+        updateStyle();
+        toggleCustomSize();
+      }
+      EventDispatcher.addEventListener('on.config.customPlayerSize', function(v) {
+        if (v === '') {
+          clearStyle();
+        } else {
+          updateStyle();
+          toggleCustomSize(true);
+        }
+      });
+      EventDispatcher.addEventListener('on.config.wideCommentPanel', function(v) {
+        if (conf.customPlayerSize !== '') {
+          updateStyle();
+        }
+      });
+      EventDispatcher.addEventListener('onWindowResize', function() {
+        if (conf.customPlayerSize !== '') {
+          updateStyle();
+        }
+      });
+
+      if (conf.debugMode) {
+        WatchItLater.debug.customSize = {
+          getAutoSize:      getAutoSize,
+          getTargetSize:    getTargetSize,
+          getCustomCss:     getCustomCss,
+          updateStyle:      updateStyle,
+          toggleCustomSize: toggleCustomSize
+        };
+      }
+
+    } //
+
     function initStageVideo($, conf, w) {
       var onStageVideoAvailabilityUpdated = function(v) {
         $('#nicoplayerContainerInner').toggleClass('stageVideo', v);
@@ -10933,6 +11076,7 @@
     initNicoS($, conf, w);
     initInvisibleCommentInput($, conf, w);
     initOtherCss();
+    initCustomPlayerSize($, conf, w);
     initStageVideo($, conf, w);
     initHeatMap($, conf, w);
     initPopupMarquee();
