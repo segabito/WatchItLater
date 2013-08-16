@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130815
+// @version        1.130816
 // ==/UserScript==
 
 /**
@@ -38,8 +38,8 @@
  * ・綺麗なコード
  */
 
-// * ver 1.130815
-// - 大画面サイズを可変にするやつ
+// * ver 1.130816
+// - プレイヤーの設定 →  「大画面をもっと大画面にする」追加。 大画面がモニターに合わせてもっと大きくなります。(WQHDモニターだと1080p)
 
 // * ver 1.130813
 // - 隠し機能 にシークコマンドをつけた
@@ -785,7 +785,7 @@
       }
       .full_with_browser #sidePanelTabContainer { background: #000; }
       body:not(.videoExplorer):not(.full_with_browser) #sidePanelTabContainer.left {
-        background: #000 {* firefoxはこれがないと欠ける *}; right: auto; left: -375px; padding: 0; height: 25px;
+        background: #000 {* firefoxはこれがないと欠ける *}; right: auto; left: -375px; padding: 0; height: 27px;
                 transform: rotate(-90deg);         transform-origin: 100% 0 0;
         -webkit-transform: rotate(-90deg); -webkit-transform-origin: 100% 0 0;
       }
@@ -1919,8 +1919,9 @@
       {title: 'コメントの盛り上がりをグラフ表示', varName: 'enableHeatMap', reload: true,
         description: '動画のどのあたりが盛り上がっているのか、わかりやすくなります',
         values: {'する': true, 'しない': false}},
-      {title: '大画面の大きさを変える', varName: 'customPlayerSize', reload: true,
-        values: {'フルHD': '1080p', 'HD': '720p',  '自動(推奨)': 'auto', '変えない': ''}},
+      {title: '大画面をもっと大画面にする', varName: 'customPlayerSize',
+        description: '※有効にするとニコニコニュースが表示できなくなります。',
+        values: {'フルHD': '1080p', '720p': '720p',  '自動調整(推奨)': 'auto', 'しない': ''}},
       {title: 'プレイリスト消えないモード(実験中)', varName: 'storagePlaylistMode', reload: true,
         description: '有効にすると、リロードしてもプレイリストが消えなくなります。',
         values:
@@ -6479,13 +6480,15 @@
         changeTab(conf.lastRightTab);
       });
 
-      EventDispatcher.addEventListener('onWindowResize', function() {
+      var onOuterResize = function() {
         var $body = $('body'), $right = $('#playerTabWrapper');
         if (WatchController.isSearchMode() || $body.hasClass('full_with_browser')) { return; }
         var w = $('#external_nicoplayer').outerWidth(), margin = 84;
         w += $right.is(':visible') ? $right.outerWidth() : 0;
         $('#sidePanelTabContainer').toggleClass('left', (window.innerWidth - w - margin < 0));
-      });
+      };
+      EventDispatcher.addEventListener('onWindowResize',              onOuterResize);
+      EventDispatcher.addEventListener('onPlayerAlignmentAreaResize', onOuterResize);
 
       EventDispatcher.addEventListener('onVideoInitialized', function() {
         sidePanelRefresh($infoPanel, $ichibaPanel, $sidePanel, $infoPanelTemplate.clone());
@@ -7744,11 +7747,11 @@
       $('#videoExplorer, #content, #bottomContentTabContainer').toggleClass('w_adjusted', conf.videoExplorerHack);
       var
         rightAreaWidth = $('.videoExplorerBody').outerWidth(), // 592
-        availableWidth = $(window).innerWidth() - rightAreaWidth,
+        availableWidth = Math.max($(window).innerWidth() - rightAreaWidth, 300),
         commentInputHeight = $('#playerContainer').hasClass('oldTypeCommentInput') ? 36 : 0,
         controlPanelHeight = $('#playerContainer').hasClass('controll_panel') ? 46 : 0;
       //console.log('rightAreaWidth', rightAreaWidth, 'availableWidth', availableWidth);
-      if (availableWidth <= 0) { return; }
+      //if (availableWidth <= 0) { return; }
 
       var
         defPlayerWidth = 300, otherPluginsHeight = 0,
@@ -10202,6 +10205,16 @@
         #playerAlignmentArea .toggleCommentPanel {
         {*transition: 0.4s ease-in-out;*}
         }
+        {*
+        body:not(.videoExplorer):not(.full_with_browser) #playerNicoplayer,
+        body:not(.videoExplorer):not(.full_with_browser) #playerAlignmentArea{
+          transition: width  0.4s ease;
+        }
+        body:not(.videoExplorer):not(.full_with_browser) #nicoplayerContainer{
+          transition: height 0.4s ease 0.4s;
+        }
+        *}
+
        */});
       if (conf.debugMode) addStyle(__debug_css__, 'watchItLater_debug_css');
     } // end initOtherCss
@@ -10229,68 +10242,90 @@
           transform: scaleX({$heatMapScale}); -webkit-transform: scaleX({$heatMapScale});
         }
        */});
-      var SIZE_SET = {
+      var PROFILE_SET = {
+        'WQHD':   [2560, 1440],
         '1080p':  [1920, 1080],
-        'HDPLUS2': [1600,  900],
-        'HDPLUS': [1400,  810],
+        'HD+':    [1600,  900],
+        'WXGA+':  [1400,  810],
         'WXGA':   [1366,  768],
         '720p':   [1280,  720],
-        'WSVGA':  [1024,  600],
-        'QHD':    [ 960,  540],
+        'WSVGA':  [1024,  576],
+        'QHD':    [ 960,  540]//, // 元より小さいパターンもサポートする？
+//        'WVGA':   [ 854,  480],
+//        'NORMAL': [ 640,  360],
+//        'SMALL':  [ 512,  288],
+//        'ECO':    [ 352,  200],
       };
+      var CONTROL_HEIGHT = 46, INPUT_HEIGHT = 36, PLAYER_TAB_WIDTH = 280 + 10, PLAYER_TAB_WIDTH_WIDE = 420 + 10, TAB_MARGIN = 20;
+      var HORIZONTAL_MARGIN = 1.05; // 両端に 2.5% x 2 のマージンがある
 
-      var CONTROL_HEIGHT = 46, INPUT_HEIGHT = 36, PLAYER_TAB_WIDTH = 280 + 10, PLAYER_TAB_WIDTH_WIDE = 420 + 10;
-      var HORIZONTAL_MARGIN = 1.05;
       var getTargetSize = function(targetWidth, targetHeight) {
-        var plWidth  = targetWidth * HORIZONTAL_MARGIN;
+        var plWidth  = Math.round(targetWidth * HORIZONTAL_MARGIN);
         var plHeight = targetHeight + CONTROL_HEIGHT + INPUT_HEIGHT;
         var alWidth  = plWidth + PLAYER_TAB_WIDTH;
         var alWidthW = plWidth + PLAYER_TAB_WIDTH_WIDE;
         return {
-          playerWidth: plWidth,
-          playerHeight: plHeight,
-          alignmentAreaWidth: alWidth,
+          playerWidth:            plWidth,
+          playerHeight:           plHeight,
+          alignmentAreaWidth:     alWidth,
           alignmentAreaWideWidth: alWidthW,
-          heatMapScale: plWidth / 100
+          heatMapScale:           plWidth / 100
         };
       };
-      var getAutoSize = function() {
+      var suggestProfile = function() {
         var iw = $(window).innerWidth(), ih = $(window).innerHeight();
         var hh = (WatchController.isFixedHeader() ? $("#siteHeader").outerHeight() : 0);
-        iw -= conf.wideCommentPanel ? PLAYER_TAB_WIDTH_WIDE : PLAYER_TAB_WIDTH;
+        iw -= (conf.wideCommentPanel ? PLAYER_TAB_WIDTH_WIDE : PLAYER_TAB_WIDTH);
+        iw -= TAB_MARGIN;
+
         ih -= hh;
-        for (var v in SIZE_SET) {
-          var w = SIZE_SET[v][0], h = SIZE_SET[v][1];
+        for (var v in PROFILE_SET) {
+          var w = PROFILE_SET[v][0], h = PROFILE_SET[v][1];
           if (w * HORIZONTAL_MARGIN <= iw && h <= ih) {
             return {w: w, h: h, name: v};
           }
         };
         return null;
       };
-      var getCustomCss = function() {
-        var size = '';
-        if (SIZE_SET[conf.customPlayerSize]) {
-          var s = SIZE_SET[conf.customPlayerSize];
-          size = {w: s[0], h: s[1]};
+      var generateCss = function() {
+        var profile = '';
+        if (PROFILE_SET[conf.customPlayerSize]) {
+          var s = PROFILE_SET[conf.customPlayerSize];
+          profile = {w: s[0], h: s[1], name: conf.customPlayerSize};
         } else {
-          size = getAutoSize();
+          profile = suggestProfile();
         }
-        if (!size) return {css: '', size: {}};
-        var ts = getTargetSize(size.w, size.h);
+        if (!profile) return {css: '', profile: ''};
+        var ts = getTargetSize(profile.w, profile.h);
         var css = tpl;
         for (var v in ts) {
           css = css.split('{$' + v + '}').join(ts[v]);
         }
-        return {css: css, size: size};
+        return {css: css, profile: profile};
       };
-      var customStyleElement = null;
+      var customStyleElement = null, lastCssName = '';
       var updateStyle = function() {
-        var customCss = getCustomCss(), css = customCss.css;
+        if (WatchController.isFullScreen() || WatchController.isSearchMode()) {
+          return;
+        }
+
+        var result = generateCss();
+        if (result.css === '') {
+         // clearStyle();
+         // return;
+        }
+        var css = result.css, profile = result.profile, name = profile.name;
+
+        if (lastCssName === name) {
+          return;
+        }
+        lastCssName = name;
         if (customStyleElement) {
           customStyleElement.innerHTML = css;
         } else {
           customStyleElement = addStyle(css, 'customPlayerSize');
         }
+        EventDispatcher.dispatch('onPlayerAlignmentAreaResize');
       };
       var toggleCustomSize = function(v) {
         if (typeof v === 'boolean') {
@@ -10304,8 +10339,9 @@
           customStyleElement.innerHTML = '';
           toggleCustomSize(false);
         }
+        lastCssName = '';
       };
-       if (conf.customPlayerSize !== '') {
+      if (conf.customPlayerSize !== '') {
         updateStyle();
         toggleCustomSize();
       }
@@ -10330,9 +10366,9 @@
 
       if (conf.debugMode) {
         WatchItLater.debug.customSize = {
-          getAutoSize:      getAutoSize,
+          suggestProfile:   suggestProfile,
           getTargetSize:    getTargetSize,
-          getCustomCss:     getCustomCss,
+          generateCss:      generateCss,
           updateStyle:      updateStyle,
           toggleCustomSize: toggleCustomSize
         };
