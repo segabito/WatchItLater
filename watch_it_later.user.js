@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130821
+// @version        1.130828
 // ==/UserScript==
 
 /**
@@ -37,6 +37,11 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130828
+// - 4列表示の改善
+// - songriumも大・大画面に合わせる
+// - チャンネル動画を60件まで表示するように
 
 // * ver 1.130821
 // - マイリストパネルを自動で目立たない色に
@@ -110,26 +115,6 @@
 // * ver 1.130726
 // - 本家の更新に暫定対応。まだ不安定だったり動かない機能もあります。
 // - チャンネルのアイコンをクリックしたらチャンネル動画一覧を表示。ただし最新20件のみ
-
-// * ver 1.130720
-// - 画面右上の検索フォームに accesskey="@" をつけてみた
-
-// * ver 1.130716
-// - 本家側のプレイリストの仕様変更で発生した細かい不具合を修正
-// - 右下のマイリスト選択メニューにaccesskey=":"を追加
-
-// * ver 1.130709
-// - プレイリストの内部仕様変更に対応
-
-// * ver 1.130708
-// - コメントの盛り上がり状態をグラフ表示する機能を追加
-
-// * ver 1.130704
-// - 設定パネルが長くなったので折りたたむようにした
-
-// * ver 1.130701
-// - フルスクリーンメニューを改良。タグも出るようにした
-
 
 (function() {
   var isNativeGM = true;
@@ -1379,8 +1364,23 @@
         top: 4px; font-size: 20px;
       }
 
+      .videoExplorerContent .contentItemList                 .column4 {
+        text-align: center;
+      }
       .videoExplorerContent .contentItemList                 .column4 .balloon {
         bottom: auto; top: 10px;
+      }
+      .videoExplorerContent .contentItemList                 .column4 .videoInformation>.info {
+        font-size: 85%;
+      }
+      .videoExplorerContent .contentItemList                 .column4 .videoInformation>.info .info{
+        color: #000;
+      }
+      .videoExplorerContent .contentItemList                 .column4 .videoInformationOuter {
+        width: 100px; height: 48px; margin: auto; color: #666; text-align: left;
+      }
+      .videoExplorerBody .videoExplorerContent.column4 .contentItemList .item {
+        height: 220px;
       }
       #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .thumbnailContainer .balloon {
         top: -20px; {* 一列の時に「再生リストに追加しました」が上の動画に被るのを防ぐ *}
@@ -1414,7 +1414,7 @@
         bottom:  4px; left: 4px;
       }
       .videoExplorerContent .contentItemList .column4 .thumbnailHoverMenu {
-        bottom: 75px; left: 5px;
+        bottom: 29px; left: 5px;
       }
       .videoExplorerContent .contentItemList .deleteFromMyMylist {
         cursor: pointer; font-size: 70%; border: 1px solid #ccc; padding: 0;
@@ -2370,8 +2370,8 @@
         }
       }
     }
-     function dispatch(name) {
-      if (conf.debugMode) console.log('%cevent:', 'background: blue; color: white;', name, arguments);
+    function dispatch(name) {
+      if (conf.debugMode) console.log('%cevent:', 'background: blue; color: white;', name);//, arguments);
       _dispatch.apply(null, arguments);
     }
     return {
@@ -3680,7 +3680,7 @@
             !e.added &&
             (m = vreg.exec(href)) !== null &&
             !ereg.test(href) &&
-            e.className !== "itemEcoLink" &&
+//            e.className !== "itemEcoLink" &&
             e.className !== "playlistSaveLink"
           ) {
             each.apply(e, [w, m[2]]);
@@ -3698,7 +3698,7 @@
             href &&
             (m = vreg.exec(href)) !== null &&
             !ereg.test(href) &&
-            e.className !== "itemEcoLink" &&
+//            e.className !== "itemEcoLink" &&
             true
           ) {
             watchId = m[2];
@@ -5078,7 +5078,7 @@
         }
       });
     }
- };
+  };
 
 
   /**
@@ -5244,7 +5244,12 @@
 
 
   var NicorepoVideo = (function(w, Util) {
-    function getNicorepoTitle(type) {
+    if (!WatchController.isZeroWatch()) return {};
+
+    var CACHE_TIME = 1000 * 60 * 10;
+    var WatchApp = w.WatchApp, escapeHTML = WatchApp.ns.util.StringUtil.escapeHTML;
+
+    var getNicorepoTitle = function(type, param) {
       var base = '【ニコレポ】';
       if (type === 'all') {
         return base + 'すべての動画';
@@ -5259,159 +5264,200 @@
         return WatchController.getOwnerName() + 'のニコレポ';
       }
       return base + 'お気に入りユーザーの動画';
-    }
+    };
 
-    var CACHE_TIME = 1000 * 60 * 10;
-    function request(callback, param) {
-      var watch, $, url, myNick, myId, type, baseUrl;
-      try{
-          watch = w.WatchApp.ns.init;
-          $ = w.$;
-          url = '';
-          myNick = WatchController.getMyNick();
-          myId = WatchController.getMyUserId();
-          type = param.type ? param.type : 'user';
-          baseUrl = '/my/top/' + type + '?innerPage=1&mode=next_page';
+    var parseItemList = function($dom) {
+      var $list = $dom.find('.timeline');
+      return $list.find([
+        '.log-user-mylist-add',
+        '.log-user-uad-advertise',
+        '.log-user-video-upload',
+        '.log-user-video-review',
+        '.log-mylist-added-video',
+        '.log-community-video-upload',
+        '.log-user-video-round-number-of-view-counter',
+        '.log-user-video-round-number-of-mylist-counter'
+      ].join(', '));
+    };
+
+    var ownerReg = /\/(community|user|channel)\/((co|ch)?\d+)\??/;
+    var parseNicorepoItem = function(src) {
+      var
+        $item = $(src), $title = $item.find('.log-content .log-target-info a'),
+        id = $title.attr('href').split('/').reverse()[0].replace(/\?.*$/, ''), title = $title.text(),
+        duration = '--:--',
+        viewCnt   = '-',
+        resCnt    = '-',
+        mylistCnt = '-',
+        postedAt  = WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date($item.find('.log-footer-date time').attr('datetime'))),
+        thumbnail = $item.find('.log-target-thumbnail .video').attr('data-src'),
+        description_short = $.trim($item.find('.log-body').text()).replace(/(しました|されました)。/g, ''),
+        $owner = $item.find('.author-user, .author-community'),
+        ownerPage  = $owner.attr('href'),
+        ownerMatch = ownerReg.exec(ownerPage),
+        ownerName  = $owner.text(),
+        ownerId    = (ownerMatch !== null && ownerMatch.length >= 3) ? ownerMatch[2] : null,
+        ownerIcon  = $item.find('.log-author img').attr('data-src'),
+        mylistComment = $item.find('.log-content .log-subdetails').text()
+        ;
+
+      $item.removeClass('log').removeClass('passive').removeClass('first');
+      if (src.className === 'log-mylist-added-video') {
+        ownerName = $item.find('.log-body a:first').text();
+        ownerPage = $item.find('.log-body a:last').attr('href');
+      }
+
+      var item = new DummyMylistVideo({
+        id: id,
+        length: duration,
+        mylist_counter: mylistCnt,
+        view_counter: viewCnt,
+        num_res: resCnt,
+        first_retrieve: postedAt,
+        thumbnail_url: thumbnail,
+        mylist_comment: mylistComment,
+        title: title,
+        _info: {
+          first_retrieve: postedAt,
+          nicorepo_className: src.className,
+          nicorepo_log: [escapeHTML(description_short)],
+          nicorepo_owner: {
+            id: ownerId,
+            icon: ownerIcon,
+            page: ownerPage,
+            name: ownerName
+          }
+        },
+        description_short: description_short
+      });
+      return item;
+    };
+
+    var loadPage = function(baseUrl, result, nextLink, type) {
+      var def = new $.Deferred;
+      if (nextLink === null) {
+        return def.resolve(baseUrl, result, null, null);
+      }
+      var url = baseUrl;
+      if (type === 'offset') {
+        url += nextLink ? ('&offset='        + nextLink) : '';
+      } else {
+        url += nextLink ? ('&last_timeline=' + nextLink) : '';
+      }
+      if (conf.debugMode) console.log('load Url=', url);
+
+      $.ajax({
+        url: url,
+      }).then(
+        function(resp) {
+          var $dom = $(resp),
+            $nextPageLink = $dom.find('.next-page-link'),
+            hasNextPage = $nextPageLink.length > 0;
+
+          parseItemList($dom).each(function() {
+            result.push(parseNicorepoItem(this));
+          });
+
+          var nextLinkReg = /(last_timeline|offset)=(\d+)/;
+          if (hasNextPage) {
+            var href = $nextPageLink.attr('href');
+            if (nextLinkReg.test(href)) {
+              def.resolve(baseUrl, result, RegExp.$2, RegExp.$1);
+            } else {
+              def.resolve(baseUrl, result, null, null);
+            }
+          } else {
+             def.resolve(baseUrl, result, null, null);
+          }
+        },
+        function() {
+          def.reject();
+        });
+
+      return def.promise();
+    };
+
+    var pipeRequest = function(baseUrl, result, maxPages, callback) {
+      var def = new $.Deferred, p = def.promise();
+
+      for (var i = maxPages; i >= 0; i--) {
+        p = p.pipe(loadPage);
+        if (i > 0) p = p.pipe(Util.Deferred.wait(300));
+      }
+
+      p.pipe(
+        function() {
+          var uniq = {}, uniq_items = [];
+          for (var i = result.rawData.list.length - 1; i >= 0; i--) {
+            var item = result.rawData.list[i], id = item.id, mc = item.mylist_comment;
+            if (uniq[id + mc]) {
+              uniq[id + mc]._info.nicorepo_log.push(item.first_retrieve + '　' + item._info.nicorepo_log[0].replace(/^.*?さん(の|が)動画(が|を) ?/, ''));
+            } else {
+              uniq[id + mc] = item;
+            }
+          }
+          for (var v in uniq) {
+            uniq_items.unshift(uniq[v]);
+          }
+          result.rawData.list = uniq_items;
+          callback(result);
+        }
+      );
+      def.resolve(baseUrl, result, '', '');
+
+    };
+
+    var request = function(param) {
+      var url, nickname, userId, type, baseUrl;
+      var def = new $.Deferred;
+      try {
+          url      = '';
+          nickname = param.nickname || WatchController.getMyNick();
+          userId   = param.userId   || WatchController.getMyUserId();
+          type     = param.type     || 'user';
+          baseUrl  = '/my/top/' + type + '?innerPage=1&mode=next_page';
           if (param.userId) {
             baseUrl = '/user/'+ param.userId +'/top?innerPage=1&mode=next_page';
           }
       } catch (e) {
         if (conf.debugMode) console.log(e);
-        throw { message: 'エラーが発生しました', status: 'fail'};
+        return def.reject({message: 'エラーが発生しました', status: 'fail'});
       }
 
       var cacheData = Util.Cache.get(baseUrl);
       if (cacheData) {
-        setTimeout(function() {callback(cacheData); }, 0);
-        return;
+        return def.resolve(cacheData);
       }
 
       var
-        last_timeline = false,
         result = new DummyMylist({
           id: '-10',
           sort: '1',
           default_sort: '1',
-          name: getNicorepoTitle(type),
-          user_id:       type === 'owner' ? WatchController.getOwnerId()   : myId,
-          user_nickname: type === 'owner' ? WatchController.getOwnerName() :'ニコニコ動画'
+          name: getNicorepoTitle(type, param),
+          user_id:       type === 'owner' ? WatchController.getOwnerId()   : userId,
+          user_nickname: type === 'owner' ? WatchController.getOwnerName() : nickname
         });
-      function req(callback, param, pageCount, maxPageCount) {
-        var WatchApp = w.WatchApp, $ = w.$, url = baseUrl, escapeHTML = WatchApp.ns.util.StringUtil.escapeHTML;
-        url += last_timeline ? ('&last_timeline=' + last_timeline) : '';
-        if (conf.debugMode) console.log(url);
 
-        var ownerReg = /\/(community|user|channel)\/((co|ch)?\d+)\??/;
-        GM_xmlhttpRequest({
-          url: url,
-          onload: function(resp) {
-            var $dom = $(resp.responseText), $list = $dom.find('.timeline'), $nextPageLink = $dom.find('.next-page-link'), hasNextPage = $nextPageLink.length > 0;
+      pipeRequest(baseUrl, result, 2, function(result) {
+        def.resolve(Util.Cache.set(baseUrl, result, CACHE_TIME));
+      });
 
-            $list.find([
-              '.log-user-mylist-add',
-              '.log-user-uad-advertise',
-              '.log-user-video-upload',
-              '.log-user-video-review',
-              '.log-mylist-added-video',
-              '.log-community-video-upload',
-              '.log-user-video-round-number-of-view-counter',
-              '.log-user-video-round-number-of-mylist-counter'
-            ].join(', ')).each(function() {
-              var
-                $item = $(this), $title = $item.find('.log-content .log-target-info a'),
-                id = $title.attr('href').split('/').reverse()[0].replace(/\?.*$/, ''), title = $title.text(),
-                duration = '--:--',
-                viewCnt   = '-',
-                resCnt    = '-',
-                mylistCnt = '-',
-                postedAt  = WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date($item.find('.log-footer-date time').attr('datetime'))),
-                thumbnail = $item.find('.log-target-thumbnail .video').attr('data-src'),
-                description_short = $.trim($item.find('.log-body').text()).replace(/(しました|されました)。/g, ''),
-                $owner = $item.find('.author-user, .author-community'),
-                ownerPage  = $owner.attr('href'),
-                ownerMatch = ownerReg.exec(ownerPage),
-                ownerName  = $owner.text(),
-                ownerId    = (ownerMatch !== null && ownerMatch.length >= 3) ? ownerMatch[2] : null,
-                ownerIcon  = $item.find('.log-author img').attr('data-src'),
-                mylistComment = $item.find('.log-content .log-subdetails').text()
-                ;
+      return def.promise();
+    };
 
-              $item.removeClass('log').removeClass('passive').removeClass('first');
-              if (this.className === 'log-mylist-added-video') {
-                ownerName = $item.find('.log-body a:first').text();
-                ownerPage = $item.find('.log-body a:last').attr('href');
-              }
-
-              var item = new DummyMylistVideo({
-                id: id,
-                length: duration,
-                mylist_counter: mylistCnt,
-                view_counter: viewCnt,
-                num_res: resCnt,
-                first_retrieve: postedAt,
-                thumbnail_url: thumbnail,
-                mylist_comment: mylistComment,
-                title: title,
-                _info: {
-                  first_retrieve: postedAt,
-                  nicorepo_className: this.className,
-                  nicorepo_log: [escapeHTML(description_short)],
-                  nicorepo_owner: {
-                    id: ownerId,
-                    icon: ownerIcon,
-                    page: ownerPage,
-                    name: ownerName
-                  }
-                },
-                description_short: description_short
-              });
-              result.push(item);
-            });
-            var lastTimelineReg = /last_timeline=(\d+)/;
-            if (hasNextPage && ++pageCount <= maxPageCount) {
-             var href = $nextPageLink.attr('href');
-             if (lastTimelineReg.test(href)) {
-               last_timeline = RegExp.$1;
-               setTimeout(function() {
-                   req(callback, param, pageCount, maxPageCount);
-                 }, 500);
-               } else {
-                callback(Util.Cache.set(baseUrl, result, CACHE_TIME));
-               }
-            } else {
-                callback(Util.Cache.set(baseUrl, result, CACHE_TIME));
-            }
-          },
-          onerror: function() {
-            Popup.alert('ニコレポの取得に失敗しました'); // setTimeoutかましてるので例外投げてもcatchできない
-          }
-       });
-      }
-      req(function (result) {
-        var uniq = {}, uniq_items = [];
-        for (var i = result.rawData.list.length - 1; i >= 0; i--) {
-          var item = result.rawData.list[i], id = item.id, mc = item.mylist_comment;
-          if (uniq[id + mc]) {
-            uniq[id + mc]._info.nicorepo_log.push(item.first_retrieve + '　' + item._info.nicorepo_log[0].replace(/^.*?さん(の|が)動画(が|を) ?/, ''));
-          } else {
-            uniq[id + mc] = item;
-          }
-        }
-        for (var v in uniq) {
-          uniq_items.unshift(uniq[v]);
-        }
-        result.rawData.list = uniq_items;
-        callback(result);
-      }, param, 1, 3);
-    }
-    function load(callback, param) {
-      request(function(result) {
-        var viewPage = (param && typeof param.page === 'number') ? param.page : 1;
-        result.sortItem(param.sort || 1, true);
-        result.setPage(viewPage);
-        callback(result);
-      }, param);
-    }
+    var load = function(callback, param) {
+      return request(param)
+        .pipe(function(result) {
+          var viewPage = (param && typeof param.page === 'number') ? param.page : 1;
+          result.sortItem(param.sort || 1, true);
+          result.setPage(viewPage);
+          if (typeof result === 'function') { callback(result); }
+          return this.resolve(result);
+        }, function() {
+          return this.reject({message: 'ニコレポの取得に失敗しました', status: 'fail'});
+        });
+    };
 
     var self = {
       load: load,
@@ -5423,30 +5469,32 @@
       loadAll:    function(callback, p) {
         p = p || {};
         p.type = 'all';
-        self.load(callback, p);
+        return self.load(callback, p);
       },
       loadUser:   function(callback, p) {
         p = p || {};
         p.type = 'user';
-        self.load(callback, p);
+        return self.load(callback, p);
       },
       loadChCom:  function(callback, p) {
         p = p || {};
         p.type = 'chcom';
-        self.load(callback, p);
+        return self.load(callback, p);
       },
       loadMylist: function(callback, p) {
         p = p || {};
         p.type = 'mylist';
-        self.load(callback, p);
+        return self.load(callback, p);
       },
       loadOwner: function(callback, p) {
         p = p || {};
         p.type = 'owner';
         p.userId = WatchController.getOwnerId();
-        self.load(callback, p);
+        return self.load(callback, p);
       }
     };
+    WatchItLater.NicorepoVideo = self;
+
     return self;
   })(w, Util);
 
@@ -5456,6 +5504,7 @@
    *  ランキングのRSSをマイリストAPIと互換のある形式に変換することで、ダミーマイリストとして表示してしまう作戦
    */
   var VideoRanking = (function(w, Util) {
+    if (!WatchController.isZeroWatch()) return {};
     var $ = w.jQuery;
 
     var
@@ -5558,7 +5607,7 @@
     /**
      *  ニコニコ動画ランキングのRSSをマイリストAPI互換のデータ形式に変換
      */
-    function rss2mylist(xml) {
+    var rss2mylist = function(xml) {
       var
         $x = $(xml),
         title = $x.find('channel title:first').text(),
@@ -5584,11 +5633,11 @@
         result.push(item);
       });
       return result;
-    }
+    };
 
-    function parseRssItem($item) {
+    var parseRssItem = function($item) {
       var
-        desc_cdata = $item.find('description')[0].innerHTML.replace(/^<!--\[CDATA\[/, '').replace(/ *\]\]&gt;$/, ''),
+        desc_cdata = $item.find('description').text(),
         $desc      = $('<div>' + desc_cdata + '</div>');
       return {
         title       : $item.find('title')                  .text(),
@@ -5604,29 +5653,45 @@
         description : $desc.find('.nico-description')      .text(),
         thumbnail   : $desc.find('.nico-thumbnail img').attr('src')
       };
-    }
+    };
 
-    function xhr(callback, url) {
-      GM_xmlhttpRequest({
-        url: url,
-        onload: function(resp) {
-          if (typeof callback === 'function') {
-            callback(resp);
-          }
-        },
-        onerror: function() {
-          Popup.alert('取得に失敗しました');
-        }
-      });
-    }
+    var pipeRequest = function(baseUrl, result, page, maxPage) {
+      var def = new $.Deferred, p = def.promise();
+
+      var getPipe = function(result, url, page) {
+        return function() {
+          if (conf.debugMode) console.log('load RSS', url, page);
+          return $.ajax({
+              url: url,
+              data: {rss: '2.0', lang: 'ja-jp', page: page},
+              beforeSend: function(xhr) {
+                xhr.setRequestHeader('X-Requested-With', {toString: function(){ return ''; }});
+              }
+            }).pipe(function(resp) {
+              var res = rss2mylist(resp);
+              for (var i = 0, len = res.rawData.list.length; i < len; i++) {
+                result.push(res.rawData.list[i]);
+              }
+            });
+        };
+      };
+
+      for (var i = page; i <= maxPage; i++) {
+        p = p.pipe(getPipe(result, baseUrl, i));
+        if (i < maxPage) { p = p.pipe(Util.Deferred.wait(300)); }
+      }
+
+      def.resolve();
+
+      return p;
+    };
 
     var CACHE_TIME = 1000 * 60 * 30;
-    function request(baseUrl, rssPage, maxRssPage, callback) {
-
+    var request = function(baseUrl, page, maxPage) {
+      var def = new $.Deferred;
       var cacheData = Util.Cache.get(baseUrl);
       if (cacheData) {
-        setTimeout(function() {callback(cacheData); }, 0);
-        return;
+        return def.resolve(cacheData);
       }
 
       var result = new DummyMylist({
@@ -5634,31 +5699,18 @@
         id: '-100'
       });
 
-      function req(rssPage, maxRssPage, callback) {
-        var url = baseUrl + '&page=' + rssPage;
-        xhr(
-          function(resp) {
-            var res = rss2mylist(resp.responseText);
-            for (var i = 0, len = res.rawData.list.length; i < len; i++) {
-              result.push(res.rawData.list[i]);
-            }
-            if (rssPage >= maxRssPage) {
-              result.setName(res.getName());
+      pipeRequest(baseUrl, result, page, maxPage).pipe(
+        function() {
+          def.resolve(Util.Cache.set(baseUrl, result, CACHE_TIME));
+        },
+        function() {
+          def.reject();
+        });
 
-              callback(Util.Cache.set(baseUrl, result, CACHE_TIME));
-            } else {
-              setTimeout(function() {
-                req(rssPage + 1, maxRssPage, callback);
-              }, 500);
-            }
-          },
-          url
-        );
-      }
-      req(rssPage, maxRssPage, callback);
-    }
+      return def.promise();
+    };
 
-    function parseParam(param) {
+    var parseParam = function(param) {
       var
         id = parseInt(param.id || -100, 10),
         genreId  = getGenreId(id),
@@ -5680,30 +5732,39 @@
         viewPage: viewPage,
         sort: sort,
         maxRssPage: maxRssPage,
-        baseUrl: '/ranking/'+ type +'/'+ term + '/'+ category +'?rss=2.0&lang=' + lang
+        baseUrl:
+          '/ranking/'+ type +'/'+ term + '/'+ category //+'?rss=2.0&lang=' + lang
       };
-    }
+    };
 
-    function loadRanking(callback, param) {
+    var loadRanking = function(param) {
       var p = parseParam(param);
-      //console.log('loadRanking', p, param);
-      request(p.baseUrl, 1, p.maxRssPage, function(result) {
-        //if (conf.debugMode) console.log(result);
-        result.name = p.genreName;
-        //if (p.sort !== '') {
-        //  result.sortItem(p.sort);
-        //}
-        result.setPage(p.viewPage);
-        if (typeof callback === 'function') {
-          callback(result);
-        }
-      });
-    }
+      return request(p.baseUrl, 1, p.maxRssPage)
+        .pipe(function(result) {
+          result.name = p.genreName;
+          result.setPage(p.viewPage);
 
-    function load(onload, p) {
-      loadRanking(onload, p);
-    }
-    function getTermId(t) {
+          this.resolve(result);
+        });
+    };
+
+    var load = function(onload, param) {
+      var p = parseParam(param);
+      return request(p.baseUrl, 1, p.maxRssPage)
+        .pipe(function(result) {
+          result.name = p.genreName;
+          result.setPage(p.viewPage);
+
+          if (typeof onload === 'function') {
+            onload(result);
+          }
+          return this.resolve(result);
+        }, function() {
+          return this.reject({message: 'ランキングの取得に失敗しました', status: 'fail'});
+        });
+    };
+
+    var getTermId = function(t) {
       if (typeof t === 'string') {
         return termIdTable[t] || 0;
       } else
@@ -5711,8 +5772,8 @@
         return (t - (t % 1000)) % 10000;
       }
       return 0;
-    }
-    function getGenreId(g, term) {
+    };
+    var getGenreId = function(g, term) {
       if (typeof g === 'string') {
         return (genreIdTable[g] || 0) + getTermId(term);
       } else
@@ -5721,8 +5782,8 @@
       } else {
         return genreIdTable;
       }
-    }
-    function getGenreName(g) {
+    };
+    var getGenreName = function(g) {
       if (typeof g === 'number' || (typeof g === 'string' && g.match(/^-?[0-9]+$/))) {
         g = g % 1000;
         var genre = idGenreTable[g];
@@ -5733,8 +5794,8 @@
       } else {
         return genreNameTable;
       }
-    }
-    function getCategory(g) {
+    };
+    var getCategory = function(g) {
       if (typeof g === 'number') {
         g = g % 1000;
         return idGenreTable[g - (g %10)];
@@ -5745,7 +5806,8 @@
       } else {
         return 'all';
       }
-    }
+    };
+
     var self = {
       load: load,
       getTermId: getTermId,
@@ -5753,6 +5815,7 @@
       getGenreName: getGenreName,
       getCategory: getCategory
     };
+    WatchItLater.VideoRanking = self;
     return self;
   })(w, Util);
 
@@ -5762,25 +5825,61 @@
    *  チャンネル動画一覧をマイリストAPIと互換のある形式で返すことで、ダミーマイリストとして表示してしまう作戦
    */
   var ChannelVideoList = (function(w, Util){
+    if (!WatchController.isZeroWatch()) return {};
     var
+      CACHE_TIME = 1000 * 60 * 1, MAX_PAGE = 3,
+      getPipe = function(baseUrl, result, page) {
+        return function(hasPage) {
+          var def = new $.Deferred;
+          if (!hasPage) return def.resolve(hasPage);
+          var url = baseUrl + '?page=' + page;
+          if (conf.debugMode) console.log('load page', url);
+
+          $.ajax({url: url}).pipe(function(resp) {
+            var hasNextPage = parseItems(resp, result);
+            def.resolve(hasNextPage);
+          }, function(err) {
+            def.reject(err);
+          });
+          return def.promise();
+        };
+      },
+      pipeRequest = function(baseUrl, result) {
+        var def = new $.Deferred, p = def.promise();
+
+        var maxPage = MAX_PAGE;
+        for (var i = 1; i <= maxPage; i++) {
+          p = p.pipe(getPipe(baseUrl, result, i));
+          if (i < maxPage) { p = p.pipe(Util.Deferred.wait(300)); }
+        }
+
+        p.pipe(function() {
+          this.resolve(result);
+        });
+
+        def.resolve(true);
+        return p;
+      },
       load = function(callback, params) {
-        var watch, $, myNick, myId, url, id, ownerName;
+        var myId, url, id, ownerName, def = new $.Deferred;
         try{
           id = params.id.toString().replace(/^ch/, '');
           ownerName = params.ownerName;
-          watch = w.WatchApp.ns.init;
-          $ = w.$; url = 'http://ch.nicovideo.jp/channel/ch'+ id + '/video';
-          myNick = WatchController.getMyNick(); myId = WatchController.getMyUserId();
+          url = 'http://ch.nicovideo.jp/channel/ch'+ id + '/video';
+          myId = WatchController.getMyUserId();
         } catch (e) {
           if (conf.debugMode) console.log(e);
           throw { message: 'エラーが発生しました', status: 'fail'};
         }
 
-        var CACHE_KEY = 'ch-' + id, CACHE_TIME = 1000 * 60 * 1, cacheData = Util.Cache.get(CACHE_KEY);
+        var CACHE_KEY = 'ch-' + id, cacheData = Util.Cache.get(CACHE_KEY);
         if (cacheData) {
-          setTimeout(function() {callback(cacheData); }, 0);
-          return;
+          if (typeof callback === 'function') {
+            setTimeout(function() { callback(cacheData); } , 0);
+          }
+          return def.resolve(cacheData);
         }
+
 
         var result = new DummyMylist({
           id: 'ch' + id,
@@ -5789,22 +5888,18 @@
           user_id: myId,
           user_name: 'ニコニコ動画'
         });
-        $.ajax({
-          url: url,
-          method: 'get',
-          cache: true,
-          success: function(html) {
-            parseItems(html, result);
-            callback(Util.Cache.set(CACHE_KEY, result, CACHE_TIME));
-          },
-          error: function(error) {
-            Popup.alert('チャンネル動画の取得に失敗しました');
-            throw {message: 'チャンネル動画の取得に失敗しました:' + id, status: 'fail'};
-          }
+
+        pipeRequest(url, result).pipe(function() {
+          Util.Cache.set(CACHE_KEY, result, CACHE_TIME);
+          if (typeof callback === 'function') callback(result);
+          def.resolve(result);
         });
+
+        return def.promise();
       },
       parseItems = function(html, result) {
         var $html = $(html), $list = $html.find('.contents_list .item');
+        var hasNextPage = false;
         $list.each(function() {
           var $item = $(this);
           var id = $item.find('.title a').attr('href').split('/').reverse()[0];
@@ -5823,24 +5918,34 @@
             description_short: $item.find('.description').text().trim()
           }));
         });
-        return result;
+        if ($html.find('.pager .next:not(.disabled)').length > 0) {
+          hasNextPage = true;
+        }
+        return hasNextPage;
       },
       loadOwnerVideo = function(callback) {
         if (!WatchController.isChannelVideo()) {
           throw {message: 'チャンネル情報の取得に失敗しました', status: 'fail'};
         }
-        var watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
         var params = {
-          id: watchInfoModel.channelId,
+          id: WatchController.getOwnerId(),
           ownerName: WatchController.getOwnerName()
         };
-        load(callback, params);
+        var def = new $.Deferred;
+        load(callback, params).pipe(function(result) {
+            if (typeof callback === 'function') callback(result);
+            def.resolve(result);
+          }, function() {
+            def.reject({message: 'チャンネル動画の取得に失敗しました', status: 'fail'});
+          });
+        return def.promise();
       };
 
     var self = {
-      load : load,
+      load: load,
       loadOwnerVideo: loadOwnerVideo
     };
+    WatchItLater.ChannelVideo = self;
     return self;
   })(w, Util);
 
@@ -6730,7 +6835,7 @@
           $('#videoMenuTopList').append('<li style="position:absolute;left:300px;font-size:50%">　＼　│　／<br>　　／￣＼　　 ／￣￣￣￣￣￣￣￣￣<br>─（ ﾟ ∀ ﾟ ）＜　しんねんしんねん！<br>　　＼＿／　　 ＼＿＿＿＿＿＿＿＿＿<br>　／　│　＼</li>');
         }
         if (!hidariue) {
-          $('#videoMenuTopList').append('<li class="hidariue" style="position:absolute;top:21px;left:0px;"><a href="http://userscripts.org/scripts/show/151269" target="_blank" style="color:black;"><img id="hidariue" style="border-radius: 8px; box-shadow: 1px 1px 2px #ccc;"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:Q"></a></p><!--<a href="http://nico.ms/sm18845030" class="itemEcoLink">…</a>--></li>');
+          $('#videoMenuTopList').append('<li class="hidariue" style="position:absolute;top:21px;left:0px;"><a href="http://userscripts.org/scripts/show/151269" target="_blank" style="color:black;"><img id="hidariue" style="border-radius: 8px; box-shadow: 1px 1px 2px #ccc;"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:Q"></a></p></li>');
           hidariue = $('#hidariue')[0];
         }
         hidariue.src = 'http://res.nimg.jp/img/base/head/icon/nico/' +
@@ -7324,7 +7429,7 @@
             if (typeof VideoRanking.getGenreName(id) === 'string') {
               //if (conf.debugMode)console.log('load VideoRanking: ', VideoRanking.getGenreName(id));
               isRanking = true;
-              VideoRanking.load(onload, {id: id});
+              VideoRanking.load(null, {id: id}).pipe(onload, onerror);
               return;
             }
             // TODO: マジックナンバーを
@@ -7336,23 +7441,23 @@
                 VideoRecommendations.load(onload);
                 break;
               case -3:
-                ChannelVideoList.loadOwnerVideo(onload);
+                ChannelVideoList.loadOwnerVideo(null).pipe(onload, onerror);
                 break;
               case NicorepoVideo.REPO_ALL:
-                NicorepoVideo.loadAll(onload);
+                NicorepoVideo.loadAll()   .pipe(onload, onerror);
                 break;
               case NicorepoVideo.REPO_USER:
-                NicorepoVideo.loadUser(onload);
+                NicorepoVideo.loadUser()  .pipe(onload, onerror);
                 break;
               case NicorepoVideo.REPO_CHCOM:
-                NicorepoVideo.loadChCom(onload);
+                NicorepoVideo.loadChCom() .pipe(onload, onerror);
                 break;
               case NicorepoVideo.REPO_MYLIST:
-                NicorepoVideo.loadMylist(onload);
+                NicorepoVideo.loadMylist().pipe(onload, onerror);
                 break;
               case NicorepoVideo.REPO_OWNER:
                 isOwnerNicorepo = true;
-                NicorepoVideo.loadOwner(onload);
+                NicorepoVideo.loadOwner() .pipe(onload, onerror);
                 break;
               default:
                 throw {message: '未定義のIDです:' + id, status: 'fail'};
@@ -8378,12 +8483,17 @@
             '</div>', $menu = $(menu);
 
           var $template = $('<div/>').html(watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html());
+          //console.log($template.html());
             $template.find('.column1 .thumbnailContainer').append($menu);
-            $template.find('.column4 .balloon').before($menu.clone());
+            $template.find('.column4 .balloon').before($menu.clone());//.before($template.find('.column4 .videoInformation'));
+            $template.find('.column4 .createdTime').after($template.find('.column4 .videoInformationOuter'));
+            //$template.find('.column4 .balloon').before($template.find('.column4 .videoInformationOuter'));
+            $template.find('.column4 .balloon').remove();
             $template.find('.column1')
               .find('.descriptionShort').after($('<p class="itemMylistComment mylistComment"/>'))
               .end().find('.createdTime').after($('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>'));
             watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html($template.html());
+          //console.log($template.html());
             $template = $menu = null;
 
         },
@@ -9171,7 +9281,7 @@
 
       var togglePlaylistDisplay = function(v) {
         var $playlist = $('#playlist');
-        if (v) {
+        if (!v) {
           $playlist.addClass('w_show').removeClass('w_closing');
         } else {
           $playlist.addClass('w_closing');
@@ -9412,7 +9522,7 @@
         });
 
         var togglePlaylistDisplay = function(v) {
-          $playlistToggle.toggleClass('w_show', v);
+          $playlistToggle.toggleClass('w_show', !v);
         };
 
         EventDispatcher.addEventListener('on.config.hidePlaylist', togglePlaylistDisplay);
@@ -9902,7 +10012,7 @@
             top: 50%; left: 50%;
           }
           body.videoExplorer #videoExplorer.squareThumbnail .item .column4 .thumbnailHoverMenu {
-            bottom: 47px;
+            bottom: 1px;
           }
         */});
 
@@ -10247,7 +10357,15 @@
         body.size_normal.w_size_custom:not(.videoExplorer):not(.full_with_browser) #nicoHeatMap {
           transform: scaleX({$heatMapScale}); -webkit-transform: scaleX({$heatMapScale});
         }
-       */});
+        body.size_normal.w_size_custom:not(.videoExplorer):not(.full_with_browser) #smart_music_kiosk {
+          -webkit-transform: scaleX({$songriumScale}); -webkit-transform-origin: 0 0;
+        }
+
+        body.size_normal.w_size_custom:not(.videoExplorer):not(.full_with_browser) #inspire_category {
+         left: {$songriumCategoryLeft}px !important;
+        }
+
+        */});
       var PROFILE_SET = {
         'WQHD':   [2560, 1440],
         '1080p':  [1920, 1080],
@@ -10263,6 +10381,7 @@
 //        'ECO':    [ 352,  200],
       };
       var CONTROL_HEIGHT = 46, INPUT_HEIGHT = 36, PLAYER_TAB_WIDTH = 280 + 10, PLAYER_TAB_WIDTH_WIDE = 420 + 10, TAB_MARGIN = 20;
+      var SONGRIUM_WIDTH = 898;
       var HORIZONTAL_MARGIN = 1.05; // 両端に 2.5% x 2 のマージンがある
 
       var getTargetSize = function(targetWidth, targetHeight) {
@@ -10275,7 +10394,9 @@
           playerHeight:           plHeight,
           alignmentAreaWidth:     alWidth,
           alignmentAreaWideWidth: alWidthW,
-          heatMapScale:           plWidth / 100
+          heatMapScale:           plWidth / 100,
+          songriumScale:          plWidth / SONGRIUM_WIDTH,
+          songriumCategoryLeft:   plWidth + 32
         };
       };
       var suggestProfile = function() {
@@ -10654,8 +10775,8 @@
         update();
       });
       EventDispatcher.addEventListener('onVideoChangeStatusUpdated', function() {
-        clearCanvas();
         commentReady = videoReady = updated = false;
+        clearCanvas();
       });
 
       var update = function() {
@@ -10910,6 +11031,12 @@
       // TODO: 過去ログを開くタイミングでこれをやる
       // $('.logDateSelect .logTime input')[0].setAttribute('type', 'time');
 
+      if (!w.Ads) {
+        // hostsに 0.0.0.0 ads.nicovideo.jp してるとスクリプトエラーがうるさいのでダミーを入れる
+        w.Ads = {
+          Advertisement: function() { return {set: function() {}}; }
+        };
+      }
 
       if (conf.debugMode) {
         watch.PopupMarqueeInitializer.popupMarqueeViewController.itemList.addEventListener('popup', function(body) {
@@ -10931,6 +11058,7 @@
           ChannelVideoList.load(function(result) {
             console.log('ChannelVideoList.load', result);
             expect(result.name).toEqual('ニコニコアプリちゃんねるの動画', 'チャンネル名');
+            expect(result.list.length >= 30).toBeTrue('2013/08/28時点で33件');
             def.resolve();
           }, {id: '55', ownerName: 'ニコニコアプリちゃんねる'});
         },
@@ -11078,6 +11206,32 @@
               def.resolve();
             });
           d.resolve();
+        },
+        testVideoRanking: function(def) {
+          VideoRanking.load(null, {id: -4000})
+            .pipe(function(result) {
+              console.log('VideoRanking.load result:', result);
+              expect(result.name).toEqual('カテゴリ合算', 'ダミーマイリストの名前が一致');
+              expect(result.list.length).toEqual(300, 'カテゴリ合算ランキングは300件');
+              expect(result.list[  0].title.indexOf('第001位')).toEqual(0,'ランキング1位のタイトル');
+              expect(result.list[299].title.indexOf('第300位')).toEqual(0,'ランキング300位のタイトル');
+              def.resolve();
+            },
+            function() {
+              def.reject();
+            });
+        },
+        testNicorepoVideo: function(def) {
+          NicorepoVideo.loadAll(null, null)
+            .pipe(function(result) {
+              console.log('NicorepoVideo.loadAll result:', result);
+              expect(result.name).toEqual('【ニコレポ】すべての動画', 'ダミーマイリストの名前が一致');
+              expect(result.list).toBeTruthy('ニコレポがある');
+              def.resolve();
+            },
+            function() {
+              def.reject();
+            });
         }
       }); // end WatchApp.mixin
 
