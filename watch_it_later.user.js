@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130828
+// @version        1.130903
 // ==/UserScript==
 
 /**
@@ -37,6 +37,10 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130903
+// - 全画面モードの仕様変更に暫定対応
+// - トップページのホラーっぽいのが表示されなくなっていた不具合を修正
 
 // * ver 1.130828
 // - 4列表示の改善
@@ -437,9 +441,6 @@
       .w_fullScreenMenu .mylistPopupPanel.fixed { bottom: 2px; }
 
 
-      #top_horror_message {
-        display: none !important; opacity: 0; z-index: -1; visibility: hidden;
-      }
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
      addStyle(__css__, 'watchItLaterCommonStyle');
@@ -1483,9 +1484,6 @@
         {* コメント入力欄は動画上表示にするのではなく、画面外に押し出す事によって見えなくする *}
         margin-top: -10px; margin-bottom: -36px;
       }
-      body.full_with_browser.trueBrowserFull #nicoplayerContainerInner:not(.stageVideo) {
-        margin-left: -2.5%; width: 105% !important;
-      }
       body.full_with_browser.trueBrowserFull #playerContainerWrapper {
         margin: 0 !important;
       }
@@ -1997,8 +1995,6 @@
       {title: 'ニコレポのポップアップを置き換える',       varName: 'replacePopupMarquee', reload: true,
         description: '画面隅に出るポップアップの不可解な挙動を調整します',
         values: {'する': true, 'しない': false}},
-      {title: 'ゆっくり再生(スロー再生)ボタンを表示', varName: 'enableYukkuriPlayButton',
-        values: {'する': true, 'しない': false}},
       {title: '検索時のデフォルトパラメータ', varName: 'defaultSearchOption', type: 'text',
        description: '常に指定したいパラメータ指定するのに便利です\n例: 「-グロ -例のアレ」とすると、その言葉が含まれる動画が除外されます'},
       {title: '「@ジャンプ」を無効化', varName: 'ignoreJumpCommand', reload: true,
@@ -2032,6 +2028,11 @@
       {title: 'コメントの背面表示ON/FF',              varName: 'shortcutDeepenedComment',    type: 'keyInput'},
       {title: 'ハードウェアアクセラレーションON/FF',  varName: 'shortcutToggleStageVideo',   type: 'keyInput'},
 
+      {title: 'その他2(一発ネタ系)', description: 'いつのまにか消えるかもしれません', className: 'shortcut'},
+      {title: 'てれびちゃんメニュー内にランダム画像(左上)表示', varName: 'hidariue',
+        values: {'する': true, 'しない': false}},
+      {title: 'ゆっくり再生(スロー再生)ボタンを表示', varName: 'enableYukkuriPlayButton',
+        values: {'する': true, 'しない': false}},
 
       {title: '実験中の設定', debugOnly: true, className: 'forDebug'},
       {title: 'プレイリスト消えないモード(※実験中)',       varName: 'hashPlaylistMode', debugOnly: true, reload: true,
@@ -6834,6 +6835,7 @@
         if (dt.getMonth() < 1 && dt.getDate() <=1) {
           $('#videoMenuTopList').append('<li style="position:absolute;left:300px;font-size:50%">　＼　│　／<br>　　／￣＼　　 ／￣￣￣￣￣￣￣￣￣<br>─（ ﾟ ∀ ﾟ ）＜　しんねんしんねん！<br>　　＼＿／　　 ＼＿＿＿＿＿＿＿＿＿<br>　／　│　＼</li>');
         }
+        if (!conf.hidariue) { return; }
         if (!hidariue) {
           $('#videoMenuTopList').append('<li class="hidariue" style="position:absolute;top:21px;left:0px;"><a href="http://userscripts.org/scripts/show/151269" target="_blank" style="color:black;"><img id="hidariue" style="border-radius: 8px; box-shadow: 1px 1px 2px #ccc;"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:Q"></a></p></li>');
           hidariue = $('#hidariue')[0];
@@ -8716,9 +8718,8 @@
 
       function toggleTrueBrowserFull(v) {
         v = (typeof v === 'boolean') ? v : !$('body').hasClass('trueBrowserFull');
-        $('body').toggleClass('trueBrowserFull', v);//.toggleClass('full_and_mini', v);
+        $('body').toggleClass('trueBrowserFull', v).toggleClass('full_and_mini', v);
         conf.setValue('enableTrueBrowserFull', v);
-        //try { $('#external_nicoplayer')[0].setIsForceExpandStageVideo(v || conf.forceExpandStageVideo);} catch(e) {console.log(e);}
         if (!v) {
           watch.PlaylistInitializer.playlistView.resetView();
         }
@@ -8744,7 +8745,7 @@
           conf.setValue('lastControlPanelPosition', lastPlayerConfig.oldTypeControlPanel ? 'bottom' : 'over');
           //$('body').toggleClass('w_fullWithPlaylist', WatchController.isFullScreenContentAll());
           hideIfNeed();
-          toggleTrueBrowserFull(conf.enableTrueBrowserFull);
+          if (conf.enableTrueBrowserFull) toggleTrueBrowserFull(conf.enableTrueBrowserFull);
         } else
         if (lastScreenMode === 'browserFull' && mode !== 'browserFull') {
           conf.setValue('lastControlPanelPosition', '');
@@ -10512,9 +10513,6 @@
         onStageVideoAvailabilityUpdated(WatchController.isStageVideoAvailable());
         if (conf.forceEnableStageVideo) {
           try {$('#external_nicoplayer')[0].setIsForceUsingStageVideo(true);  } catch (e) { console.log(e);}
-        }
-        if (conf.forceExpandStageVideo) {
-          try {$('#external_nicoplayer')[0].setIsForceExpandStageVideo(true); } catch (e) { console.log(e);}
         }
       });
 
