@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130903
+// @version        1.130905
 // ==/UserScript==
 
 /**
@@ -37,6 +37,9 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130905
+// - 本家側の仕様変更によりマイリスト外すボタンが出なくなったのを修正
 
 // * ver 1.130903
 // - 全画面モードの仕様変更に暫定対応
@@ -7336,7 +7339,8 @@
       content._isRanking       = false;
       content.getIsMine          = $.proxy(function() {
         // getUserId()はstringだけどwatchInfoModelから取ってるmyUserIdはnumber HAHAHA
-        return parseInt(this.getUserId(), 10) === myUserId && parseInt(this.getMylistId(), 10) > 0;
+        // ・・・と思ったら両方stringになったぽい？ 2013/09/05
+        return parseInt(this.getUserId(), 10) === parseInt(myUserId, 10) && parseInt(this.getMylistId(), 10) > 0;
       }, content);
       content.getIsDummy         = $.proxy(function() {
         return parseInt(this.getMylistId(), 10) <= 0;
