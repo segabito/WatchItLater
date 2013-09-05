@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130905
+// @version        1.130906
 // ==/UserScript==
 
 /**
@@ -37,6 +37,9 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130906
+// - 動画説明文中の動画IDに「次に再生」ボタンを追加
 
 // * ver 1.130905
 // - 本家側の仕様変更によりマイリスト外すボタンが出なくなったのを修正
@@ -1842,6 +1845,33 @@
       {* 不要な時まで横スクロールバーが出てしまうので *}
       #songrium_inline { overflow: hidden; }
 
+      .sideVideoInfo .nextPlayButton {
+        position: absolute;
+        margin-top: -6px;
+        width: 30px;
+        height: 30px;
+        background: url(http://res.nimg.jp/img/watch_zero/icon_nextplay.png);
+        z-index: 100;
+        cursor: pointer;
+        text-indent: -999em;
+        overflow: hidden;
+        display: inline-block;
+        -webkit-transform: scale(1.0); transform: scale(1.0);
+      }
+      .nextPlayButton {
+        -webkit-transform: scale(1.5); transform: scale(1.5);
+        transition: transform 0.1s ease; -webkit-transition: -webkit-transform 0.1s ease;
+      }
+      .sideVideoInfo .nextPlayButton:hover {
+        -webkit-transform: scale(1.5); transform: scale(1.5);
+      }
+      .nextPlayButton:active, .sideVideoInfo .nextPlayButton:active {
+        -webkit-transform: scale(1.2); transform: scale(1.2);
+      }
+
+      .sideVideoInfo .nextPlayButton:active {
+        background-position-y: 30px;
+      }
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
     addStyle(__css__, 'watchItLaterStyle');
@@ -4141,6 +4171,14 @@
         }
         this.setPlaylistItems(items, currentItem);
       },
+      insertVideoToPlaylist: function(id) {
+        WatchItLater.VideoInfoLoader.load(id).pipe(function(info) {
+            var item = new WatchApp.ns.model.playlist.PlaylistItem(info);
+            watch.PlaylistInitializer.playlist.insertNextPlayingItem(item);
+          }, function(err) {
+            Popup.alert(err.message);
+          });
+      },
       addDefMylist: function(description) {
         var watchId = watchInfoModel.id;
         setTimeout(function() {
@@ -5084,6 +5122,74 @@
     }
   };
 
+
+  var VideoInfoLoader = function() { this.initialize.apply(this, arguments); };
+  VideoInfoLoader.BASE_URL = "http://riapi.nicovideo.jp/api/search/tag";
+  VideoInfoLoader.prototype = {
+    initialize: function(params) {
+    },
+    load: function(id, callback) {
+      var def = new $.Deferred;
+
+      var cache_key = JSON.stringify({'VideoInfoLoaderCache': id}), cacheData = Util.Cache.get(cache_key);
+      if (cacheData) {
+        return def.resolve(cacheData);
+      }
+
+      if (id.toString().match(/^\d+$/)) { // watchId
+        WatchApp.ns.init.PlaylistInitializer.videoInfoAPILoader.load(
+          [id],
+          function(err, resp) {
+            if (err !== null) {
+              return def.reject({message: '通信に失敗しました(1)', status: 'fail'});
+            }
+//            console.log(err, resp, resp.items);
+            if (resp.items && resp.items[id] && resp.items[id].id) {
+              if (typeof callback === 'function') { callback(null, resp.items[id]); }
+              return def.resolve(Util.Cache.set(cache_key, resp.items[id]));
+            }
+            var err = {message: '動画が見つかりませんでした(1): ' + id, status: 'fail'};
+            if (typeof callback === 'function') { callback(err, null); }
+            return def.reject(err);
+          }
+        );
+        return def.promise();
+      }
+
+      WatchApp.ns.util.HTTPUtil.loadXDomainAPI({ // videoId
+        url: VideoInfoLoader.BASE_URL,
+        type: 'GET',
+        dataType: 'json',
+        xhrFields: {
+          withCredentials: true
+        },
+        data: {
+          words: 'watch/' + id,
+          sort: 'f',
+          order: 'd',
+          page: '1',
+          mode: 'watch'
+        },
+        success: function(result) {
+          if (result.suggest_video && result.suggest_video.id) {
+            if (typeof callback === 'function') { callback(null, result.suggest_video); }
+            def.resolve(Util.Cache.set(cache_key, result.suggest_video));
+          } else {
+            var err = {message: '動画が見つかりませんでした(2): ' + id, status: 'fail'};
+            if (typeof callback === 'function') { callback(err, null); }
+            def.reject(err);
+          }
+        },
+        error: function(resp) {
+          var err = {message: '通信に失敗しました(2)', status: 'fail'};
+          if (typeof callback === 'function') { callback(err, null); }
+          def.reject(err);
+        }
+      });
+      return def.promise();
+    }
+  };
+  WatchItLater.VideoInfoLoader = new VideoInfoLoader({});
 
   /**
    *  動画視聴履歴をマイリストAPIと互換のある形式で返すことで、ダミーマイリストとして表示してしまう作戦
@@ -6646,10 +6752,11 @@
         if (info.type === 'video') {
             text = $this.text();
             $this.after([
-                '<div class="descriptionThumbnail video" style="">',
-                '<img src="', info.thumbnail[0], '">',
-                '<p>', info.title, '</p>',
-                '</div>',
+              '<div class="nextPlayButton" title="次に再生" onclick="WatchItLater.WatchController.insertVideoToPlaylist(\'', $this.text(),'\')">次に再生</div>',
+              '<div class="descriptionThumbnail video" style="">',
+              '<img src="', info.thumbnail[0], '">',
+              '<p>', info.title, '</p>',
+              '</div>',
             ''].join(''));
         } else
         if (info.type === 'mylist') {
@@ -6672,6 +6779,11 @@
                 '<p>', info.title, '</p>',
                 '</div>',
             ''].join(''));
+        } else
+        if (url.match(/\/watch\/((sm|nm|so|)\d+)$/)) {
+          $this.after([
+            '<div class="nextPlayButton" title="次に再生" onclick="WatchItLater.WatchController.insertVideoToPlaylist(\'', RegExp.$1, '\')">次に再生</div>',
+          ''].join(''));
         }
       });
 
@@ -8207,26 +8319,22 @@
           content: '← ';
         }
 
-       .w_adjusted .videoExplorerBody  .nextPlayButton, .w_adjusted .videoExplorerBody  .nextPlayButton {
-         -webkit-transform: scale(1.5); transform: scale(1.5);
-       }
+        .videoExplorerOpening .videoExplorerBody .videoExplorerConfig {
+          display: none;
+        }
+        .videoExplorerBody .videoExplorerConfig {
+          cursor: pointer;
+          width: 80px; margin-left: -36px; white-space: nowra;
+          border-radius: 0 32px 0 0; border: solid 1px #666; border-width: 1px 1px 0;
+          color: #fff; background: #aaa;
+        }
+        #videoExplorer.w_adjusted       .videoExplorerConfig .open,
+        #videoExplorer:not(.w_adjusted) .videoExplorerConfig .close {
+          display: none;
+        }
+        .videoExplorerConfig::-moz-focus-inner { border: 0px; }
 
-       .videoExplorerOpening .videoExplorerBody .videoExplorerConfig {
-         display: none;
-       }
-       .videoExplorerBody .videoExplorerConfig {
-         cursor: pointer;
-         width: 80px; margin-left: -36px; white-space: nowra;
-         border-radius: 0 32px 0 0; border: solid 1px #666; border-width: 1px 1px 0;
-         color: #fff; background: #aaa;
-       }
-       #videoExplorer.w_adjusted       .videoExplorerConfig .open,
-       #videoExplorer:not(.w_adjusted) .videoExplorerConfig .close {
-         display: none;
-       }
-       .videoExplorerConfig::-moz-focus-inner { border: 0px; }
-
-     */});
+      */});
       return addStyle(__css__, 'videoExplorerStyleStatic');
     } // end setupVideoExplorerStaticCss
 
@@ -9010,7 +9118,7 @@
           }
 
           var isAutoPlay = playlist.isContinuous();//isAutoPlay();
-          playlist.reset(newItems, list.t, list.o);
+          playlist.reset(newItems, 'WatchItLater', list.t, list.o);
           if (!isAutoPlay) { // 本家側の更新でリセット時に勝手に自動再生がONになるようになったので、リセット前の状態を復元する
             playlist.disableContinuous();
           }
@@ -11234,6 +11342,27 @@
             function() {
               def.reject();
             });
+        },
+        testVideoInfoLoader: function(def) {
+          var loader = new VideoInfoLoader({});
+          $.when(
+
+            loader.load('sm9').pipe(function(result) {
+              expect(result.id).toEqual('sm9', '存在する動画ID');
+              expect(result.length).toEqual('5:19', 'length');
+              return this.resolve();
+            }, function(err) {
+              return this.reject();
+            }),
+
+            loader.load('sm1').pipe(function(result) {
+              return new $.Deferred().reject().promise();
+            }, function(resp) {
+              expect(result.status).toEqual('fail', '存在しない動画ID');
+              return new $.Deferred().resolve().promise();
+            })
+
+          ).pipe(function() { def.resolve(); }, function() { def.reject(); });
         }
       }); // end WatchApp.mixin
 
