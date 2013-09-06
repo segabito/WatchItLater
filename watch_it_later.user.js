@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130906
+// @version        1.130906b
 // ==/UserScript==
 
 /**
@@ -691,6 +691,10 @@
       }
       .sidePanel .sideVideoInfo .videoDetails a{
         margin: auto 4px;
+      }
+      .sidePanel .sideVideoInfo .videoDetails a.watch{
+        margin: auto 30px auto 4px;
+        display:inline-block;
       }
       .sideVideoInfo .userName, .sideVideoInfo .channelName{
         display: block;
@@ -1848,6 +1852,7 @@
       .sideVideoInfo .nextPlayButton {
         position: absolute;
         margin-top: -6px;
+        margin-left: -30px;
         width: 30px;
         height: 30px;
         background: url(http://res.nimg.jp/img/watch_zero/icon_nextplay.png);
@@ -1858,6 +1863,7 @@
         display: inline-block;
         -webkit-transform: scale(1.0); transform: scale(1.0);
       }
+
       .nextPlayButton {
         -webkit-transform: scale(1.5); transform: scale(1.5);
         transition: transform 0.1s ease; -webkit-transition: -webkit-transform 0.1s ease;
@@ -5143,7 +5149,6 @@
             if (err !== null) {
               return def.reject({message: '通信に失敗しました(1)', status: 'fail'});
             }
-//            console.log(err, resp, resp.items);
             if (resp.items && resp.items[id] && resp.items[id].id) {
               if (typeof callback === 'function') { callback(null, resp.items[id]); }
               return def.resolve(Util.Cache.set(cache_key, resp.items[id]));
@@ -11138,8 +11143,11 @@
         WatchController.scrollTop(0, 400);
       });
 
-      // TODO: 過去ログを開くタイミングでこれをやる
-      // $('.logDateSelect .logTime input')[0].setAttribute('type', 'time');
+      watch.PlayerInitializer.commentPanelViewController.commentPanelContentModel.addEventListener('change', function(name) {
+        if (name === 'log_comment') {
+          $('.logDateSelect .logTime input')[0].setAttribute('type', 'time');
+        }
+      });
 
       if (!w.Ads) {
         // hostsに 0.0.0.0 ads.nicovideo.jp してるとスクリプトエラーがうるさいのでダミーを入れる
