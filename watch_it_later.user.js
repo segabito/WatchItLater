@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130906b
+// @version        1.130914
 // ==/UserScript==
 
 /**
@@ -37,6 +37,10 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130914
+// - 急に原宿で動かなくなったので暫定対応
+// - 省スペース/軽量化設定 → コメントパネルのマウスオーバー時にチラチラするのをなくす設定 (動作の軽さを優先する用)
 
 // * ver 1.130906
 // - 動画説明文中の動画IDに「次に再生」ボタンを追加
@@ -200,6 +204,7 @@
       playerTabAutoOpenNicommend: 'enable', // 終了時にニコメンドを自動で開くかどうか 'enable' 'auto' 'disable'
       autoPauseInvisibleInput: true, //
       customPlayerSize: '', //
+      removeCommentPanelHoverEvent: false, //
 
       searchEngine:              'normal', // 'normal' 'sugoi'
       searchStartTimeRange:      '', //
@@ -969,11 +974,7 @@
       .playlistToggle.w_show:after {
         content: "▲";
       }
-      #content #playlist .playlistInformation  .generationMessage{
-        {* 「連続再生ボタンとリスト名は左右逆のほうが安定するんじゃね？ 名前の長さによってボタンの位置がコロコロ変わらなくなるし」という対応。*}
-        {* ついに本家のほうもボタンが左になったよ！ *}
-        {* position: absolute; margin-left: 90px; *}
-      }
+
       body.videoExplorer #content #playlist .playlistInformation  .generationMessage{
         max-width: 350px;
       }
@@ -1347,7 +1348,7 @@
       }
 
 
-      body:not(.videoExplorer) #content.w_hideSearchExpand #videoExplorerExpand {
+      body:not(.videoExplorer) {*#playlist:not(.nico-bucket-videoExplorer-b)*} #videoExplorerExpand {
         display: none;
       }
       #outline .openVideoExplorer {
@@ -1878,6 +1879,16 @@
       .sideVideoInfo .nextPlayButton:active {
         background-position-y: 30px;
       }
+      {*
+      #playlist.nico-bucket-videoExplorer-b .playbackOption .option {
+        transform: scaleY(0.75);                 transform-origin: 0 0;
+        -webkit-transform: scaleY(0.75); -webkit-transform-origin: 0 0;
+      }
+
+      #playlist.nico-bucket-videoExplorer-b .playlistInformation {
+        line-height: 32px; height: 32px;
+      }
+      *}
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
     addStyle(__css__, 'watchItLaterStyle');
@@ -2012,7 +2023,7 @@
       {title: 'レビューの表示', varName: 'reviewVisibility',
         values: {'非表示': 'hidden', '表示': 'visible'}},
 
-      {title: '省スペース設定', className: 'compact'},
+      {title: '省スペース/軽量化設定', className: 'compact'},
       {title: 'タグが2行以内の時に高さを詰める(ピン留め時のみ)', varName: 'enableAutoTagContainerHeight', reload: true,
         values: {'詰める': true, '詰めない': false}},
       {title: '動画情報の空きスペースを詰める', varName: 'compactVideoInfo',
@@ -2023,6 +2034,9 @@
 //        values: {'なくす': 'on', 'なくさない': ''}},
       {title: '「ニコる」をなくす', varName: 'noNicoru',
         description: '画面上から見えなくなります。',
+        values: {'なくす': true, 'なくさない': false}},
+      {title: 'コメントパネルのマウスオーバー処理をなくす', varName: 'removeCommentPanelHoverEvent', reload: true,
+        description: 'マウスオーバー時のちらちらした物がなくなり、表示が軽くなります',
         values: {'なくす': true, 'なくさない': false}},
 
       {title: 'その他の設定', className: 'otherSetting'},
@@ -3218,13 +3232,14 @@
       var body = document.createElement('iframe');
       body.name = 'nicomylistaddDummy';
       body.className = 'mylistPopupPanel';
-      body.style.width = '130px';
-      body.style.height = '24px';
-      body.style.zIndex = 10000;
-      body.style.border = '1px solid silver';
-      body.style.padding = 0;
-      body.style.margin  = 0;
-      body.style.overflow = 'hidden';
+      body.setAttribute('style', 'width: 130px; height: 24px; z-index: 10000; border: 1px solid silver; padding: 0; margin: 0; overflow: hidden');
+//      body.style.width = '130px';
+//      body.style.height = '24px';
+//      body.style.zIndex = 10000;
+//      body.style.border = '1px solid silver';
+//      body.style.padding = 0;
+//      body.style.margin  = 0;
+//      body.style.overflow = 'hidden';
       body.watchId = function(w) {
         if (w) {
           _watchId = w;
@@ -6072,7 +6087,7 @@
    *
    */
   (function(w) { // Zero Watch
-    var $ = w.$, $$ = w.$$;
+    //var $ = w.$, $$ = w.$$;
     if (!w.WatchApp || !w.WatchJsApi) return;
 
     $.fx.interval = conf.fxInterval;
@@ -6592,7 +6607,27 @@
         });
         if (conf.enableSharedNgSetting) { $div.show(); }
       });
-
+//*
+      if (conf.removeCommentPanelHoverEvent) {
+        $("#commentDefault").find(".commentTableContainerInner")               .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
+        $('#playerCommentPanel .section .commentTable .commentTableContainer') .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
+      }
+      WatchApp.ns.init.PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
+        .off('contextmenu').on('contextmenu', '.cell', $.proxy(function(a) {
+        a.preventDefault(); a.stopPropagation();
+        var c = this.commentListModel.getComment(this.parseResNo(jQuery(a.currentTarget)));
+        if (c) {
+          var
+            $d   = this.CommentContextMenu.$contextMenuContainer,
+            $e   = jQuery("#playerCommentPanel"),
+            left = this.$commentTableHeaderOuter.position().left,
+            top  = a.pageY - $e.offset().top,
+            $e   = Math.min($e.offset().top + $e.outerHeight(), jQuery(window).scrollTop() + jQuery(window).outerHeight());
+          $e < a.pageY + $d.outerHeight() && (top -= a.pageY + $d.outerHeight() - $e);
+          this.CommentContextMenu.show(c, left, top);
+        }
+      }, WatchApp.ns.init.PlayerInitializer.commentPanelViewController.commentContent));
+//*/
     } // end initRightPanel
 
     function initRightPanelHorizontalTab($, conf, w) {
@@ -9235,7 +9270,7 @@
 
               var $clear = $('<li>リストを消去： 全体</li>').click(function() {
                 WatchController.clearPlaylist();
-                watch.PlaylistInitializer.playlist.setPlaybackMode('normal');
+                //watch.PlaylistInitializer.playlist.setPlaybackMode('normal');
               });
               $ul.append($clear);
 
@@ -10927,6 +10962,7 @@
           var ct = list[i].comments;
           comments = (comments.length < ct.length) ? ct : comments;
         }
+        list = null;
       };
       var getDuration = function() {
         var exp = document.getElementById('external_nicoplayer');//$('#external_nicoplayer')[0];
@@ -11428,13 +11464,21 @@
    *
    */
   (function() {
-    if (!w.Video) return;
-    var Video = w.Video, watchId = Video.v, videoId = Video.id;
+    if (w.Video === undefined || w.Video !== null) return;
+    var watchId = undefined, videoId = undefined;
+    if (w.Video === null) {
+      if (!location.href.match(/\/watch\/(sm\d+|nm\d+|so\d+|\d+)/)) return;
+      watchId = RegExp.$1;
+    } else {
+      Video   = w.Video;
+      watchId = Video.v;
+      videoId = Video.id;
+    }
+    var watchId = RegExp.$1;
     var iframe = Mylist.getPanel('');
     iframe.id = "mylist_add_frame";
-    iframe.style.position = 'fixed';
-    iframe.style.right = 0;
-    iframe.style.bottom = 0;
+    iframe.setAttribute('style', 'position: fixed; right: 0; bottom: 0;');
+
     document.body.appendChild(iframe);
     iframe.watchId(watchId, videoId);
   })();
