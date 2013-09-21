@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130914
+// @version        1.130922
 // ==/UserScript==
 
 /**
@@ -1640,15 +1640,29 @@
       #content.w_compact        #topVideoInfo .videoDescription.description {
         background: #fff; margin: 10px 0 0;padding: 4px ;width: 952px; {*font-size: 90%;*}
       }
-      body:not(.full_with_browser) #content.w_compact.w_wide #topVideoInfo .videoDescription.description {
-        width: 1192px;
+
+      {* 本家の幅が変わったら変える必要がある。 変数化した方が楽かも *}
+      body:not(.full_with_browser):not(.videoExplorer).size_normal #content.w_compact.w_wide #topVideoInfo .videoDescription.description {
+        width: 1318px; {* base + 358 *}
       }
-      .size_normal #content.w_compact        #videoDetailInformation .description {
-        width: 1178px;
+      body:not(.full_with_browser):not(.videoExplorer).size_normal #content.w_compact        #topVideoInfo .videoDescription.description {
+        width: 1178px; {* base + 218 *}
       }
-      body:not(.full_with_browser) .size_normal #content.w_compact.w_wide #videoDetailInformation .description {
-        width: 1318px;
+      body:not(.full_with_browser)                                 #content.w_compact.w_wide #topVideoInfo .videoDescription.description {
+        width: 1092px; {* base + 132 *}
       }
+      body:not(.full_with_browser).size_normal                     #content.w_compact.w_wide #videoTagContainer {
+        width: 1263px; {* base + 303 *}
+      }
+      body:not(.full_with_browser)                                 #content.w_compact.w_wide #videoTagContainer {
+        width: 1040px; {* base + 80 *}
+      }
+      body:not(.full_with_browser)                                 #content.w_compact        #videoTagContainer {
+        width: 900px;  {* base - 60 *}
+      }
+      #foot_inner { width: 960px; {* base + 0 *}}
+      .size_normal #foot_inner { width: 1186px; {* base + 226 *} }
+
       #content.w_compact #topVideoInfo .videoMainInfoContainer{
         padding: 0;
       }
@@ -1663,18 +1677,6 @@
       }
       #content.w_compact #topVideoInfo .videoStats {
         margin-bottom: 2px;
-      }
-      body:not(.full_with_browser) #content.w_compact        #videoTagContainer{
-        width: 900px;
-      }
-      body:not(.full_with_browser) #content.w_compact.w_wide #videoTagContainer{
-        width: 1040px;
-      }
-      body:not(.full_with_browser).size_normal #content.w_compact        #videoTagContainer{
-        width: 1123px;
-      }
-      body:not(.full_with_browser).size_normal #content.w_compact.w_wide #videoTagContainer{
-        width: 1263px;
       }
       body:not(.full_with_browser) #content.w_compact #videoTagContainer .tagInner #videoHeaderTagList .toggleTagEdit {
         width: 72px;
@@ -1774,8 +1776,6 @@
         box-shadow: 0px 0px 8px #fff;
       }
 
-      #foot_inner { width: 960px; }
-      .size_normal #foot_inner { width: 1186px; }
       #footer.noBottom #foot_inner { padding: 0; }
       #footer.noBottom a:nth-of-type(3):after, #footer.noBottom a:nth-of-type(6):after  {
         content: ' | '; color: white;
@@ -1879,16 +1879,7 @@
       .sideVideoInfo .nextPlayButton:active {
         background-position-y: 30px;
       }
-      {*
-      #playlist.nico-bucket-videoExplorer-b .playbackOption .option {
-        transform: scaleY(0.75);                 transform-origin: 0 0;
-        -webkit-transform: scaleY(0.75); -webkit-transform-origin: 0 0;
-      }
 
-      #playlist.nico-bucket-videoExplorer-b .playlistInformation {
-        line-height: 32px; height: 32px;
-      }
-      *}
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
     addStyle(__css__, 'watchItLaterStyle');
@@ -4098,6 +4089,7 @@
         var isAutoPlay = playlist.isContinuous();//.isAutoPlay();
         playlist.reset(
           items,
+          'WatchItLater',
           playlist.type,
           playlist.option
         );
@@ -4527,6 +4519,23 @@
       showLargeThumbnail: function(url) {
         return function() {
           WatchController.showLargeThumbnail(url);
+        };
+      },
+      commentPanelContextMenu: function() {
+        return function(a) {
+          a.preventDefault(); a.stopPropagation();
+          var c = this.commentListModel.getComment(this.parseResNo(jQuery(a.currentTarget)));
+          var WatchApp = null, WatchController = null;
+          if (c) {
+            var
+              $d   = this.CommentContextMenu.$contextMenuContainer,
+              $e   = jQuery("#playerCommentPanel"),
+              left = this.$commentTableHeaderOuter.position().left,
+              top  = a.pageY - $e.offset().top,
+              $e   = Math.min($e.offset().top + $e.outerHeight(), jQuery(window).scrollTop() + jQuery(window).outerHeight());
+            $e < a.pageY + $d.outerHeight() && (top -= a.pageY + $d.outerHeight() - $e);
+            this.CommentContextMenu.show(c, left, top);
+          }
         };
       }
     };
@@ -6607,27 +6616,22 @@
         });
         if (conf.enableSharedNgSetting) { $div.show(); }
       });
-//*
+
       if (conf.removeCommentPanelHoverEvent) {
         $("#commentDefault").find(".commentTableContainerInner")               .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
         $('#playerCommentPanel .section .commentTable .commentTableContainer') .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
       }
-      WatchApp.ns.init.PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
-        .off('contextmenu').on('contextmenu', '.cell', $.proxy(function(a) {
-        a.preventDefault(); a.stopPropagation();
-        var c = this.commentListModel.getComment(this.parseResNo(jQuery(a.currentTarget)));
-        if (c) {
-          var
-            $d   = this.CommentContextMenu.$contextMenuContainer,
-            $e   = jQuery("#playerCommentPanel"),
-            left = this.$commentTableHeaderOuter.position().left,
-            top  = a.pageY - $e.offset().top,
-            $e   = Math.min($e.offset().top + $e.outerHeight(), jQuery(window).scrollTop() + jQuery(window).outerHeight());
-          $e < a.pageY + $d.outerHeight() && (top -= a.pageY + $d.outerHeight() - $e);
-          this.CommentContextMenu.show(c, left, top);
+      watch.PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
+        .off('contextmenu')
+        .on('contextmenu', '.cell',
+          $.proxy(Util.Closure.commentPanelContextMenu(), watch.PlayerInitializer.commentPanelViewController.commentContent)
+        );
+      EventDispatcher.addEventListener('onVideoChangeStatusUpdated', function(isChanging) {
+        if (isChanging) {
+          watch.PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
+            .find('.cell').off('contextmenu').off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
         }
-      }, WatchApp.ns.init.PlayerInitializer.commentPanelViewController.commentContent));
-//*/
+      });
     } // end initRightPanel
 
     function initRightPanelHorizontalTab($, conf, w) {
@@ -9635,6 +9639,7 @@
           if (conf.doubleClickScroll) {
             EventDispatcher.dispatch('onScrollReset');
             WatchController.scrollToVideoPlayer(true);
+            e.preventDefault();
           }
         }
       });
@@ -10871,6 +10876,7 @@
           background: #000; height: 8px;
           overflow: hidden;
         }
+        .setting_panel #nicoHeatMapContainer { display: none; opacity: 0; }
         .size_normal #nicoHeatMapContainer {
           width: 898px;
         }
@@ -11464,11 +11470,12 @@
    *
    */
   (function() {
-    if (w.Video === undefined || w.Video !== null) return;
+    if (!w.Video) return;
+    if (!location.href.match(/\/watch\/(sm\d+|nm\d+|so\d+|\d+)/)) return;
     var watchId = undefined, videoId = undefined;
     if (w.Video === null) {
-      if (!location.href.match(/\/watch\/(sm\d+|nm\d+|so\d+|\d+)/)) return;
       watchId = RegExp.$1;
+      w.Video = {id: watchId};
     } else {
       Video   = w.Video;
       watchId = Video.v;
