@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130923
+// @version        1.130923b
 // ==/UserScript==
 
 /**
@@ -979,8 +979,11 @@
         content: "▲";
       }
 
+      #playlist .playlistInformation {
+        white-space: nowrap;
+      }
       body.videoExplorer #content #playlist .playlistInformation  .generationMessage{
-        max-width: 350px;
+        max-width: 350px; overflow: hidden;
       }
       #playlistContainerInner .thumbContainer, #playlistContainerInner .balloon{
         cursor: move;
@@ -1978,8 +1981,8 @@
       },
 
       {title: '検索モードの設定', className: 'videoExplorer'},
-      {title: '検索モードを使わなくする', varName: 'disableVideoExplorer',
-        description: 'タグ検索などが原宿同様の動きになります。\nただし、自分で検索モードにしている時は検索モードで開きます',
+      {title: '検索モードを無効化', varName: 'disableVideoExplorer',
+        description: '無効にするとタグ検索などが原宿と同じになります。\nただし、自分で検索モードにしている時は検索モードで開きます',
         values: {'する': true, 'しない': false}},
       {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack',
         description: '便利ですがちょっと重いです。\n大きめのモニターだと快適ですが、小さいといまいちかも',
@@ -8388,6 +8391,7 @@
         }
         .videoExplorerConfig::-moz-focus-inner { border: 0px; }
 
+
       */});
       return addStyle(__css__, 'videoExplorerStyleStatic');
     } // end setupVideoExplorerStaticCss
@@ -8556,7 +8560,8 @@
       }, controller);
       controller.searchVideo = $.proxy(function(word, type) {
         if (conf.disableVideoExplorer && !WatchController.isSearchMode()) {
-          location.href = (type === 'tag' ? 'tag' : 'search') + "/" + encodeURIComponent(word);
+          var sortOrder = '?sort=' + conf.searchSortType + '&order=' + conf.searchSortOrder;
+          location.href = (type === 'tag' ? 'tag' : 'search') + "/" + encodeURIComponent(word) + sortOrder;
           return;
         }
         this.searchVideo_org(word, type);
