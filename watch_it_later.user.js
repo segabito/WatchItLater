@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130922
+// @version        1.130923
 // ==/UserScript==
 
 /**
@@ -37,6 +37,9 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130923
+// - 検索モードを無効にするやつ
 
 // * ver 1.130914
 // - 急に原宿で動かなくなったので暫定対応
@@ -205,6 +208,7 @@
       autoPauseInvisibleInput: true, //
       customPlayerSize: '', //
       removeCommentPanelHoverEvent: false, //
+      disableVideoExplorer: false, //
 
       searchEngine:              'normal', // 'normal' 'sugoi'
       searchStartTimeRange:      '', //
@@ -1974,6 +1978,9 @@
       },
 
       {title: '検索モードの設定', className: 'videoExplorer'},
+      {title: '検索モードを使わなくする', varName: 'disableVideoExplorer',
+        description: 'タグ検索などが原宿同様の動きになります。\nただし、自分で検索モードにしている時は検索モードで開きます',
+        values: {'する': true, 'しない': false}},
       {title: 'プレイヤーをできるだけ大きくする (コメントやシークも可能にする)', varName: 'videoExplorerHack',
         description: '便利ですがちょっと重いです。\n大きめのモニターだと快適ですが、小さいといまいちかも',
         values: {'する': true, 'しない': false}},
@@ -4482,6 +4489,9 @@
       openVideoOwnersNicorepo: function() {
         return function(e) {
           if (isMetaKey(e)) { return; }
+          if (conf.disableVideoExplorer && !WatchController.isSearchMode()) {
+            return;
+          }
           prevent(e);
           WatchController.showMylist(NicorepoVideo.REPO_OWNER);
         };
@@ -8511,6 +8521,49 @@
         this._refreshMenu_org();
         attachMenuItems();
       }, controller);
+      controller.showDeflist_org         = controller.showDeflist;
+      controller.showMylist_org          = controller.showMylist;
+      controller.showOtherUserVideos_org = controller.showOtherUserVideos;
+      controller.showOwnerVideo_org      = controller.showOwnerVideo;
+      controller.searchVideo_org         = controller.searchVideo;
+      controller.showDeflist = $.proxy(function() {
+        if (conf.disableVideoExplorer && !WatchController.isSearchMode()) {
+          location.href = "/my/mylist";
+          return;
+        }
+        this.showDeflist_org();
+      }, controller);
+      controller.showMylist = $.proxy(function(id) {
+        if (conf.disableVideoExplorer && !WatchController.isSearchMode()) {
+          location.href = "/mylist/" + id;
+          return;
+        }
+        this.showMylist_org(id);
+      }, controller);
+      controller.showOtherUserVideos = $.proxy(function(id, name) {
+        if (conf.disableVideoExplorer && !WatchController.isSearchMode()) {
+          location.href = "/user/" + id;
+          return;
+        }
+        this.showOtherUserVideos_org(id, name);
+      }, controller);
+      controller.showOwnerVideo = $.proxy(function() {
+        if (conf.disableVideoExplorer && !WatchController.isSearchMode()) {
+          location.href = "/user/" + WatchController.getOwnerId();
+          return;
+        }
+        this.showOwnerVideo_org();
+      }, controller);
+      controller.searchVideo = $.proxy(function(word, type) {
+        if (conf.disableVideoExplorer && !WatchController.isSearchMode()) {
+          location.href = (type === 'tag' ? 'tag' : 'search') + "/" + encodeURIComponent(word);
+          return;
+        }
+        this.searchVideo_org(word, type);
+      }, controller);
+
+
+
 
       EventDispatcher.addEventListener('on.config.enableFavTags',
         function() { if (WatchController.isSearchMode()) { controller._refreshMenu(); }});
@@ -9637,9 +9690,9 @@
         if (!WatchController.isFullScreen()) {
           AnchorHoverPopup.hidePopup();
           if (conf.doubleClickScroll) {
+            e.preventDefault();
             EventDispatcher.dispatch('onScrollReset');
             WatchController.scrollToVideoPlayer(true);
-            e.preventDefault();
           }
         }
       });
