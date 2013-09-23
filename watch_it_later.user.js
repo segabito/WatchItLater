@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130923b
+// @version        1.130924
 // ==/UserScript==
 
 /**
@@ -37,6 +37,9 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130924
+// - レイアウトの崩れを修正
 
 // * ver 1.130923
 // - 検索モードを無効にするやつ
@@ -979,11 +982,20 @@
         content: "▲";
       }
 
-      #playlist .playlistInformation {
+      body.videoExplorer #content.w_adjusted #playlist .playlistInformation {
         white-space: nowrap;
       }
-      body.videoExplorer #content #playlist .playlistInformation  .generationMessage{
-        max-width: 350px; overflow: hidden;
+      body.videoExplorer #content.w_adjusted #playlist .playlistInformation  .playbackOption {
+        position: absolute;
+      }
+      body.videoExplorer #content.w_adjusted #playlist .playlistInformation  .generationMessage{
+        margin-left: 90px; max-width: 350px; overflow: hidden; text-overflow: ellipsis;
+      }
+      body.videoExplorer #content.w_adjusted #playlist .playlistInformation .browserFullOption {
+        position: absolute; right: 0; top: 0;
+      }
+      body.videoExplorer #content.w_adjusted #playlist .playlistInformation .browserFullOption a {
+        background: #444;
       }
       #playlistContainerInner .thumbContainer, #playlistContainerInner .balloon{
         cursor: move;
