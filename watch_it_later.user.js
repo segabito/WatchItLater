@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130924
+// @version        1.130925
 // ==/UserScript==
 
 /**
@@ -37,6 +37,10 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130925
+// - ニコるをなくす設定にするとコメントパネルが軽くなるようにした。ホイール操作の謎の重さがなくなる。
+//   (Chromeだと変わらないけどFirefoxだと効果が大きいです)
 
 // * ver 1.130924
 // - レイアウトの崩れを修正
@@ -2046,7 +2050,7 @@
 //        description: '軽い表示になります',
 //        values: {'なくす': 'on', 'なくさない': ''}},
       {title: '「ニコる」をなくす', varName: 'noNicoru',
-        description: '画面上から見えなくなります。',
+        description: '画面上から見えなくなります。\nまた、コメントパネルの処理が軽くなります',
         values: {'なくす': true, 'なくさない': false}},
       {title: 'コメントパネルのマウスオーバー処理をなくす', varName: 'removeCommentPanelHoverEvent', reload: true,
         description: 'マウスオーバー時のちらちらした物がなくなり、表示が軽くなります',
@@ -11268,11 +11272,22 @@
         };
       }
 
+      // ニコる数を取得するためにコメントパネルがめちゃくちゃ重くなってるのを改善
+      WatchApp.ns.model.player.NicoPlayerConnector.getCommentNicoruCount = function(name, num) {
+        if (conf.noNicoru) {
+          //console.log(name, num);
+          return 0;
+        }
+        return PlayerApp.ns.player.Nicoplayer.getInstance().getCommentNicoruCount(name, num);
+      }
+
       if (conf.debugMode) {
         watch.PopupMarqueeInitializer.popupMarqueeViewController.itemList.addEventListener('popup', function(body) {
           console.log('%c popup: ' + body, 'background: #0ff');
         });
         console.log(JSON.parse($('#watchAPIDataContainer').text()));
+
+        //NicoPlayerConnector.getCommentNicoruCount_org = NicoPlayerConnector.getCommentNicoruCount;
       }
     }
 
