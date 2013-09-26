@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130925
+// @version        1.130926
 // ==/UserScript==
 
 /**
@@ -37,6 +37,9 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.130926
+// - プレイリストがプレイリストじゃなくなったのに対応
 
 // * ver 1.130925
 // - ニコるをなくす設定にするとコメントパネルが軽くなるようにした。ホイール操作の謎の重さがなくなる。
@@ -4905,7 +4908,7 @@
       data.join    = params.join    || [
         // TODO:投稿者IDを取得する方法がないか？
           'cmsid', 'title', 'description', 'thumbnail_url', 'start_time',
-          'view_counter', 'comment_counter', 'mylist_counter', 'length_seconds'
+          'view_counter', 'comment_counter', 'mylist_counter', 'length_seconds', 'last_res_body'
         //  'user_id', 'channel_id', 'main_community_id', 'ss_adlut'
         ];
       data.filters = params.filters || [{}];
@@ -5082,7 +5085,8 @@
               title:             item.title,
               description_short: description.substr(0, 150),
               description_full:  description,
-              length_seconds:    item.length_seconds
+              length_seconds:    item.length_seconds,
+              last_res_body:     item.last_res_body
   //            channel_id:        item.channel_id,
   //            main_community_id: item.main_community_id
             });
@@ -5886,7 +5890,7 @@
         category = idGenreTable[genreId] || 'all', type = 'fav', term = 'daily', lang= 'ja-jp',
         viewPage = (param && typeof param.page === 'number') ? param.page : 1,
         genreName = genreNameTable[category] || genreNameTable['all'],
-        maxRssPage = 1, sort = param.sort || '4';
+        maxRssPage = 1, sort = param.sort || '1';
 
         term = idTermTable[termId] || idTermTable[0];
         maxRssPage = (category === 'all' && term !== 'hourly') ? 3 : 1;
@@ -9444,10 +9448,12 @@
       });
 
       EventDispatcher.addEventListener('onVideoExplorerOpened', function() {
+        // 2013/09/26 本家側で開閉を記録するようになった
+
         // 通常画面でプレイリストを表示にしてるなら、開いた状態をデフォルトにする
-        if ($('#playlist').hasClass('w_show') === $('#playlist').find('.browserFullOption .browserFullPlaylistOpen').is(':visible')) {
-          $('#playlist').find('.browserFullOption a:visible').click();
-        }
+        //if ($('#playlist').hasClass('w_show') === $('#playlist').find('.browserFullOption .browserFullPlaylistOpen').is(':visible')) {
+        //  $('#playlist').find('.browserFullOption a:visible').click();
+        //}
       });
 
       EventDispatcher.addEventListener('on.config.hashPlaylistMode', function(v) {
@@ -9521,6 +9527,19 @@
       };
       EventDispatcher.addEventListener('on.config.hidePlaylist', togglePlaylistDisplay);
       togglePlaylistDisplay(conf.hidePlaylist);
+
+      // プレイリスト消えないモードの時はプレイリストを勝手におすすめに置き換える機能をキャンセル
+      (function() {
+        var ld = WatchApp.ns.init.VideoExplorerInitializer.videoExplorerController._videoExplorerPlaylistResetArgumentsLoader;
+        ld.load_org = ld.load;
+        ld.load = $.proxy(function(a, b, c) {
+          if (conf.storagePlaylistMode !== '') {
+            return;
+          }
+          this.load_org(a, b, c);
+        }, ld);
+        ld = null;
+      })();
 
     } // end initPlaylist
 
@@ -11082,6 +11101,7 @@
         }
       };
       var clearCanvas = function() {
+        if (!context) return;
         context.fillStyle = palette[0];
         context.beginPath();
         context.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -11493,7 +11513,7 @@
             loader.load('sm1').pipe(function(result) {
               return new $.Deferred().reject().promise();
             }, function(resp) {
-              expect(result.status).toEqual('fail', '存在しない動画ID');
+              expect(resp.status).toEqual('fail', '存在しない動画ID');
               return new $.Deferred().resolve().promise();
             })
 
