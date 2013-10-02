@@ -17,13 +17,11 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.130926
+// @version        1.131002
 // ==/UserScript==
 
 /**
- * 7/25のバージョンアップに対応できていない所
  *
- * ・まだ細かい動作が不安定な感じ  なんかしっくりこない
  *
  * やりたい事・アイデア
  * ・検索画面にコミュニティ動画一覧を表示 (チャンネルより難しい。力技でなんとかする)
@@ -37,6 +35,12 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.131002
+// - プレーヤーのサイズが変わったのに対応
+
+// * ver 1.130930
+// - タグの自動更新無効化の設定を追加
 
 // * ver 1.130926
 // - プレイリストがプレイリストじゃなくなったのに対応
@@ -219,6 +223,7 @@
       customPlayerSize: '', //
       removeCommentPanelHoverEvent: false, //
       disableVideoExplorer: false, //
+      disableTagReload: false, //
 
       searchEngine:              'normal', // 'normal' 'sugoi'
       searchStartTimeRange:      '', //
@@ -603,13 +608,13 @@
       }
       {* 右に表示する動画情報 *}
       .sidePanel .sideVideoInfo, .sidePanel .sideIchibaPanel, .sidePanel .sideReviewPanel  {
-        padding: 0px 0px 0 0px; width: 196px; height: 100%; z-index: 10;
+        padding: 0px 0px 0 0px; width: 196px; height: 100%; z-index: 10060;
         position:absolute; top:0; right:0; border: 1px solid #000;
         display:none; overflow-x: visible; overflow-y: auto;
       }
       {* 右に表示する動画情報 *}
       #playerTabWrapper.sidePanel .sideVideoInfo, #playerTabWrapper.sidePanel .sideIchibaPanel, #playerTabWrapper.sidePanel .sideReviewPanel  {
-        padding: 0px 0px 0 0px; width: 276px; height: 100%;
+        padding: 0px 0px 0 0px; width: 324px; height: 100%;
         position: absolute; top: 0; right:0;
       }
       body:not(.full_with_browser) .w_wide #playerTabWrapper .sideVideoInfo,
@@ -618,7 +623,7 @@
       .videoExplorer #playerTabWrapper .sideVideoInfo,
       .videoExplorer #playerTabWrapper .sideIchibaPanel,
       .videoExplorer #playerTabWrapper .sideReviewPanel {
-        width: 418px; z-index: 10030;
+        width: 418px; z-index: 10060;
       }
       #playerTabWrapper.w_videoInfo #appliPanel, #playerTabWrapper.w_ichiba #appliPanel, #playerTabWrapper.w_review #appliPanel  {
         top: -9999px;
@@ -1619,18 +1624,7 @@
       #content #videoExplorerExpand a {
         text-shadow: none;
       }
-      body:not(.full_with_browser) #content.w_compact #videoHeader {
-        width: 960px;
-      }
-      body:not(.full_with_browser).size_normal #content.w_compact #videoHeader {
-        width: 1186px;
-      }
-      body:not(.full_with_browser) #content.w_compact.w_wide #videoHeader {
-        width: 1100px;
-      }
-      body:not(.full_with_browser).size_normal #content.w_compact.w_wide #videoHeader {
-        width: 1326px;
-      }
+
       .videoMenuToggle {
         -webkit-transform-origin: 100% 100%; -webkit-transition: -webkit-transform 0.4s;
         transform-origin: 100% 100%; transition: transform 0.4s;
@@ -1664,30 +1658,40 @@
         height: auto; padding: 0;
       }
       #content.w_compact        #topVideoInfo .videoDescription.description {
-        background: #fff; margin: 10px 0 0;padding: 4px ;width: 952px; {*font-size: 90%;*}
+        background: #fff; margin: 10px 0 0;padding: 4px ;width: 1000px;{* base - 8 *} {*font-size: 90%;*}
       }
 
-      {* 本家の幅が変わったら変える必要がある。 変数化した方が楽かも *}
+      {* 本家の幅が変わったら変える必要がある。 変数化した方が楽かも base = 1008 *}
       body:not(.full_with_browser):not(.videoExplorer).size_normal #content.w_compact.w_wide #topVideoInfo .videoDescription.description {
-        width: 1318px; {* base + 358 *}
+        width: 1318px; {* base + 310 *}
       }
       body:not(.full_with_browser):not(.videoExplorer).size_normal #content.w_compact        #topVideoInfo .videoDescription.description {
-        width: 1178px; {* base + 218 *}
+        width: 1226px; {* base + 218 *}
       }
       body:not(.full_with_browser)                                 #content.w_compact.w_wide #topVideoInfo .videoDescription.description {
-        width: 1092px; {* base + 132 *}
+        width: 1092px; {* base +  84 *}
       }
       body:not(.full_with_browser).size_normal                     #content.w_compact.w_wide #videoTagContainer {
-        width: 1263px; {* base + 303 *}
+        width: 1263px; {* base + 255 *}
       }
       body:not(.full_with_browser)                                 #content.w_compact.w_wide #videoTagContainer {
-        width: 1040px; {* base + 80 *}
+        width: 1040px; {* base +  32 *}
       }
       body:not(.full_with_browser)                                 #content.w_compact        #videoTagContainer {
-        width: 900px;  {* base - 60 *}
+        width: 948px;  {* base -  60 *}
       }
-      #foot_inner { width: 960px; {* base + 0 *}}
-      .size_normal #foot_inner { width: 1186px; {* base + 226 *} }
+      body:not(.full_with_browser)                                 #content.w_compact #videoHeader,              #foot_inner {
+        width: 1008px; {* base +  48 *}
+      }
+      body:not(.full_with_browser).size_normal                     #content.w_compact #videoHeader, .size_normal #foot_inner {
+        width: 1234px;  {* base + 226 *}
+      }
+      body:not(.full_with_browser)                                 #content.w_compact.w_wide #videoHeader {
+        width: 1100px;
+      }
+      body:not(.full_with_browser).size_normal                     #content.w_compact.w_wide #videoHeader {
+        width: 1326px;
+      }
 
       #content.w_compact #topVideoInfo .videoMainInfoContainer{
         padding: 0;
@@ -2058,6 +2062,8 @@
       {title: 'コメントパネルのマウスオーバー処理をなくす', varName: 'removeCommentPanelHoverEvent', reload: true,
         description: 'マウスオーバー時のちらちらした物がなくなり、表示が軽くなります',
         values: {'なくす': true, 'なくさない': false}},
+      {title: 'タグの自動更新を無効化', varName: 'disableTagReload',
+        values: {'する': true, 'しない': false}},
 
       {title: 'その他の設定', className: 'otherSetting'},
       {title: '動画リンクにカーソルを重ねたらメニューを表示', varName: 'enableHoverPopup', reload: true,
@@ -5798,7 +5804,7 @@
           num_res: video.resCnt,
           first_retrieve: video.postedAt,
           thumbnail_url: video.thumbnail,
-          title: video.title.replace(/^第(\d+)位/, '第000$1位').replace(/^第\d+(\d{3})位/, '第$1位'),
+          title: video.title.replace(/^.*?第(\d+)位/, '第000$1位').replace(/^第\d+(\d{3})位/, '第$1位'),
           _info: {first_retrieve: video.postedAt},
           description_short: video.description.substring(0, 50)
         });
@@ -5890,7 +5896,7 @@
         category = idGenreTable[genreId] || 'all', type = 'fav', term = 'daily', lang= 'ja-jp',
         viewPage = (param && typeof param.page === 'number') ? param.page : 1,
         genreName = genreNameTable[category] || genreNameTable['all'],
-        maxRssPage = 1, sort = param.sort || '1';
+        maxRssPage = 1, sort = param.sort || '4';
 
         term = idTermTable[termId] || idTermTable[0];
         maxRssPage = (category === 'all' && term !== 'hourly') ? 3 : 1;
@@ -6653,16 +6659,16 @@
       if (conf.removeCommentPanelHoverEvent) {
         $("#commentDefault").find(".commentTableContainerInner")               .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
         $('#playerCommentPanel .section .commentTable .commentTableContainer') .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
+        watch.PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
+          .off('contextmenu')
+          .on('contextmenu', '.cell',
+            $.proxy(Util.Closure.commentPanelContextMenu(), watch.PlayerInitializer.commentPanelViewController.commentContent)
+          );
       }
-      watch.PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
-        .off('contextmenu')
-        .on('contextmenu', '.cell',
-          $.proxy(Util.Closure.commentPanelContextMenu(), watch.PlayerInitializer.commentPanelViewController.commentContent)
-        );
       EventDispatcher.addEventListener('onVideoChangeStatusUpdated', function(isChanging) {
         if (isChanging) {
           watch.PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
-            .find('.cell').off('contextmenu').off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
+            .find('.cell').off();
         }
       });
     } // end initRightPanel
@@ -9597,6 +9603,17 @@
       watch.TagInitializer.tagList.addEventListener('reset', onTagReset);
 
       $videoHeaderTagEditLinkArea = $toggleTagEditText = null;
+
+
+      WatchApp.ns.model.player.NicoPlayerConnector.onTagDataRecieved_org = WatchApp.ns.model.player.NicoPlayerConnector.onTagDataRecieved;
+      WatchApp.ns.model.player.NicoPlayerConnector.onTagDataRecieved = function(a) {
+        if (conf.disableTagReload) {
+          return 0;
+        }
+        return PlayerApp.ns.player.Nicoplayer.getInstance().getCommentNicoruCount(name, num);
+      };
+
+
     } // end initVideoTagContainer
 
 
@@ -9719,7 +9736,7 @@
       explorer.addEventListener('closeEnd',     onVideoExplorerClosed);
       explorer.addEventListener('refreshStart', onVideoExplorerRefreshStart);
       explorer.addEventListener('refreshEnd',   onVideoExplorerRefreshEnd);
-      explorer.addEventListener('changePage',   onVideoExplorerChangePage);
+      explorer.addEventListener('changePage',   onVideoExplorerChangePage); //
 
 
       $('body').dblclick(function(e){
@@ -10631,7 +10648,7 @@
 //        'SMALL':  [ 512,  288],
 //        'ECO':    [ 352,  200],
       };
-      var CONTROL_HEIGHT = 46, INPUT_HEIGHT = 36, PLAYER_TAB_WIDTH = 280 + 10, PLAYER_TAB_WIDTH_WIDE = 420 + 10, TAB_MARGIN = 20;
+      var CONTROL_HEIGHT = 46, INPUT_HEIGHT = 36, PLAYER_TAB_WIDTH = 326 + 10, PLAYER_TAB_WIDTH_WIDE = 420 + 10, TAB_MARGIN = 0;
       var SONGRIUM_WIDTH = 898;
       var HORIZONTAL_MARGIN = 1.05; // 両端に 2.5% x 2 のマージンがある
 
@@ -11295,11 +11312,11 @@
       // ニコる数を取得するためにコメントパネルがめちゃくちゃ重くなってるのを改善
       WatchApp.ns.model.player.NicoPlayerConnector.getCommentNicoruCount = function(name, num) {
         if (conf.noNicoru) {
-          //console.log(name, num);
           return 0;
         }
         return PlayerApp.ns.player.Nicoplayer.getInstance().getCommentNicoruCount(name, num);
-      }
+      };
+
 
       if (conf.debugMode) {
         watch.PopupMarqueeInitializer.popupMarqueeViewController.itemList.addEventListener('popup', function(body) {
