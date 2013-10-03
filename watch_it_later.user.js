@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131002
+// @version        1.131004
 // ==/UserScript==
 
 /**
@@ -35,6 +35,9 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+// * ver 1.131004
+// - 動画リンクの?ref=xxxxを除去
 
 // * ver 1.131002
 // - プレーヤーのサイズが変わったのに対応
@@ -469,7 +472,6 @@
         display: none;
       }
       .w_fullScreenMenu .mylistPopupPanel.fixed { bottom: 2px; }
-
 
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
@@ -3701,8 +3703,10 @@
     function each(w, watchId) {
 
       this.w_eventInit = false;
+
       this.addEventListener('mouseover', function() {
         var mx = 0, my = 0, self = this;
+        this.setAttribute('href', this.href.split('?')[0]);
 
         self.w_mouse_in = true;
         self.w_mouse_timer = null;
@@ -6782,7 +6786,7 @@
       var onOuterResize = function() {
         var $body = $('body'), $right = $('#playerTabWrapper');
         if (WatchController.isSearchMode() || $body.hasClass('full_with_browser')) { return; }
-        var w = $('#external_nicoplayer').outerWidth(), margin = 84;
+        var w = $('#external_nicoplayer').outerWidth(), margin = 124;
         w += $right.is(':visible') ? $right.outerWidth() : 0;
         $('#sidePanelTabContainer').toggleClass('left', (window.innerWidth - w - margin < 0));
       };
@@ -9628,13 +9632,13 @@
         #outline.w_compact #videoReview .inner { width: 300px; }
         #outline.w_compact .commentContent { width: 278px; }
         #outline.w_compact .commentContentBody { width: 232px; }
-        .sidePanel.w_review #videoReview { width: 260px; }
-        .sidePanel.w_review textarea.newVideoReview { width: 237px; }
-        .sidePanel.w_review #videoReviewHead { width: 243px; }
-        .sidePanel.w_review #videoReview .stream { width: 260px; }
-        .sidePanel.w_review #videoReview .inner { width: 260px; }
-        .sidePanel.w_review .commentContent { width: 238px; }
-        .sidePanel.w_review .commentContentBody { width: 192px; }
+        .sidePanel.w_review #videoReview { width: 308px; }
+        .sidePanel.w_review textarea.newVideoReview { width: 286px; }
+        .sidePanel.w_review #videoReviewHead { width: 291px; }
+        .sidePanel.w_review #videoReview .stream { width: 308px; }
+        .sidePanel.w_review #videoReview .inner { width: 308px; }
+        .sidePanel.w_review .commentContent { width: 286px; }
+        .sidePanel.w_review .commentContentBody { width: 240px; }
         body:not(.full_with_browser) .w_wide .sidePanel.w_review #videoReview { width: 400px; }
         body:not(.full_with_browser) .w_wide .sidePanel.w_review textarea.newVideoReview { width: 377px; }
         body:not(.full_with_browser) .w_wide .sidePanel.w_review #videoReviewHead { width: 383px; }
@@ -9689,7 +9693,7 @@
           }
         };
         makeCss(300, '#outline.w_compact ');
-        makeCss(260, '.sidePanel.w_review ');
+        makeCss(308, '.sidePanel.w_review ');
         makeCss(400, '.sidePanel.w_review.w_wide ');
         makeCss(400, 'body.videoExplorer .sidePanel.w_review ');
         console.log(css.join(''));
@@ -10641,6 +10645,7 @@
         'WXGA+':  [1400,  810],
         'WXGA':   [1366,  768],
         '720p':   [1280,  720],
+        'WSVGA+': [1152,  648],
         'WSVGA':  [1024,  576],
         'QHD':    [ 960,  540]//, // 元より小さいパターンもサポートする？
 //        'WVGA':   [ 854,  480],
