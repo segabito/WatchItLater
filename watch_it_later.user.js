@@ -473,6 +473,7 @@
       }
       .w_fullScreenMenu .mylistPopupPanel.fixed { bottom: 2px; }
 
+
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
      addStyle(__css__, 'watchItLaterCommonStyle');
@@ -3706,7 +3707,7 @@
 
       this.addEventListener('mouseover', function() {
         var mx = 0, my = 0, self = this;
-        this.setAttribute('href', this.href.split('?')[0]);
+        if (this.href) this.setAttribute('href', this.href.split('?')[0]);
 
         self.w_mouse_in = true;
         self.w_mouse_timer = null;
@@ -5263,6 +5264,26 @@
   };
   WatchItLater.VideoInfoLoader = new VideoInfoLoader({});
 
+  var RelatedVideo = function() { this.initialize.apply(this, arguments); }
+  RelatedVideo.prototype = {
+    initialize: function(params) {
+    },
+    load: function(watchId) {
+      var def = new $.Deferred;
+      window.WatchApp.ns.init.VideoExplorerInitializer.relatedVideoAPILoader.load(
+        {'video_id': watchId},
+        function(err, result) {
+          if (err !== null) {
+            return def.reject({message: '通信に失敗しました(1)', status: 'fail', err: err});
+          }
+          return def.resolve(result);
+        }
+      );
+      return def.promise();
+    }
+  };
+  WatchItLater.RelatedVideo = new RelatedVideo({});
+
   /**
    *  動画視聴履歴をマイリストAPIと互換のある形式で返すことで、ダミーマイリストとして表示してしまう作戦
    */
@@ -6130,6 +6151,10 @@
     WatchItLater.ChannelVideo = self;
     return self;
   })(w, Util);
+
+
+
+
 
   /**
    *  QWatch上でのあれこれ
@@ -11540,7 +11565,19 @@
             })
 
           ).pipe(function() { def.resolve(); }, function() { def.reject(); });
+        },
+        testRelatedVideo: function(def) {
+          var loader = new RelatedVideo({});
+          loader.load('sm9').pipe(function(result) {
+            console.log('RelatedVideo', result);
+            expect(result.list).toBeTruthy('関連動画がある');
+            expect(result.list[0].title).toBeTruthy('タイトルがある');
+            expect(result.list[0].title.length >= 0).toBeTrue('タイトル長がある');
+            expect(typeof result.list[0].type === 'number').toBeTrue('type属性がある');
+            def.resolve();
+          });
         }
+
       }); // end WatchApp.mixin
 
     } // end initTest
