@@ -1,4 +1,4 @@
-// ==UserScript==
+/// ==UserScript==
 // @name           WatchItLater
 // @namespace      https://github.com/segabito/
 // @description    動画を見る前にマイリストに登録したいGreasemonkey (Chrome/Fx用)
@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131004
+// @version        1.131008
 // ==/UserScript==
 
 /**
@@ -35,6 +35,11 @@
  * ・軽量化
  * ・綺麗なコード
  */
+
+
+// * ver 1.131008
+// - 銀座対応？
+// - 省スペース/軽量化の設定に「横スクロールバーを出なくする」を追加
 
 // * ver 1.131004
 // - 動画リンクの?ref=xxxxを除去
@@ -190,7 +195,7 @@
       hidePlaylist: true, // プレイリストを閉じる
       hidariue: true, // てれびちゃんメニュー内に、原宿以前のランダム画像復活
       videoExplorerHack: true, // 検索画面を乗っ取る
-      squareThumbnail: false, // 検索画面のサムネを4:3にする
+      squareThumbnail: true, // 検索画面のサムネを4:3にする
       enableFavTags: false, // 動画検索画面にお気に入りタグを表示
       enableFavMylists: false, // 動画検索画面にお気に入りマイリストを表示
       searchPageItemCount: 50, // 検索モードの1ページあたりの表示数
@@ -227,6 +232,7 @@
       removeCommentPanelHoverEvent: false, //
       disableVideoExplorer: false, //
       disableTagReload: false, //
+      disableHorizontalScroll: false, // 横スクロールバーを出なくする
 
       searchEngine:              'normal', // 'normal' 'sugoi'
       searchStartTimeRange:      '', //
@@ -473,7 +479,47 @@
       }
       .w_fullScreenMenu .mylistPopupPanel.fixed { bottom: 2px; }
 
+    {* タグ検索やランキングのサムネを4:3にするやつ  4列がまだおかしい *}
+    {*
+      .columns .video .itemThumbWrap:before {
+              transform: scale(0.8125, 1.111111);         transform-origin: 0 0 0;
+      -webkit-transform: scale(0.8125, 1.111111); -webkit-transform-origin: 0 0 0;
+      }
 
+      .columns .video .videoLength {
+        right: 4px;
+      }
+
+      .columns .video .itemThumb img {
+        width: 130px; margin-left: 0px; margin-top: 0px;
+      }
+
+      .columns .video .itemThumb {
+        height: 100px; width: 130px;
+      }
+
+      .columns .videoList01 .videoList01Wrap {
+        width: 130px;
+      }
+      .columns .videoList02 .videoList02Wrap {
+        width: 142px;
+      }
+
+      .contentBody:not(.videoList01):not(.videoList02) .video .item {
+        width: 130px; margin-right: 30px;
+      }
+      .contentBody:not(.videoList01):not(.videoList02) .video .item:nth-child(4n+1) {
+        margin-left: 45px;
+      }
+
+      .columns .video .itemTime {
+        width: 130px; text-align: center;
+      }
+
+      .columns .videoList01 .itemContent .itemComment.ranking, .videoList01 .itemContent .itemDescription.ranking {
+        width: 470px;
+      }
+    *}
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
      addStyle(__css__, 'watchItLaterCommonStyle');
@@ -1431,15 +1477,23 @@
       #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .thumbnailContainer .balloon {
         top: -20px; {* 一列の時に「再生リストに追加しました」が上の動画に被るのを防ぐ *}
       }
-      .videoExplorerContent .contentItemList                 .column1 .itemMylistComment {
-        font-size: 85%; color: #666; border: 1px solid silver; border-radius: 8px; padding: 4px; margin: 0 2px; display: none;
+      .column1 .itemMylistComment {
+        font-size: 85%; color: #666; display: none;
+        color: #400; border: 1px solid #ccc; padding: 0 4px 0px; line-height: 130%; border-radius: 4px;
+      }
+      .column1 .itemMylistComment:before {
+        content: '本人コメント ';
+        background: #ccc; border-radius: 0 0 8px 0; display: inline-block; margin: 0 4px 4px -4px; padding: 2px;
+      }
+      .column1 .itemMylistComment:after {
+        content: '';
       }
       .videoExplorerContent .contentItemList                 .column1 .nicorepoOwnerIconContainer {
         display: none;
       }
       .videoExplorerContent .contentItemList .nicorepoResult .column1 .nicorepoOwnerIconContainer {
         float: right; display: block;
-        padding: 3px; border: 1px solid silver;
+        padding: 24px 14px 0 4px;
       }
       .videoExplorerContent .contentItemList                 .column1 .nicorepoOwnerIconContainer img {
         height: 48px;
@@ -1453,14 +1507,9 @@
       }
 
       .videoExplorerContent .contentItemList .thumbnailHoverMenu {
-        position: absolute; padding: 0; box-shadow: 1px 1px 2px black;
+        position: absolute; padding: 0; box-shadow: 0px 1px 2px black;
         display: none;
-      }
-      .videoExplorerContent .contentItemList .column1 .thumbnailHoverMenu {
-        bottom:  4px; left: 4px;
-      }
-      .videoExplorerContent .contentItemList .column4 .thumbnailHoverMenu {
-        bottom: 29px; left: 5px;
+        bottom: -1px; left: 0px;
       }
       .videoExplorerContent .contentItemList .deleteFromMyMylist {
         cursor: pointer; font-size: 70%; border: 1px solid #ccc; padding: 0;
@@ -1575,6 +1624,9 @@
       #content.noNews #textMarquee {
         display: none !important;
       }
+      body:not(.videoExplorer):not(.full_with_browser) #content.noNews #playerContainer {
+        min-height: 461px;
+      }
       body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerTabWrapper {
         height: auto !important; position: absolute; bottom: 18px;
       }
@@ -1620,6 +1672,13 @@
       }
       #content.w_flat_white #playerContainerWrapper {
         background: #f4f4f4;
+      }
+      #content.w_flat_gray #wallImageContainer, #content.w_flat_white #wallImageContainer,
+      #content.w_flat_gray #chipWallList,       #content.w_flat_white #chipWallList {
+        display: none !important;
+      }
+      #content #chipWallList {
+        right: auto; left: -42px;
       }
       #content #playlist .playlistInformation {
         background: #444;
@@ -1913,6 +1972,10 @@
         background-position-y: 30px;
       }
 
+      body.w_disableHorizontalScroll {
+        overflow-x: hidden !important;
+      }
+
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
     addStyle(__css__, 'watchItLaterStyle');
@@ -1991,7 +2054,8 @@
       {title: 'ニコニコニュースを消す', varName: 'hideNicoNews',
         values: {'消す': true, '消さない': false}},
       {title: 'プレイヤーの背景', varName: 'playerBgStyle',
-        values: {'白': 'white', 'グレー': 'gray', '標準': ''}},
+        description: 'ウォール機能より優先されます',
+        values: {'白': 'white', 'グレー': 'gray', 'ウォール': ''}},
       {title: 'コメントの盛り上がりをグラフ表示', varName: 'enableHeatMap', reload: true,
         description: '動画のどのあたりが盛り上がっているのか、わかりやすくなります',
         values: {'する': true, 'しない': false}},
@@ -2018,9 +2082,9 @@
       {title: 'お気に入りマイリストを表示', varName: 'enableFavMylists',
         description: '更新のあったリストが上に来るので、新着動画のチェックに便利です。',
         values: {'する': true, 'しない': false}},
-      {title: 'サムネを4:3にする', varName: 'squareThumbnail',
-        description: '上下がカットされなくなり、サムネの全体が見えるようになります。',
-        values: {'する': true, 'しない': false}},
+//      {title: 'サムネを4:3にする', varName: 'squareThumbnail',
+//        description: '上下がカットされなくなり、サムネの全体が見えるようになります。',
+//        values: {'する': true, 'しない': false}},
       {title: '「マイリストから外す」ボタンを表示', varName: 'enableMylistDeleteButton',
         description: 'マイリストの整理に便利。\n ※ 消す時に確認ダイアログは出ないので注意',
         values: {'する': true, 'しない': false}},
@@ -2066,6 +2130,8 @@
         description: 'マウスオーバー時のちらちらした物がなくなり、表示が軽くなります',
         values: {'なくす': true, 'なくさない': false}},
       {title: 'タグの自動更新を無効化', varName: 'disableTagReload',
+        values: {'する': true, 'しない': false}},
+      {title: '横スクロールバーを出なくする', varName: 'disableHorizontalScroll',
         values: {'する': true, 'しない': false}},
 
       {title: 'その他の設定', className: 'otherSetting'},
@@ -2135,6 +2201,7 @@
           '<div class="head"><button class="closeButton" title="閉じる">▲</button><h2>WatchItLaterの設定</h2>(※)のつく項目は、リロード後に反映されます</div>',
           '<div class="inner"></div></div>'
         ].join(''));
+        $panel.on('click', function(e) { e.stopPropagation(); });
 
         var scrollTo = function() {
           var $target = this;
@@ -8081,7 +8148,7 @@
       var
         rightAreaWidth = $('.videoExplorerBody').outerWidth(), // 592
         availableWidth = Math.max($(window).innerWidth() - rightAreaWidth, 300),
-        commentInputHeight = $('#playerContainer').hasClass('oldTypeCommentInput') ? 36 : 0,
+        commentInputHeight = $('#playerContainer').hasClass('oldTypeCommentInput') ? 30 : 0,
         controlPanelHeight = $('#playerContainer').hasClass('controll_panel') ? 46 : 0;
 
       var
@@ -8284,8 +8351,27 @@
         body.videoExplorer #footer.w_adjusted {
           display: none;
         }
-        #videoExplorer.w_adjusted .uadTagRelatedContainer .itemList>li {
-          width: 124px;
+        #videoExplorer.w_adjusted .uadTagRelatedContainer .uadTagRelated .default .itemList .item .videoTitleContainer {
+          width: 130px;
+        }
+        #videoExplorer.w_adjusted .uadTagRelatedContainer .uadTagRelated {
+          margin-bottom: 30px;
+        }
+        #videoExplorer.w_adjusted .uadTagRelatedContainer .itemList>li,
+        #videoExplorer.w_adjusted .uadTagRelated .default .landing {
+          //width: 124px; margin: 0;
+          width: 130px; margin: 0 8px;
+                 {*        transform: scale(0.8985, 1.111111);         transform-origin: 0 0 0;
+          -webkit-transform: scale(0.8985, 1.111111); -webkit-transform-origin: 0 0 0;*}
+        }
+        #videoExplorer.w_adjusted .uadTagRelated .default .itemList .item .imageContainer .itemImageWrapper .itemImage {
+          width: 130px; height: auto; top: 0; left: 0;
+        }
+        #videoExplorer.w_adjusted .uadTagRelated .default .itemList .item .imageContainer .itemImageWrapper {
+          width: 130px; height: 100px;
+        }
+        .w_adjusted .uadTagRelated .emptyItem .emptyMessageContainer {
+          width: 130px; height: 100px;
         }
         #videoExplorer.w_adjusted .videoExplorerContent .itemList.column1 .videoInformationOuter .link{
           display: inline;
@@ -8338,7 +8424,33 @@
           z-index: 99;
           transition: right 0.3s ease-out;
         }
-
+        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent.column1 .contentItemList .item {
+          margin-left: 8px;
+        }
+        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent.column4 .contentItemList .item {
+          width: 130px; margin-left: 8px; margin-right: 10px;
+        }
+        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent.column1                 .videoInformationOuter {
+          width: 444px;
+        }
+        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent.column1 .nicorepoResult .videoInformationOuter {
+          width: auto;
+        }
+        #videoExplorer.w_adjusted .contentItemList .folder .column1 .description,
+        #videoExplorer.w_adjusted .suggestVideo    .folder .column1 .description,
+        #videoExplorer.w_adjusted .descriptionShort {
+          width: 440px;
+        }
+        .w_adjusted .column1 .createdTime.at {
+          width: 130px; text-align: center;
+        }
+        .w_adjusted .createdTime {
+          white-space: nowrap;
+        }
+        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .contentItemList .folder .container,
+        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .suggestVideo .folder .container {
+          background-position: -15px 0; width: 130px; height: 100px;
+        }
 
         body.size_small.no_setting_panel.videoExplorer #content #videoExplorerExpand { {*「閉じる」ボタン *}
           position: static; top: auto; left: auto; margin-top: 0;',
@@ -8436,7 +8548,7 @@
         }
         .videoExplorerBody .videoExplorerConfig {
           cursor: pointer;
-          width: 80px; margin-left: -36px; white-space: nowra;
+          width: 80px; margin-left: -36px; white-space: nowrap;
           border-radius: 0 32px 0 0; border: solid 1px #666; border-width: 1px 1px 0;
           color: #fff; background: #aaa;
         }
@@ -8757,7 +8869,7 @@
           //console.log($template.html());
             $template.find('.column1 .thumbnailContainer').append($menu);
             $template.find('.column4 .balloon').before($menu.clone());//.before($template.find('.column4 .videoInformation'));
-            $template.find('.column4 .createdTime').after($template.find('.column4 .videoInformationOuter'));
+            //$template.find('.column4 .createdTime').after($template.find('.column4 .videoInformationOuter'));
             //$template.find('.column4 .balloon').before($template.find('.column4 .videoInformationOuter'));
             $template.find('.column4 .balloon').remove();
             $template.find('.column1')
@@ -8808,7 +8920,7 @@
       ItemView.prototype._setView_org = ItemView.prototype._setView;
       ItemView.prototype._setView = function($item) {
         this._setView_org($item);
-        this._$createdTime     = $item.find('.column4 .createdTime span');
+        //this._$createdTime     = $item.find('.column4 .createdTime span');
         this._$createdTimeFull = $item.find('.column1 .createdTime span');
       };
       ItemView.prototype._setItem_org = ItemView.prototype._setItem;
@@ -8821,12 +8933,12 @@
         var item = this._item, $item = this._$item;
         this.update_org(item);
 
-        this._$createdTimeFull.html(
-          WatchApp.ns.util.DateFormat.strftime(
-            "%Y年%m月%d日 %H:%M:%S",
-            new Date(item.getFirstRetrieve().replace(/-/g, '/'))
-          )
-        );
+//        this._$createdTimeFull.html(
+//          WatchApp.ns.util.DateFormat.strftime(
+//            "%Y年%m月%d日 %H:%M:%S",
+//            new Date(item.getFirstRetrieve().replace(/-/g, '/'))
+//          )
+//        );
 
         this._$item.find('.deleteFromMyMylist').data('watchId', this._item.getId());
         if (item._mylistComment) { // マイリストコメント
@@ -8971,7 +9083,7 @@
           $('body').addClass('hideCommentInput');
         } else {
           var $w = $(window), iw = $w.innerWidth(), ih = $w.innerHeight();
-          var controllerH = 46, inputH = 36;
+          var controllerH = 46, inputH = 30;
         }
       }
 
@@ -9018,6 +9130,7 @@
         } else
         if (lastScreenMode === 'browserFull' && mode !== 'browserFull') {
           conf.setValue('lastControlPanelPosition', '');
+          $('#playerContainerSlideArea').css({height: ''});
           restoreVisibility();
         }
         lastScreenMode = mode;
@@ -9765,7 +9878,7 @@
       explorer.addEventListener('closeEnd',     onVideoExplorerClosed);
       explorer.addEventListener('refreshStart', onVideoExplorerRefreshStart);
       explorer.addEventListener('refreshEnd',   onVideoExplorerRefreshEnd);
-      explorer.addEventListener('changePage',   onVideoExplorerChangePage); //
+      explorer.addEventListener('changeCurrentPage',   onVideoExplorerChangePage); //
 
 
       $('body').dblclick(function(e){
@@ -9900,16 +10013,26 @@
         }
 
         .relatedTagList {
-          background: #ddd; padding: 8px;
         }
         .relatedTagList p{
           display: inline-block; margin: 4px;
         }
         .relatedTagList li, .relatedTagList ul {
-          display: inline-block;
-          margin: 0 18px 0 0;
+          display: inline;
+          margin: 0 8px 0 0;
           list-style: none;
           word-break: break-all;
+        }
+        .relatedTagList li {
+          background: #f4f4f4; padding: 2px 4px;
+          border: solid 1px #999;
+          border-radius: 4px;
+          line-height: 180%;
+        }
+        .relatedTagList li:hover {
+        }
+        .relatedTagList li:hover a{
+          text-decoration: none;
         }
       */});
       addStyle(__css__, 'searchContent');
@@ -10286,30 +10409,37 @@
 
     var isSquareCssInitialized = false;
     function initSquareThumbnail() {
-      var isSquare = !!conf.squareThumbnail;
+      var isSquare = true;// !!conf.squareThumbnail;
       if (isSquare && !isSquareCssInitialized) {
         var __css__ = Util.here(function() {/*
           {* 元のCSSを打ち消すためにやや冗長 *}
-          body.videoExplorer #videoExplorer.squareThumbnail .videoExplorerBody .videoExplorerContent .contentItemList .item.gold .thumbnailContainer{
+          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .videoExplorerBody .videoExplorerContent .contentItemList .item.gold .thumbnailContainer{
             background: #e9d7b4;
           }
-          body.videoExplorer #videoExplorer.squareThumbnail .videoExplorerBody .videoExplorerContent .contentItemList .item.silver .thumbnailContainer{
+          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .videoExplorerBody .videoExplorerContent .contentItemList .item.silver .thumbnailContainer{
             background: #cecece;
           }
-          body.videoExplorer #videoExplorer.squareThumbnail .item .thumbnailContainer {
+          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .item .thumbnailContainer {
             width: 130px; height: 100px;
           }
-          body.videoExplorer #videoExplorer.squareThumbnail .item .thumbnailContainer .link {
+          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .item .thumbnailContainer .link {
             width: 130px; height: 100px;
           }
-          body.videoExplorer #videoExplorer.squareThumbnail .item .thumbnailContainer img {
-            max-width: 130px; top: 0; left: 0;
+          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .item .thumbnailContainer,
+          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .item .thumbnailContainer .thumbnail {
+            max-width: 130px; height: auto; top: 0; left: 0; margin-right: 8px;
           }
-          body.videoExplorer #videoExplorer.squareThumbnail .item .thumbnailContainer img.playingIcon {
+          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .item .thumbnailContainer img.playingIcon {
             top: 50%; left: 50%;
           }
-          body.videoExplorer #videoExplorer.squareThumbnail .item .column4 .thumbnailHoverMenu {
-            bottom: 1px;
+
+          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .uadFrame {
+                    transform: scale(0.8125, 1.111111);         transform-origin: 0 0 0;
+            -webkit-transform: scale(0.8125, 1.111111); -webkit-transform-origin: 0 0 0;
+            width: 160px; height: 90px;
+          }
+          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .uadTagRelated .default .itemList .item .imageContainer {
+            width: 130px; height: 100px;
           }
         */});
 
@@ -10678,7 +10808,7 @@
 //        'SMALL':  [ 512,  288],
 //        'ECO':    [ 352,  200],
       };
-      var CONTROL_HEIGHT = 46, INPUT_HEIGHT = 36, PLAYER_TAB_WIDTH = 326 + 10, PLAYER_TAB_WIDTH_WIDE = 420 + 10, TAB_MARGIN = 0;
+      var CONTROL_HEIGHT = 46, INPUT_HEIGHT = 30, PLAYER_TAB_WIDTH = 326 + 10, PLAYER_TAB_WIDTH_WIDE = 420 + 10, TAB_MARGIN = 0;
       var SONGRIUM_WIDTH = 898;
       var HORIZONTAL_MARGIN = 1.05; // 両端に 2.5% x 2 のマージンがある
 
@@ -11013,7 +11143,7 @@
           position: absolute; z-index: 200;
           bottom: 0px; left: 0;
           width: 672px;
-          background: #000; height: 8px;
+          background: #000; height: 6px;
           overflow: hidden;
         }
         .setting_panel #nicoHeatMapContainer { display: none; opacity: 0; }
@@ -11021,7 +11151,7 @@
           width: 898px;
         }
         .oldTypeCommentInput #nicoHeatMapContainer {
-          bottom: 32px;
+          bottom: 29px;
           display: none;
         }
         #nicoHeatMap {
@@ -11052,7 +11182,7 @@
           display: block;
         }
         .full_with_browser.w_fullScreenMenu .oldTypeCommentInput #nicoHeatMapContainer {
-          bottom: 34px; height: 10px;
+          bottom: 29px; height: 6px;
         }
         .full_with_browser.w_fullScreenMenu #nicoHeatMapContainer {
           width: 100%;
@@ -11308,6 +11438,9 @@
         } else
         if (name === 'compactVideoInfo') {
           $('#content, #outline').toggleClass('w_compact', newValue);
+        } else
+        if (name === 'disableHorizontalScroll') {
+          $('body').toggleClass('w_disableHorizontalScroll', newValue);
         }
       });
 
@@ -11321,6 +11454,8 @@
       onWatchInfoReset(watchInfoModel);
 
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
+
+      if (conf.disableHorizontalScroll) $('body').addClass('w_disableHorizontalScroll');
 
       $('#videoHeaderMenu .searchText input').attr({'accesskey': '@', 'placeholder': '検索ワードを入力'}).on('focus', function() {
         WatchController.scrollTop(0, 400);
