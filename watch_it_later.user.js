@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131008
+// @version        1.131010
 // ==/UserScript==
 
 /**
@@ -34,8 +34,15 @@
  * ・お気に入りユーザーの時は「@ジャンプ」許可
  * ・軽量化
  * ・綺麗なコード
+ *
+ * ・テレビちゃんメニューをShinjukuWatch形式にする
+ * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+
+// * ver 1.131010
+// - ?ref=xxxxつきのURLでページを開いたら除去する対応  (リンク側の除去処理とはまた別)
+// - 細かい凡ミスタイプミス・GINZAでいらなくなったCSSなどを修正
 
 // * ver 1.131008
 // - 銀座対応？
@@ -1439,10 +1446,13 @@
       }
 
       {* 1列表示の時、動画タイトルの横の空白部分にまでクリック判定があるのはVistaのエクスプローラみたいで嫌なので、文字部分だけにしたい *}
+      {* GINZAで改善したのでいったんコメントアウト *}
+      {*
       #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .contentItemList .video .column1 .videoInformationOuter .title,
       #videoExplorer .videoExplorerBody .videoExplorerContent .suggestVideo .video .column1 .videoInformationOuter .title {
         display: inline;
       }
+      *}
       .videoExplorerMenu .quickSearchInput {
         background: none repeat scroll 0 0 #F4F4F4;
         border: 1px inset silver;
@@ -1475,7 +1485,7 @@
         height: 220px;
       }
       #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .thumbnailContainer .balloon {
-        top: -20px; {* 一列の時に「再生リストに追加しました」が上の動画に被るのを防ぐ *}
+        {* top: -20px; 一列の時に「再生リストに追加しました」が上の動画に被るのを防ぐ *}
       }
       .column1 .itemMylistComment {
         font-size: 85%; color: #666; display: none;
@@ -1507,7 +1517,7 @@
       }
 
       .videoExplorerContent .contentItemList .thumbnailHoverMenu {
-        position: absolute; padding: 0; box-shadow: 0px 1px 2px black;
+        position: absolute; padding: 0; box-shadow: 0px 1px 2px black; z-index: 100;
         display: none;
         bottom: -1px; left: 0px;
       }
@@ -1551,8 +1561,8 @@
       body.w_noNicoru .nicoru-button{
         left: -9999; display: none !important;
       }
-      body.w_noNicoru .menuOpened #videoMenuTopList li.videoMenuListNicoru{
-        display: none;
+      body.w_noNicoru .menuOpened #videoMenuTopList li.videoMenuListNicoru .nicoru-button{
+        display: block !important;
       }
       body.w_noNicoru #videoTagContainer .tagInner #videoHeaderTagList li {
         margin: 0 18px 4px 0;
@@ -9747,12 +9757,13 @@
       $videoHeaderTagEditLinkArea = $toggleTagEditText = null;
 
 
-      WatchApp.ns.model.player.NicoPlayerConnector.onTagDataRecieved_org = WatchApp.ns.model.player.NicoPlayerConnector.onTagDataRecieved;
-      WatchApp.ns.model.player.NicoPlayerConnector.onTagDataRecieved = function(a) {
+      WatchApp.ns.model.player.NicoPlayerConnector.onTagDataReceived_org = WatchApp.ns.model.player.NicoPlayerConnector.onTagDataReceived;
+      WatchApp.ns.model.player.NicoPlayerConnector.onTagDataReceived = function(a) {
+        if (conf.debugMode) console.log('onTagDataReceived', a);
         if (conf.disableTagReload) {
-          return 0;
+          return;
         }
-        return PlayerApp.ns.player.Nicoplayer.getInstance().getCommentNicoruCount(name, num);
+        WatchApp.ns.model.player.NicoPlayerConnector.onTagDataReceived_org(a);
       };
 
 
@@ -9841,8 +9852,15 @@
     } // end initVideoReview
 
     function initNews() {
+      var stopNicoNewsPolling = function() {
+        window.WatchApp.ns.init.TextMarqueeInitializer.textMarqueeItemDispatcher.stop();
+        window.WatchApp.ns.init.TextMarqueeInitializer.textMarqueeItemList.list.length = 0;
+      };
       var toggleNoNews = function() {
         $('#content').toggleClass('noNews', conf.hideNicoNews || conf.customPlayerSize !== '');
+        if ($('#content').hasClass('noNews')) {
+          stopNicoNewsPolling();
+        }
       };
 
       EventDispatcher.addEventListener('on.config.hideNicoNews',     toggleNoNews);
@@ -10413,12 +10431,7 @@
       if (isSquare && !isSquareCssInitialized) {
         var __css__ = Util.here(function() {/*
           {* 元のCSSを打ち消すためにやや冗長 *}
-          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .videoExplorerBody .videoExplorerContent .contentItemList .item.gold .thumbnailContainer{
-            background: #e9d7b4;
-          }
-          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .videoExplorerBody .videoExplorerContent .contentItemList .item.silver .thumbnailContainer{
-            background: #cecece;
-          }
+
           body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .item .thumbnailContainer {
             width: 130px; height: 100px;
           }
@@ -10434,9 +10447,8 @@
           }
 
           body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .uadFrame {
-                    transform: scale(0.8125, 1.111111);         transform-origin: 0 0 0;
-            -webkit-transform: scale(0.8125, 1.111111); -webkit-transform-origin: 0 0 0;
-            width: 160px; height: 90px;
+            width: 130px; height: 100px;
+            background-size: 100% 100%;
           }
           body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .uadTagRelated .default .itemList .item .imageContainer {
             width: 130px; height: 100px;
@@ -11492,6 +11504,13 @@
         //NicoPlayerConnector.getCommentNicoruCount_org = NicoPlayerConnector.getCommentNicoruCount;
       }
     }
+
+    // ?ref=等がついてるせいで未読既読のリンクの色が変わらなくなる問題の対策
+    // ShinjukuWatchと違いこっちはプレイリスト消えないモードがあるので、マイリスト等からの遷移でも遠慮無く全部消す
+    if (location.href.indexOf('?') >= 0) {
+      window.history.replaceState('', '', location.href.split('?')[0]);
+    }
+
 
     function hideAds() {
       $('#content').removeClass('panel_ads_shown');
