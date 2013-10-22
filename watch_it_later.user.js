@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131010
+// @version        1.131023
 // ==/UserScript==
 
 /**
@@ -39,6 +39,10 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+
+// * ver 1.131023
+// - 検索結果の一番下にチャンネル動画が出るようになったので、色をつけてわかりやすく
+// - 広告が0ポイントの時は表示を消す
 
 // * ver 1.131010
 // - ?ref=xxxxつきのURLでページを開いたら除去する対応  (リンク側の除去処理とはまた別)
@@ -525,6 +529,11 @@
 
       .columns .videoList01 .itemContent .itemComment.ranking, .videoList01 .itemContent .itemDescription.ranking {
         width: 470px;
+      }
+
+      {* ポイントが無いときは表示しない *}
+      .item:not(.silver):not(.gold) .uadContainer {
+        display: none !important;
       }
     *}
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
@@ -1207,7 +1216,7 @@
         display: block; font-size: 80%;;
       }
       #watchItLaterConfigPanel .shortcutSetting:not(.enable) span :not(.enable){
-        color: #silver;
+        color: silver;
       }
       #watchItLaterConfigPanel .shortcutSetting .enable {
         cursor: pointer; margin: auto 10px;
@@ -1539,6 +1548,10 @@
       }
       .videoExplorerContent .contentItemList .nicorepoResult .itemVideoDescription, .videoExplorerContent .contentItemList .nicorepoResult .videoTitle{
       }
+      .videoExplorerContent .contentItemList.channelGuideVideo {
+        background: #eff; {* 検索結果にチャンネル動画が紛れ込むようになったのでわかりやすく *}
+      }
+
       #videoExplorer.w_deflist .videoExplorerBody.isMine.enableMylistDeleteButton .item:hover .deleteFromMyMylist,
       #videoExplorer.w_mylist  .videoExplorerBody.isMine.enableMylistDeleteButton .item:hover .deleteFromMyMylist
       {
@@ -1586,7 +1599,7 @@
       {* 真・browserFullモード *}
       body.full_with_browser.hideCommentInput #nicoplayerContainerInner {
         {* コメント入力欄は動画上表示にするのではなく、画面外に押し出す事によって見えなくする *}
-        margin-top: -10px; margin-bottom: -36px;
+        margin-top: -10px; margin-bottom: -30px;
       }
       body.full_with_browser.trueBrowserFull #playerContainerWrapper {
         margin: 0 !important;
@@ -5003,8 +5016,8 @@
       data.sort_by = params.sort_by || 'start_time';
       data.order   = params.order   || 'desc';
       data.timeout = params.timeout || 10000;
-      data.issuer  = params.issuer  || 'pc';
-      data.reason  = params.reason  || 'user'; // 'watchItLater';
+      data.issuer  = params.issuer  || 'watch-it-later';
+      data.reason  = params.reason  || 'video-explorer'; // 'watchItLater';
       data.size    = params.size    || 32;
       data.from    = params.from    || 0;
 
@@ -5018,9 +5031,8 @@
         url: url,
         type: 'POST',
         data: JSON.stringify(data),
-//      data: data, //JSON.stringify(data),
-//      dataType: 'json',
         complete: function(result) {
+          if (conf.debugMode) console.log('result', result);
           if (result.status !== 200) {
             callback('fail', 'HTTP status:' + result.status);
             return;
@@ -8455,7 +8467,7 @@
           width: 130px; text-align: center;
         }
         .w_adjusted .createdTime {
-          white-space: nowrap;
+          white-space: nowrap; background: #fff;
         }
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .contentItemList .folder .container,
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .suggestVideo .folder .container {
@@ -8862,6 +8874,42 @@
 
       // TODO: ニコメンド編集ボタンが押されたら検索画面解除
       EventDispatcher.addEventListener('onVideoExplorerUpdated', function(req) { });
+
+
+      WatchController.explorer = {};
+      WatchController.explorer.serialize = function() {
+        var contentList   = explorer.getContentList();
+        var activeContent = contentList.getActiveContent();
+        if (!activeContent) {
+          return null;
+        }
+
+        var isOpen = explorer.isOpen();
+        var type   = activeContent.getType();
+        var page   = activeContent.getPage();
+        var params = activeContent.getParams();
+        var order  = activeContent.getOrder();
+        var sort   = activeContent.getSort();
+
+        return {
+          isOpen: isOpen,
+          type: type,
+          page: page,
+          params: params,
+          order: order,
+          sort: sort
+        };
+      };
+      WatchController.explorer.unSerialize = function(request, callback) {
+        if (!request.isOpen) {
+          return;
+        }
+        var contentList = explorer.getContentList();
+        var type   = request.type;
+        var params = request.params;
+
+        explorer._open(type, params, contentList.getContent(type), false, callback);
+      };
     } // end initVideoExplorer
 
     function initVideoExplorerItemContent() {
@@ -11421,6 +11469,108 @@
       itemList.addEventListener('popup', $.proxy(onData, marquee));
     } //
 
+    function initPushState($, conf, w) {
+      return; // 実験中
+      var explorerController = WatchApp.ns.init.VideoExplorerInitializer.videoExplorerController;
+      var explorer           = explorerController.getVideoExplorer();
+
+//      var serialize   = WatchController.explorer.serialize;
+//      var unSerialize = WatchController.explorer.unSerialize;
+
+      var serialize = function() {
+        var contentList   = explorer.getContentList();
+        var activeContent = contentList.getActiveContent();
+        if (!activeContent) {
+          return null;
+        }
+
+        var isOpen = explorer.isOpen();
+        var type   = activeContent.getType();
+        var page   = activeContent.getPage();
+        var params = activeContent.getParams();
+        var order  = activeContent.getOrder ? activeContent.getOrder() : null;
+        var sort   = activeContent.getSort  ? activeContent.getSort()  : null;
+
+        return JSON.stringify({
+          isOpen: isOpen,
+          type: type,
+          page: page,
+          params: params,
+          order: order,
+          sort: sort
+        });
+      };
+
+      var unSerialize = function(request, callback) {
+        request = JSON.parse(request);
+        if (!request.isOpen) {
+          if (explorer.isOpen()) {
+//            explorer.close();
+          }
+          return;
+        }
+        var contentList = explorer.getContentList();
+        var type   = request.type;
+        var params = request.params;
+
+        explorer._open(type, params, contentList.getContent(type), false, callback);
+      };
+
+      window.onpopstate = null;
+      var pageController = WatchApp.ns.init.PlayerInitializer.watchPageController;
+      //window.removeEventListener('popstate');
+
+      pageController.changePage2 = pageController.changePage;
+      pageController.changePage = function() { console.log('old changepage', arguments);};
+
+      window.addEventListener('popstate', $.proxy(function(e) {
+        if (!e.state) return;
+        var state = JSON.parse(e.state);
+        console.log('popstate', e.state);
+        var currentWatchId = watchInfoModel.v;
+        console.log('state.id', state.id, 'currentWatchId', currentWatchId);
+        e.preventDefault();
+
+        if (state.id !== currentWatchId) {
+          console.log('changePage', state.id);
+          //this.changePage2(state.id, state.params);
+        }
+        var explorerState = state.explorerState ? state.explorerState : null;
+        if (explorerState) {
+          console.log('%c restore explorerState', 'background: yellow;', explorerState);
+          unSerialize(explorerState);
+        }
+      }, pageController));
+
+      pageController.storeState = function(watchId, params, explorerState) {
+        var state = JSON.stringify({
+          id: watchId,
+          params: params,
+          explorerState: explorerState
+        });
+        console.log('storeState', state);
+        window.history.pushState(
+          state,
+          null,
+          this.generateWatchURL(watchId)
+        );
+      };
+
+      var lastExplorerState = null;
+      var onExplorerStateChange = function() {
+        var explorerState = serialize();
+        console.log('onExplorerStateChange', lastExplorerState, explorerState, lastExplorerState !== explorerState);
+        if (lastExplorerState === explorerState) return;
+        lastExplorerState = explorerState;
+        pageController.storeState(watchInfoModel.v, {}, explorerState);
+        console.log('stored!');
+      };
+      explorer.addEventListener('refreshEnd',        onExplorerStateChange);
+      explorer.addEventListener('openEnd',           onExplorerStateChange);
+      explorer.addEventListener('closeEnd',          onExplorerStateChange);
+      explorer.addEventListener('changeCurrentPage', onExplorerStateChange);
+    } //
+
     function initOther() {
       if (conf.headerViewCounter) $('#siteHeaderInner').width($('#siteHeaderInner').width() + 200);
 
@@ -11771,6 +11921,7 @@
     initHeatMap($, conf, w);
     initPopupMarquee();
     initMylistPanel($, conf, w);
+    initPushState($, conf, w);
     initOther();
 
     onWindowResizeEnd();
