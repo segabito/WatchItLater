@@ -1,4 +1,4 @@
-/// ==UserScript==
+// ==UserScript==
 // @name           WatchItLater
 // @namespace      https://github.com/segabito/
 // @description    動画を見る前にマイリストに登録したいGreasemonkey (Chrome/Fx用)
@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131023
+// @version        1.131023c
 // ==/UserScript==
 
 /**
