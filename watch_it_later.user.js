@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131023c
+// @version        1.131101
 // ==/UserScript==
 
 /**
@@ -38,6 +38,10 @@
  * ・テレビちゃんメニューをShinjukuWatch形式にする
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
+
+// * ver 1.131101
+// - GINZAで不要になったコードをコメントアウト
+// - 説明文のURL自動リンクの正規表現を調整
 
 
 // * ver 1.131023
@@ -245,7 +249,7 @@
       disableTagReload: false, //
       disableHorizontalScroll: false, // 横スクロールバーを出なくする
 
-      searchEngine:              'normal', // 'normal' 'sugoi'
+      searchEngine:              'sugoi', // 'normal' 'sugoi'
       searchStartTimeRange:      '', //
       searchLengthSecondsRange:  '', //
       searchMusicDlFilter:       false, //
@@ -6567,7 +6571,7 @@
       if (isChanging) {
         $('.sidePanel .sideVideoInfo').removeClass('show');
       }
-      if (conf.enableAutoPlaybackContinue && watch.PlayerInitializer.noUserOperationController.autoPlaybackModel._isAutoPlayback) {
+      if ((conf.enableAutoPlaybackContinue || conf.debugMode) && watch.PlayerInitializer.noUserOperationController.autoPlaybackModel._isAutoPlayback) {
         watch.PlayerInitializer.noUserOperationController.autoPlaybackModel.setCount(0);
       }
       EventDispatcher.dispatch('onVideoChangeStatusUpdated', isChanging);
@@ -7063,7 +7067,7 @@
         links.push(n);
         html = html.replace(n, ' <!----> ');
       }
-      html = html.replace(/(https?:\/\/[\x21-\x7e]+)/gi, '<a href="$1" target="_blank" class="otherSite">$1</a>');
+      html = html.replace(/(https?:\/\/[\x21-\x3b\x3d-\x7e]+)/gi, '<a href="$1" target="_blank" class="otherSite">$1</a>');
       for (var i = 0, len = links.length; i < len; i++) {
         html = html.replace(' <!----> ', links[i]);
       }
@@ -8395,9 +8399,7 @@
         .w_adjusted .uadTagRelated .emptyItem .emptyMessageContainer {
           width: 130px; height: 100px;
         }
-        #videoExplorer.w_adjusted .videoExplorerContent .itemList.column1 .videoInformationOuter .link{
-          display: inline;
-        }
+        #videoExplorer.w_adjusted .videoExplorerContent .itemList.column1 .videoInformationOuter .link,
         #videoExplorer.w_adjusted .videoExplorerContent .itemList.column1 .videoInformationOuter .link .title {
           display: inline;
         }
@@ -8976,15 +8978,16 @@
       // 動画情報表示の拡張
       var ItemView = WatchApp.ns.components.videoexplorer.view.content.item.AbstractVideoContentItemView;
       ItemView.prototype._setView_org = ItemView.prototype._setView;
-      ItemView.prototype._setView = function($item) {
-        this._setView_org($item);
-        //this._$createdTime     = $item.find('.column4 .createdTime span');
-        this._$createdTimeFull = $item.find('.column1 .createdTime span');
-      };
-      ItemView.prototype._setItem_org = ItemView.prototype._setItem;
-      ItemView.prototype._setItem = function(item) {
-        this._setItem_org(item);
-      };
+      // 一列の時は投稿時間を秒まで表示  銀座で不要になった
+//      ItemView.prototype._setView = function($item) {
+//        this._setView_org($item);
+//        //this._$createdTime     = $item.find('.column4 .createdTime span');
+//        this._$createdTimeFull = $item.find('.column1 .createdTime span');
+//      };
+//      ItemView.prototype._setItem_org = ItemView.prototype._setItem;
+//      ItemView.prototype._setItem = function(item) {
+//        this._setItem_org(item);
+//      };
       ItemView.prototype.update_org = ItemView.prototype.update;
       ItemView.prototype.update = function() {
         // 動画情報表示をゴリゴリいじる場所
