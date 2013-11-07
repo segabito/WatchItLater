@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131101
+// @version        1.131107
 // ==/UserScript==
 
 /**
@@ -39,10 +39,13 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+// * ver 1.131107
+// - 新検索β有効時、「人気が高い順」の並び替えに対応 -> http://blog.nicovideo.jp/niconews/ni042607.html
+// - Nicorenizerとの干渉を少し改善
+
 // * ver 1.131101
 // - GINZAで不要になったコードをコメントアウト
 // - 説明文のURL自動リンクの正規表現を調整
-
 
 // * ver 1.131023
 // - 検索結果の一番下にチャンネル動画が出るようになったので、色をつけてわかりやすく
@@ -1929,7 +1932,7 @@
 
       #fullScreenMenuContainer { display: none; }
       body.full_with_browser #fullScreenMenuContainer {
-        display: block; position: absolute; bottom: 3000px; left: 50px; z-index: 1;
+        display: block; position: absolute; bottom: 3000px; left: 50px; z-index: 10000;
         background: #fff; cursor: pointer; transition: bottom 0.2s ease-out;
       }
       body.full_with_browser.w_fullScreenMenu #fullScreenMenuContainer {
@@ -4999,7 +5002,7 @@
                 // upload_time,       upload_time_asc,
                 // length_seconds,    length_seconds_asc
     _size: 32,   // 一ページの件数  maxは100
-    _issuer: 'pc',
+    _issuer: 'watch-it-later',
     _base_url: NewNicoSearch.API_BASE_URL,
     initialize: function(params) {
 
@@ -5024,6 +5027,12 @@
       data.reason  = params.reason  || 'video-explorer'; // 'watchItLater';
       data.size    = params.size    || 32;
       data.from    = params.from    || 0;
+
+      if (params.sort_by === '_hot') { // 人気順ソートのパラメータ
+        data.hot_field = params.hot_field;
+        data.hot_from  = params.hot_from;
+        data.hot_to    = params.hot_to;
+      }
 
       var cache_key = JSON.stringify({url: url, data: data}), cache = Util.Cache.get(cache_key);
       if (cache) {
@@ -5072,7 +5081,10 @@
   var NewNicoSearchWrapper = function() { this.initialize.apply(this, arguments); };
   NewNicoSearchWrapper.prototype = {
     _search: null,
-    sortTable: {f: 'start_time', v: 'view_counter', r: 'comment_counter', m: 'mylist_counter', l: 'length_seconds'},
+    sortTable: {f: 'start_time', v: 'view_counter', r: 'comment_counter', m: 'mylist_counter', l: 'length_seconds',
+      '_hot':     '_hot',    // 人気が高い順
+      '_popular': '_popular' // 並び順指定なし
+    },
     initialize: function(params) {
       this._search = params.search;
     },
@@ -5086,7 +5098,8 @@
       query.size    = params.size || 32;
       query.from    = params.page ? Math.max(parseInt(params.page, 10) - 1, 0) * query.size : 0;
 
-      var now = Date.now();
+      var n = new Date();
+      var now = n.getTime();
       switch (params.u) {
         case '1h':
           query.filters.push(this._buildStartTimeRangeFilter(new Date(now -   1 *  1 * 60  * 60 * 1000)));
@@ -5108,6 +5121,18 @@
           break;
         default:
           break;
+      }
+
+      if (query.sort_by === '_hot') {
+        // 人気が高い順ソート
+        (function() {
+          var format = function(date) { return WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', date); };
+          query.hot_field = 'mylist_counter';
+          query.hot_from = format(new Date(now - 1 * 24 * 60 * 60 * 1000));
+          query.hot_to   = format(n);
+
+          query.order = 'desc';
+        })();
       }
 
       if (typeof params.userId === 'string' && params.userId.match(/^\d+$/)) {
@@ -5263,7 +5288,7 @@
         setTimeout(function() { callback(null, cache); }, 0);
         return;
       }
-      var query = {query: word, service: ['tag_video'], from: 0, size: 100, timeout: 10000, issuer: 'pc', reason: 'user'};
+      var query = {query: word, service: ['tag_video'], from: 0, size: 100, timeout: 10000, reason: 'user'};
       $.ajax({
         url: url,
         type: 'POST',
@@ -8369,7 +8394,7 @@
 
 
 
-        #content.w_adjusted #playerContainerWrapper { box-shadow: none; }
+        #content.w_adjusted #playerContainerWrapper, #content.w_adjusted #playlist { box-shadow: none; }
         #content.w_adjusted #videoExplorerExpand .arrow { display: none; }
         #videoExplorer.w_adjusted {
           {*background: #333333;*}
@@ -9191,7 +9216,7 @@
         } else
         if (lastScreenMode === 'browserFull' && mode !== 'browserFull') {
           conf.setValue('lastControlPanelPosition', '');
-          $('#playerContainerSlideArea').css({height: ''});
+          $('#playerContainerSlideArea').css({height: ''}); // wall bug fix
           restoreVisibility();
         }
         lastScreenMode = mode;
@@ -10103,8 +10128,33 @@
         .relatedTagList li:hover a{
           text-decoration: none;
         }
+
+        .sugoiOption {
+          display: none;
+        }
+        .w_sugoiSearch .sugoiOption {
+          display: block; background: #eef;
+        }
+        .w_sugoiSearch optgroup.sugoiOption {
+          font-weight: bolder;
+        }
+
       */});
       addStyle(__css__, 'searchContent');
+
+      // 動画表示のテンプレート拡張
+      var $template = $('<div/>').html(watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.searchContentTemplate').html());
+      $template.find('.searchSortOrder')
+         .append([
+             '<optgroup label="新検索専用" class="sugoiOption">',
+             '<option value="sort=_hot&amp;order=d""    class="sugoiOption">人気が高い順</option>',
+             '<option value="sort=_popular&amp;order=d" class="sugoiOption">並び順指定なし</option>',
+             '</optgroup>'
+         ].join(''));
+      watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.searchContentTemplate').html($template.html());
+      $template = null;
+
+
 
       var RelatedTagView = function() { this.initialize.apply(this, arguments); };
       RelatedTagView.prototype = {
@@ -10283,8 +10333,8 @@
       }, content);
 
       // ニコニコ新検索エンジンを使うための布石
-      content._searchEngineType  = conf.searchEngine;
-      content._lastSearchEngineType = '';
+      content._searchEngineType     = conf.searchEngine;
+      content._lastSearchEngineType = conf.searchEngine;
       content.setSearchEngineType   = $.proxy(function(type) {
         this._searchEngineType = type;
         this.updateSearchPageItemCount();
@@ -10323,6 +10373,17 @@
       content.setOwnerFilter        = $.proxy(function(value) {
         this._ownerFilter = !!value;
       }, content);
+
+      // 新検索独自のソート順への対応
+      content._searchSortOrder._flush_org = content._searchSortOrder._flush;
+      content._searchSortOrder._flush = $.proxy(function() {
+        var sort = this._sort[WatchApp.ns.components.videoexplorer.model.SearchType.KEYWORD];
+        if (sort === '_hot' || sort === '_popular') { // 新検索にしかないパラメータは保存しない
+          return;
+        }
+        this._flush_org();
+      }, content._searchSortOrder);
+
 
       EventDispatcher.addEventListener('on.config.searchPageItemCount', function() {
         content.updateSearchPageItemCount();
@@ -10374,6 +10435,11 @@
         overrideSearchSortOrder = function(proto) { // ソート順を記憶するためのフック
           proto.getSort_org  = proto.getSort;
           proto.getSort = function() {
+            var sort = conf.searchSortType;
+            if ((sort === '_hot' || sort === '_popular') && content.getLastSearchEngineType() !== 'sugoi') {
+              // 通常検索で新検索にしかないソート順だったらデフォルトのnを返す
+              return 'n';
+            }
             return conf.searchSortType;
           };
 
@@ -10688,7 +10754,7 @@
             initWheelWatch();
           } else
           if (newValue === 0) {
-            $('body')
+            $('body, #nicorenaiShield')
               .unbind('mousewheel.watchItLaterWheelWatch')
               .unbind('mousedown.watchItLaterWheelWatch')
               .unbind('mouseup.watchItLaterWheelWatch');
@@ -10703,7 +10769,7 @@
           reset: function() { this.cancel = false; return this; },
           preventDefault: function() { this.cancel = true;}
         };
-        $('body').on('mousewheel.watchItLaterWheelWatch', function(e, delta) {
+        $('body, #nicorenaiShield').on('mousewheel.watchItLaterWheelWatch', function(e, delta) {
           var button = -1;
           // TODO: マジックナンバーを
           if (typeof e.buttons === 'number') { // firefox
@@ -10751,7 +10817,7 @@
           isVolumeChanged = false;
         });
       }
-      initWheelWatch();
+      window.setTimeout(function() { initWheelWatch(); }, 5000);
     } // end initMouse
 
     function initTouch() {
@@ -10806,7 +10872,7 @@
         .videoExplorer        #playerContainerWrapper, .videoExplorer        #external_nicoplayer,
         .videoExplorerOpening #playerContainerWrapper, .videoExplorerOpening #external_nicoplayer
         {
-          transition: width 0.4s ease, height 0.4s ease;
+          {*transition: width 0.4s ease, height 0.4s ease;*}
         }
         #playerAlignmentArea .toggleCommentPanel {
         {*transition: 0.4s ease-in-out;*}
