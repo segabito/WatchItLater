@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131107
+// @version        1.131110
 // ==/UserScript==
 
 /**
@@ -38,6 +38,9 @@
  * ・テレビちゃんメニューをShinjukuWatch形式にする
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
+
+// * ver 1.131110
+// - プレイリスト復元機能の挙動修正
 
 // * ver 1.131107
 // - 新検索β有効時、「人気が高い順」の並び替えに対応 -> http://blog.nicovideo.jp/niconews/ni042607.html
@@ -689,6 +692,7 @@
         padding: 0px 0px 0 0px; width: 324px; height: 100%;
         position: absolute; top: 0; right:0;
       }
+
       body:not(.full_with_browser) .w_wide #playerTabWrapper .sideVideoInfo,
       body:not(.full_with_browser) .w_wide #playerTabWrapper .sideIchibaPanel,
       body:not(.full_with_browser) .w_wide #playerTabWrapper .sideReviewPanel,
@@ -1533,7 +1537,7 @@
       }
 
       .videoExplorerContent .contentItemList .thumbnailHoverMenu {
-        position: absolute; padding: 0; box-shadow: 0px 1px 2px black; z-index: 100;
+        position: absolute; padding: 0; z-index: 100;
         display: none;
         bottom: -1px; left: 0px;
       }
@@ -8607,6 +8611,9 @@
         }
         .videoExplorerConfig::-moz-focus-inner { border: 0px; }
 
+        .thumbnailLoadSuccess .noimage {
+          display: none;
+        }
 
       */});
       return addStyle(__css__, 'videoExplorerStyleStatic');
@@ -9481,8 +9488,10 @@
           if (currentIndex >= 0) { playlist.playingItem = newItems[currentIndex]; }
           if (list.a) { playlist.enableContinuous(); }
           if (list.r) {
-            if (newItems[0].id === blankVideoId) {
-              setTimeout(function() {WatchController.shufflePlaylist();}, 3000);
+            if (watchInfoModel.id === blankVideoId) {
+              setTimeout(function() {
+                WatchController.shufflePlaylist();
+              }, 3000);
             } else {
               playlist.enableContinuous();
             }
@@ -9497,7 +9506,7 @@
             playlist.t = 'mylist';
             LocationHashParser.setValue('playlist', playlist);
             $savelink
-              .attr('href', blankVideoUrl + LocationHashParser.getHash())
+              .attr('href', blankVideoUrl + LocationHashParser.getHash().replace(/\?/g, ''))
               .unbind();
           }
           function closeDialog() {
@@ -10395,6 +10404,7 @@
       content.load = $.proxy(function(callback) {
         var word = this.getSearchWord();
         if (this.getSearchEngineType() !== 'sugoi' || word.length <= 0 || word.match(/(sm|nm|so)\d+/)) {
+          // 新検索ではもしかして～が取得できないため、検索ワードに動画IDっぽい文字列が含まれてる場合は旧タグ検索を使う。
           this.setLastSearchEngineType('normal');
           this.load_org(callback);
         } else {
@@ -10456,7 +10466,9 @@
 
           proto.setOrder_org = proto.setOrder;
           proto.setOrder = function(type, order) {
-            conf.setValue('searchSortOrder', order);
+            if (content.getLastSearchEngineType() === 'sugoi') { // 新検索の時だけソート順を記憶
+              conf.setValue('searchSortOrder', order);
+            }
             this.setOrder_org(type, order);
           };
         },
