@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131110
+// @version        1.131115
 // ==/UserScript==
 
 /**
@@ -38,6 +38,9 @@
  * ・テレビちゃんメニューをShinjukuWatch形式にする
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
+
+// * ver 1.131115
+// - 動画ランキングをカテゴリごとに折りたたむ対応
 
 // * ver 1.131110
 // - プレイリスト復元機能の挙動修正
@@ -254,6 +257,12 @@
       disableVideoExplorer: false, //
       disableTagReload: false, //
       disableHorizontalScroll: false, // 横スクロールバーを出なくする
+
+      rankingCategory_g_ent2_Close:     true,
+      rankingCategory_g_life2_Close:    true,
+      rankingCategory_g_tech_Close:     true,
+      rankingCategory_g_culture2_Close: true,
+      rankingCategory_g_other_Close:    true,
 
       searchEngine:              'sugoi', // 'normal' 'sugoi'
       searchStartTimeRange:      '', //
@@ -1296,6 +1305,45 @@
       .videoExplorerMenu #mylistListMenu.open   a:after,  .videoExplorerMenu #videoRankingMenu.open a:after{
         content: "▲";
       }
+
+      .videoRankingList .isCategory {
+        position: relative;
+      }
+
+      .rankingCategoryToggle {
+        position: absolute;
+        display: none;
+        height: 20px;
+        padding: 0px 8px;
+        right: 14px;
+        top: 0;
+        cursor: pointer;
+        border: 1px solid;
+        color: #666;
+        outline: none;
+      }
+      .rankingCategoryToggle::-moz-focus-inner {
+        border: 0px;
+      }
+      .slideMenu.open  .isCategory:hover .rankingCategoryToggle {
+        display: block;
+      }
+      .categoryClose .rankingCategoryToggle .close, .rankingCategoryToggle .open{
+        display: none;
+      }
+      .categoryClose .rankingCategoryToggle .open{
+        display: inline;
+      }
+      .videoRankingList li:not(.isCategory) {
+        transition: max-height 0.5s;
+        max-height: 50px; overflow:hidden;
+        margin-left: 8px;
+      }
+      .videoRankingList .categoryClose:not(.isCategory) {
+        max-height: 0px;
+      }
+
+
       .videoExplorerMenu .slideMenu ul{
       }
       .videoExplorerMenu .slideMenu ul li{
@@ -2009,6 +2057,8 @@
       body.w_disableHorizontalScroll {
         overflow-x: hidden !important;
       }
+
+      #videoTagContainerPin { display: none !important; } {* タグを固定しているか4行以上の時に現われるピン *}
 
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
@@ -4676,8 +4726,8 @@
               $e   = jQuery("#playerCommentPanel"),
               left = this.$commentTableHeaderOuter.position().left,
               top  = a.pageY - $e.offset().top,
-              $e   = Math.min($e.offset().top + $e.outerHeight(), jQuery(window).scrollTop() + jQuery(window).outerHeight());
-            $e < a.pageY + $d.outerHeight() && (top -= a.pageY + $d.outerHeight() - $e);
+              f   = Math.min($e.offset().top + $e.outerHeight(), jQuery(window).scrollTop() + jQuery(window).outerHeight());
+            if (f < a.pageY + $d.outerHeight()) top -= a.pageY + $d.outerHeight() - f;
             this.CommentContextMenu.show(c, left, top);
           }
         };
@@ -5868,8 +5918,8 @@
         g_other:    -160,
           are:        -161,
           diary:      -162,
-          other:      -163,
-        r18:        -170
+          other:      -163
+//        r18:        -170
       },
       genreNameTable = {
         all:        'カテゴリ合算',
@@ -5926,6 +5976,7 @@
       idTermTable = {},
       idGenreTable = {}
     ;
+    if (conf.debugMode) { genreIdTable['r18'] = -170; }
     for (var genre in genreIdTable) { idGenreTable[genreIdTable[genre]] = genre;}
     for (var term  in termIdTable ) { idTermTable [termIdTable [term ]] = term; }
 
@@ -6155,7 +6206,7 @@
       CACHE_TIME = 1000 * 60 * 1, MAX_PAGE = 3,
       getPipe = function(baseUrl, result, page) {
         return function(hasPage) {
-          var def = new $.Deferred;
+          var def = new $.Deferred();
           if (!hasPage) return def.resolve(hasPage);
           var url = baseUrl + '?page=' + page;
           if (conf.debugMode) console.log('load page', url);
@@ -6170,7 +6221,7 @@
         };
       },
       pipeRequest = function(baseUrl, result) {
-        var def = new $.Deferred, p = def.promise();
+        var def = new $.Deferred(), p = def.promise();
 
         var maxPage = MAX_PAGE;
         for (var i = 1; i <= maxPage; i++) {
@@ -6186,7 +6237,7 @@
         return p;
       },
       load = function(callback, params) {
-        var myId, url, id, ownerName, def = new $.Deferred;
+        var myId, url, id, ownerName, def = new $.Deferred();
         try{
           id = params.id.toString().replace(/^ch/, '');
           ownerName = params.ownerName;
@@ -6256,7 +6307,7 @@
           id: WatchController.getOwnerId(),
           ownerName: WatchController.getOwnerName()
         };
-        var def = new $.Deferred;
+        var def = new $.Deferred();
         load(callback, params).pipe(function(result) {
             if (typeof callback === 'function') callback(result);
             def.resolve(result);
@@ -7388,30 +7439,13 @@
       }, 100);
     } //
 
-    var $videoRankingToggle = null, $videoRankingPopup = null, loadVideoRankingTimer = null;
-    function loadVideoRanking() {
-      if ($videoRankingToggle) {
+    var loadVideoRanking = (function() {
+      var $videoRankingToggle = null, $videoRankingPopup = null, loadVideoRankingTimer = null;
+      var attach = function() {
         $('.videoExplorerMenu').find('ul:first li:first').after($videoRankingPopup).after($videoRankingToggle);
-        return;
-      }
-      if (loadVideoRankingTimer) { return; }
-      loadVideoRankingTimer = setTimeout(function() {
-        var $toggle = $('<li style="display:none;"></li>'),
-            $a = $('<a>動画ランキング</a>'),
-            $popup = $('<li><ul></ul></li>').addClass('slideMenu'), $ul = $popup.find('ul');
-        function createMenu($, genre, id, name, category, term) {
-          var $a =
-            $('<a/>')
-              .attr({href: '/ranking/fav/' + term + '/' + genre})
-              .text(name)
-              .addClass('videoRanking')
-              .addClass(genre)
-              .click(Util.Closure.openMylist(id));
-          return $('<li/>').addClass(category).append($a);
-        }
-
-        $toggle.attr('id', 'videoRankingMenu').addClass('watchItLaterMenu');
-        $a.attr('href', '/ranking').click(function(e) {
+      };
+      var getToggleMenuClosure = function($popup, $toggle) {
+        return function(e) {
           if (e.button !== 0 || e.metaKey) return;
           e.preventDefault();
           var isVisible = $popup.hasClass('open');
@@ -7421,26 +7455,80 @@
             $toggle.toggleClass('open', !isVisible);
             $toggle.removeClass('opening');
           }, 500);
-        });
-        $toggle.append($a);
-        $('.videoExplorerMenu').find('ul:first li:first').after($popup).after($toggle);
-        $videoRankingToggle = $toggle; $videoRankingPopup = $popup;
-        var genreId = VideoRanking.getGenreId();
-
-        // TODO: マジックナンバーを
-        $ul.append(createMenu($, 'all',  -100, 'カテゴリ合算(毎時)',   'all', 'hourly'));
-        $ul.append(createMenu($, 'all', -1100, 'カテゴリ合算(24時間)', 'all', 'daily'));
-        $ul.append(createMenu($, 'all', -4100, 'カテゴリ合算(合計)',   'all', 'total'));
-
-        for (var genre in genreId) {
-          if (genre === 'all') { continue;}
-          var
-            id = genreId[genre], name = VideoRanking.getGenreName(genre), category = VideoRanking.getCategory(id);
-            $ul.append(createMenu($, genre, id, name, category, 'hourly'));
+        };
+      };
+      return function() {
+        if ($videoRankingToggle) {
+          return attach();
         }
-        $toggle.show();
-      }, 100);
-    } //
+        if (loadVideoRankingTimer) { return; }
+        loadVideoRankingTimer = setTimeout(function() {
+          var $toggle = $('<li style="display:none;"></li>'),
+              $a = $('<a>動画ランキング</a>'),
+              $popup = $('<li><ul></ul></li>').addClass('videoRankingList').addClass('slideMenu'), $ul = $popup.find('ul');
+          function createMenu($, genre, id, name, category, term) {
+            var $a =
+              $('<a/>')
+                .attr({href: '/ranking/fav/' + term + '/' + genre})
+                .text(name)
+                .addClass('videoRankingListItem')
+                .addClass(genre)
+                .click(Util.Closure.openMylist(id));
+            var $li = $('<li/>');
+            if (genre === category) {
+              $li.addClass('isCategory'); // nameと同じならカテゴリランキング、違うならジャンルランキング
+              if (genre !== 'all' && genre !== 'g_politics' && genre !== 'r18') {
+                var $button = $([
+                  '<button class="rankingCategoryToggle">',
+                    '<span class="open" title="サブカテゴリを開く">▼</span>',
+                    '<span class="close" title="サブカテゴリを閉じる">▲</span>',
+                  '</button>'
+                  ].join(''));
+                $button.attr('data-category', category);
+                $li.append($button);
+              }
+            }
+            var isClose = conf.getValue('rankingCategory_' + category + '_Close');
+            $li.toggleClass('categoryClose', isClose);
+            return $li
+              .attr({'data-genre': genre, 'data-category': category})
+              .addClass(category).addClass(genre)
+              .append($a);
+          }
+
+          $toggle.attr('id', 'videoRankingMenu').addClass('watchItLaterMenu');
+          $a.attr('href', '/ranking').click(getToggleMenuClosure($popup, $toggle));
+          $toggle.append($a);
+          $videoRankingToggle = $toggle;
+          $videoRankingPopup = $popup;
+          var genreId = VideoRanking.getGenreId();
+
+          // TODO: マジックナンバーを
+          $ul.append(createMenu($, 'all',  -100, 'カテゴリ合算(毎時)',   'all', 'hourly'));
+          $ul.append(createMenu($, 'all', -1100, 'カテゴリ合算(24時間)', 'all', 'daily'));
+//          $ul.append(createMenu($, 'all', -4100, 'カテゴリ合算(合計)',   'all', 'total'));
+
+          for (var genre in genreId) {
+            if (genre === 'all') { continue; }
+            var
+              id = genreId[genre], name = VideoRanking.getGenreName(genre), category = VideoRanking.getCategory(id);
+              $ul.append(createMenu($, genre, id, name, category, 'hourly'));
+          }
+
+          $popup.on('click', '.rankingCategoryToggle', function(e) {
+            e.preventDefault(); e.stopPropagation();
+            var $target = $(e.currentTarget), category = $target.attr('data-category');
+            var $popup = $target.closest('.slideMenu');
+            var isClose = $popup.find('li.' + category).toggleClass('categoryClose').hasClass('categoryClose');
+            conf.setValue('rankingCategory_' + category + '_Close', isClose);
+          });
+
+          attach();
+          $toggle.show();
+          $a = $ul = $popup = $toggle = null;
+        }, 100);
+      };
+    })();
 
     var WatchingVideoView = function() { this.initialize.apply(this, arguments); };
     WatchingVideoView.prototype = {
@@ -8574,7 +8662,6 @@
           content: '￪ ';
         }
         #playerAlignmentArea .toggleCommentPanel:hover {
-          {*box-shadow: 2px -2px 2px #888;*}
           right: -129px;
         }
         #playerAlignmentArea .toggleCommentPanel.w_active {
