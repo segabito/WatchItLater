@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131121
+// @version        1.131125
 // ==/UserScript==
 
 /**
@@ -39,6 +39,9 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+
+// * ver 1.131125
+// - 本家バージョンアップで動かなくなっていた部分の対応
 
 // * ver 1.131122
 // - 本家の更新にとりあえず対応
@@ -819,8 +822,8 @@
         min-width: 128px; max-width: 150px; width: auto; height: auto; border: 0;
       }
       .sidePanel .sideVideoInfo .descriptionThumbnail {
-        text-align: left; font-size: 90%; padding: 4px; background: #ddd; border: 1px solid #ccc;
-        min-height: 60px; margin: 4px; font-weight: normal; color: black;
+        text-align: left; font-size: 90%; padding: 4px; background: #eee; border: 2px solid #ccc;
+        min-height: 60px; margin: 4px 16px; font-weight: normal; color: black;
       }
 
       .sidePanel .sideVideoInfo .descriptionThumbnail.video img{
@@ -7621,9 +7624,16 @@
         this._content.setFilter(null);
         setTimeout(
           $.proxy(function() {
-            this._content.changeState({page: 1});
+            //this._content.changeState({page: 1});
+            this.contentRefresh();
             this._clearIsUpdating();
           }, this), 500);
+      },
+      contentRefresh: function() {
+        var params = this._content.getParams();
+        params.page = 1;
+        this._content.changeState(params);
+        this._content.refresh({page: 1});
       }
     }; // end WatchingVideoView.prototype
 
@@ -7703,9 +7713,16 @@
           this._content.setFilter(null);
         }
 
-        this._content.changeState({page: 1});
+        //this._content.changeState({page: 1});
+        this.contentRefresh();
       },
-      _getFilter: function() {
+      contentRefresh: function() {
+        var params = this._content.getParams();
+        params.page = 1;
+        this._content.changeState(params);
+        this._content.refresh({page: 1});
+      },
+        _getFilter: function() {
         var to_h = function(str) {
           return str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(s) {
              return String.fromCharCode(s.charCodeAt(0) - 65248);
