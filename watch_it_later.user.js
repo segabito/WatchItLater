@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131125
+// @version        1.131128
 // ==/UserScript==
 
 /**
@@ -39,6 +39,9 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+
+// * ver 1.131128
+// - スクロールが若干軽くなったかも
 
 // * ver 1.131125
 // - 本家バージョンアップで動かなくなっていた部分の対応
@@ -2071,6 +2074,10 @@
         width: 100%; height: auto; max-width: 300px; max-height: 250px;
       }
 
+
+      .w_noHover {
+        pointer-events: none !important;
+      }
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
     addStyle(__css__, 'watchItLaterStyle');
@@ -4171,7 +4178,7 @@
         // 縦解像度がタグ+プレイヤーより大きいならタグの開始位置、そうでないならプレイヤーの位置にスクロール
         // ただし、該当部分が画面内に納まっている場合は、勝手にスクロールするとかえってうざいのでなにもしない
         var $body = $('body'), isContentFix = $body.hasClass('content-fix');
-        $body.removeClass('content-fix');
+        $body.addClass('w_noHover').removeClass('content-fix');
         var h = $('#playerContainer').outerHeight() + $('#videoTagContainer').outerHeight();
         var top = $(window).height() >= h ? '#videoTagContainer, #playerContainer' : '#playerContainer';
 
@@ -4185,6 +4192,9 @@
         }
         $(window).scrollLeft(0);
         $body.toggleClass('content-fix', isContentFix);
+        setTimeout(function() {
+          $body.removeClass('w_noHover');
+        }, 800);
       },
       play: function() {
         nicoPlayer.playVideo();
@@ -5052,6 +5062,7 @@
   // http://looooooooop.blog35.fc2.com/blog-entry-1146.html
   // http://toxy.hatenablog.jp/entry/2013/07/25/200645
   // http://ch.nicovideo.jp/pita/blomaga/ar297860
+  // http://search.nicovideo.jp/docs/api/ma9.html
   var NewNicoSearch = function() { this.initialize.apply(this, arguments); };
   NewNicoSearch.API_BASE_URL  = 'http://api.search.nicovideo.jp/api/';
   NewNicoSearch.PAGE_BASE_URL = 'http://search.nicovideo.jp/video/';
@@ -5149,6 +5160,7 @@
     _search: null,
     sortTable: {f: 'start_time', v: 'view_counter', r: 'comment_counter', m: 'mylist_counter', l: 'length_seconds',
       '_hot':     '_hot',    // 人気が高い順
+      '_explore': '_explore', // 新着優先
       '_popular': '_popular' // 並び順指定なし
     },
     initialize: function(params) {
@@ -9122,6 +9134,8 @@
         this._$item.find('.deleteFromMyMylist').data('watchId', this._item.getId());
         if (item._mylistComment) { // マイリストコメント
           $item.find('.itemMylistComment').css({display: 'block'});
+        } else {
+          $item.find('.itemMylistComment').remove();
         }
 
         if (item._seed && item._seed._info) {
@@ -10100,7 +10114,11 @@
         EventDispatcher.dispatch('onWindowResizeEnd');
       }, 1000));
 
+      $(document).on('scroll', function() {
+        $('body').addClass('w_noHover');
+      });
       $(document).on('scroll', WatchApp.ns.event.EventDispatcher.debounce(function() {
+        $('body').removeClass('w_noHover');
         EventDispatcher.dispatch('onScrollEnd');
       }, 500));
 
@@ -10244,6 +10262,7 @@
              '<optgroup label="新検索専用" class="sugoiOption">',
              '<option value="sort=_hot&amp;order=d""    class="sugoiOption">人気が高い順</option>',
              '<option value="sort=_popular&amp;order=d" class="sugoiOption">並び順指定なし</option>',
+             '<option value="sort=_explore&amp;order=d" class="sugoiOption">新着優先</option>',
              '</optgroup>'
          ].join(''));
       watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.searchContentTemplate').html($template.html());
@@ -10487,7 +10506,7 @@
       content._searchSortOrder._flush_org = content._searchSortOrder._flush;
       content._searchSortOrder._flush = $.proxy(function() {
         var sort = this._sort[WatchApp.ns.components.videoexplorer.model.SearchType.KEYWORD];
-        if (sort === '_hot' || sort === '_popular') { // 新検索にしかないパラメータは保存しない
+        if (sort === '_hot' || sort === '_popular' || sort === '_explore') { // 新検索にしかないパラメータは保存しない
           return;
         }
         this._flush_org();
@@ -10548,7 +10567,7 @@
           proto.getSort_org  = proto.getSort;
           proto.getSort = function() {
             var sort = conf.searchSortType;
-            if ((sort === '_hot' || sort === '_popular') && content.getLastSearchEngineType() !== 'sugoi') {
+            if ((sort === '_hot' || sort === '_popular' || sort === '_explore') && content.getLastSearchEngineType() !== 'sugoi') {
               // 通常検索で新検索にしかないソート順だったらデフォルトのnを返す
               return 'n';
             }
