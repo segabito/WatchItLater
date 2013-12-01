@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131128
+// @version        1.131128b
 // ==/UserScript==
 
 /**
@@ -519,52 +519,11 @@
       }
       .w_fullScreenMenu .mylistPopupPanel.fixed { bottom: 2px; }
 
-    {* タグ検索やランキングのサムネを4:3にするやつ  4列がまだおかしい *}
-    {*
-      .columns .video .itemThumbWrap:before {
-              transform: scale(0.8125, 1.111111);         transform-origin: 0 0 0;
-      -webkit-transform: scale(0.8125, 1.111111); -webkit-transform-origin: 0 0 0;
-      }
-
-      .columns .video .videoLength {
-        right: 4px;
-      }
-
-      .columns .video .itemThumb img {
-        width: 130px; margin-left: 0px; margin-top: 0px;
-      }
-
-      .columns .video .itemThumb {
-        height: 100px; width: 130px;
-      }
-
-      .columns .videoList01 .videoList01Wrap {
-        width: 130px;
-      }
-      .columns .videoList02 .videoList02Wrap {
-        width: 142px;
-      }
-
-      .contentBody:not(.videoList01):not(.videoList02) .video .item {
-        width: 130px; margin-right: 30px;
-      }
-      .contentBody:not(.videoList01):not(.videoList02) .video .item:nth-child(4n+1) {
-        margin-left: 45px;
-      }
-
-      .columns .video .itemTime {
-        width: 130px; text-align: center;
-      }
-
-      .columns .videoList01 .itemContent .itemComment.ranking, .videoList01 .itemContent .itemDescription.ranking {
-        width: 470px;
-      }
-
       {* ポイントが無いときは表示しない *}
       .item:not(.silver):not(.gold) .uadContainer {
         display: none !important;
       }
-    *}
+
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
      addStyle(__css__, 'watchItLaterCommonStyle');
@@ -2074,11 +2033,14 @@
         width: 100%; height: auto; max-width: 300px; max-height: 250px;
       }
 
-
+      {* *}
       .w_noHover {
         pointer-events: none !important;
       }
-    */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
+      .w_noHover #playlist {
+        pointer-events: auto !important;
+      }
+  */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
     addStyle(__css__, 'watchItLaterStyle');
   })(); // end of watchItLaterStyle
@@ -3694,7 +3656,7 @@
       console.log('%c' + text, 'background: cyan;');
       if (w.WatchApp) {
         text = text.replace(/[\n]/, '<br />');
-        w.WatchApp.namespace.init.PopupMarqueeInitializer.popupMarqueeViewController.onData(
+        w.WatchApp.ns.init.PopupMarqueeInitializer.popupMarqueeViewController.onData(
           // Firefoxではflashの上に半透明要素を重ねられないのでとりあえず黒で塗りつぶす
           '<span style="background: black;">' + text + '</span>'
         );
@@ -3705,7 +3667,7 @@
       console.log('%c' + text, 'background: yellow;');
       if (w.WatchApp) {
         text = text.replace(/[\n]/, '<br />');
-        w.WatchApp.namespace.init.PopupMarqueeInitializer.popupMarqueeViewController.onData(
+        w.WatchApp.ns.init.PopupMarqueeInitializer.popupMarqueeViewController.onData(
           '<span style="background: black; color: red;">' + text + '</span>'
         );
       } else {
@@ -3715,7 +3677,7 @@
 
     Popup.hide = function() {
       if (w.WatchApp) {
-        w.WatchApp.namespace.init.PopupMarqueeInitializer.popupMarqueeViewController.stop();
+        w.WatchApp.ns.init.PopupMarqueeInitializer.popupMarqueeViewController.stop();
       }
     };
     return Popup;
@@ -6364,7 +6326,7 @@
     //var $ = w.$, $$ = w.$$;
     if (!w.WatchApp || !w.WatchJsApi) return;
 
-    $.fx.interval = conf.fxInterval;
+//    $.fx.interval = conf.fxInterval;
 
     var
       video_id = '', watch_id = '',
@@ -6642,7 +6604,7 @@
 
     var isFirst = true;
     function onVideoInitialized() {
-      watch = WatchApp.namespace.init;
+      watch = WatchApp.ns.init;
       AnchorHoverPopup.hidePopup().updateNow();
       tagv = watch.TagInitializer.tagViewController;
       pim  = watch.PlayerInitializer.playerInitializeModel;
@@ -11721,7 +11683,7 @@
 
       if (conf.disableHorizontalScroll) $('body').addClass('w_disableHorizontalScroll');
 
-      $('#videoHeaderMenu .searchText input').attr({'accesskey': '@', 'placeholder': '検索ワードを入力'}).on('focus', function() {
+      $('#videoHeaderMenu .searchText input').attr({'accesskey': '@'}).on('focus', function() {
         WatchController.scrollTop(0, 400);
       });
 
