@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131128b
+// @version        1.131203
 // ==/UserScript==
 
 /**
@@ -39,6 +39,9 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+
+// * ver 1.131203
+// - コメントパネル下のソーシャルボタンを隠す設定を追加
 
 // * ver 1.131128
 // - スクロールが若干軽くなったかも
@@ -267,6 +270,7 @@
       disableVideoExplorer: false, //
       disableTagReload: false, //
       disableHorizontalScroll: false, // 横スクロールバーを出なくする
+      hideCommentPanelSocialButtons: false, // コメントパネル下のソーシャルボタンを隠す
 
       rankingCategory_g_ent2_Close:     true,
       rankingCategory_g_life2_Close:    true,
@@ -692,11 +696,11 @@
         padding: 0 4px; position: relative;
       }
       .sidePanel .sideVideoInfo .videoTitleContainer {
-        background: #ddd; text-align: center;  color: #000; margin: 6px 0 0;
-        border: solid; border-width: 1px 1px 0; border-color: #ccc;
+        background: #ddd; text-align: center;  color: #000; margin: 6px 6px 0;
+        border: solid; border-width: 1px 1px 0; border-color: #888;
       }
       .sidePanel .sideVideoInfo .videoOwnerInfoContainer {
-        border: solid; border-width: 0 1px 0; border-color: #ccc;
+        margin: 0 6px; border: solid; border-width: 0 1px 0; border-color: #888;
       }
       .sidePanel .sideVideoInfo .videoThumbnailContainer {
         background: #ddd; text-align: center; color: #000; margin: 0;
@@ -723,8 +727,8 @@
         display: none !important;
       }
       .sidePanel .sideVideoInfo .videoInfo{
-        background: #ddd; text-align: center; padding: 4px;
-        border: solid; border-width: 0 1px 1px; border-color: #ccc;
+        background: #ddd; text-align: center; padding: 4px; margin: 0 6px 6px;
+        border: solid; border-width: 0 1px 1px; border-color: #888;
       }
       .sideVideoInfo .sideVideoInfoInner{
         -webkit-transition: opacity 1s ease-out, color 3s ease-out;
@@ -782,9 +786,10 @@
       }
       .sidePanel .userIcon, .sidePanel .channelIcon{
         min-width: 128px; max-width: 150px; width: auto; height: auto; border: 0;
+        box-shadow: 0 0 4px #666;
       }
       .sidePanel .sideVideoInfo .descriptionThumbnail {
-        text-align: left; font-size: 90%; padding: 4px; background: #eee; border: 2px solid #ccc;
+        text-align: left; font-size: 90%; padding: 4px; background: #ddd;
         min-height: 60px; margin: 4px 16px; font-weight: normal; color: black;
       }
 
@@ -2040,6 +2045,23 @@
       .w_noHover #playlist {
         pointer-events: auto !important;
       }
+      {* ソーシャルボタン *}
+      .area-JP .panel_ads_shown #playerTabContainer.w_noSocial.has_panel_ads .playerTabContent {
+        bottom: 80px;
+      }
+      .area-JP                  #playerTabContainer.w_noSocial               .playerTabContent {
+        bottom: 4px;
+      }
+      #playerTabContainer.w_noSocial .playerTabAds {
+        bottom: 0;
+      }
+      #playerTabContainer.w_noSocial .socialButtons{
+        display: none;
+      }
+      .w_noSocial .nicoSpotAds {
+        bottom: 8px;
+      }
+
   */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
     addStyle(__css__, 'watchItLaterStyle');
@@ -2197,6 +2219,8 @@
         values: {'する': true, 'しない': false}},
       {title: '横スクロールバーを出なくする', varName: 'disableHorizontalScroll',
         values: {'する': true, 'しない': false}},
+      {title: 'コメントパネル下のソーシャルボタン', varName: 'hideCommentPanelSocialButtons',
+        values: {'隠す': true, '隠さない': false}},
 
       {title: 'その他の設定', className: 'otherSetting'},
       {title: '動画リンクにカーソルを重ねたらメニューを表示', varName: 'enableHoverPopup', reload: true,
@@ -4644,6 +4668,12 @@
       },
       prevent = function(e) {
         e.preventDefault(); e.stopPropagation();
+      },
+      scrollToVideoExplorer = function() {
+        if (!WatchController.isSearchMode()) { return; }
+        window.setTimeout(function() {
+          window.WatchApp.ns.util.WindowUtil.scrollFit($('#videoExplorer'));
+        }, 100);
       };
 
     var Closure = {
@@ -4652,6 +4682,7 @@
           if (isMetaKey(e)) { return; }
           prevent(e);
           WatchController.openVideoOwnersVideo();
+          scrollToVideoExplorer();
         };
       },
       openVideoOwnersNicorepo: function() {
@@ -4661,7 +4692,9 @@
             return;
           }
           prevent(e);
-          WatchController.showMylist(NicorepoVideo.REPO_OWNER);
+          //WatchController.showMylist(NicorepoVideo.REPO_OWNER);
+          WatchController.showMylist('repo-owner-' + WatchController.getOwnerId());
+          scrollToVideoExplorer();
         };
       },
       openDefMylist: function() {
@@ -4669,6 +4702,7 @@
           if (isMetaKey(e)) { return; }
           prevent(e);
           WatchController.showDefMylist();
+          scrollToVideoExplorer();
         };
       },
       openMylist: function(id) {
@@ -4676,6 +4710,7 @@
           if (isMetaKey(e)) { return; }
           prevent(e);
           WatchController.showMylist(id);
+          scrollToVideoExplorer();
         };
       },
       openNicoSearch: function(word, type) {
@@ -4684,6 +4719,7 @@
           if (WatchController.isZeroWatch()) {
             prevent(e);
             WatchController.nicoSearch(word, type);
+            scrollToVideoExplorer();
           }
         };
       },
@@ -7219,11 +7255,11 @@
       var resetHidariue = function() {
         var dt = new Date();
         if (dt.getMonth() < 1 && dt.getDate() <=1) {
-          $('#videoMenuTopList').append('<li style="position:absolute;left:300px;font-size:50%">　＼　│　／<br>　　／￣＼　　 ／￣￣￣￣￣￣￣￣￣<br>─（ ﾟ ∀ ﾟ ）＜　しんねんしんねん！<br>　　＼＿／　　 ＼＿＿＿＿＿＿＿＿＿<br>　／　│　＼</li>');
+          $('#videoMenuTopList').append('<li style="position:absolute;left:300px;font-size:50%">　＼　│　／<br>　　／‾＼　　 ／‾‾‾‾‾‾‾‾‾<br>─（ ゜ ∀ ゜ ）＜　しんねんしんねん！<br>　　＼＿／　　 ＼＿＿＿＿＿＿＿＿＿<br>　／　│　＼</li>');
         }
         if (!conf.hidariue) { return; }
         if (!hidariue) {
-          $('#videoMenuTopList').append('<li class="hidariue" style="position:absolute;top:21px;left:0px;"><a href="http://userscripts.org/scripts/show/151269" target="_blank" style="color:black;"><img id="hidariue" style="border-radius: 8px; box-shadow: 1px 1px 2px #ccc;"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:Q"></a></p></li>');
+          $('#videoMenuTopList').append('<li class="hidariue" style="position:absolute;top:21px;left:0px;"><a href="http://userscripts.org/scripts/show/151269" target="_blank" style="color:black;"><img id="hidariue" style="border-radius: 8px; box-shadow: 1px 1px 2px #ccc;"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:GINZA"></a></p></li>');
           hidariue = $('#hidariue')[0];
         }
         hidariue.src = 'http://res.nimg.jp/img/base/head/icon/nico/' +
@@ -7838,11 +7874,13 @@
         return false;
       }, content);
 
-
       loader.load_org = loader.load;
       loader.load = $.proxy(function(params, callback) {
         var isOwnerNicorepo = false, isRanking = false;
         var id = params.id;
+        if (typeof id === 'string' && id.indexOf('repo-owner-') === 0) {
+          id = NicorepoVideo.REPO_OWNER;
+        }
 
         var applyFilter = function(err, result) {
           result.isOwnerNicorepo = isOwnerNicorepo;
@@ -8370,7 +8408,7 @@
               'margin-left: 154px; height: 100%; ',
             '}',
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoOwnerInfoContainer{',
-              'position: absolute; width: 150px; top: 0; border: 1px solid #ccc;',
+              'position: absolute; width: 150px; top: 0; border: 1px solid #ccc; margin: 0;',
             '}',
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .userIconContainer, body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .ch_profile{',
               'background: #ddd; max-width: 150px; float: none; border-radius: 0;',
@@ -8904,6 +8942,7 @@
           if (items.length === 1 && items[0].getContentItemType() !== ContentItemType.VIDEO) {
             // ユーザーの投稿動画一覧が公開マイリスト一つだけだったら自動でそれを開く
             items[0].stepIn();
+            return;
           }
         }
       });
@@ -11667,6 +11706,9 @@
         } else
         if (name === 'disableHorizontalScroll') {
           $('body').toggleClass('w_disableHorizontalScroll', newValue);
+        } else
+        if (name === 'hideCommentPanelSocialButtons') {
+          $('#playerTabContainer').toggleClass('w_noSocial', newValue);
         }
       });
 
@@ -11682,6 +11724,8 @@
       if (conf.enableYukkuriPlayButton) { Yukkuri.show(); }
 
       if (conf.disableHorizontalScroll) $('body').addClass('w_disableHorizontalScroll');
+
+      if (conf.hideCommentPanelSocialButtons) $('#playerTabContainer').addClass('w_noSocial');
 
       $('#videoHeaderMenu .searchText input').attr({'accesskey': '@'}).on('focus', function() {
         WatchController.scrollTop(0, 400);
@@ -12087,4 +12131,5 @@
     monkey(true);
   }
 })();
+
 
