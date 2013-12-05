@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131203
+// @version        1.131206
 // ==/UserScript==
 
 /**
@@ -1991,7 +1991,7 @@
         transition: margin-left 0.2s ease-in-out;
       }
 
-      .dummyMylist .editFavorite, .dummyMylist .mylistDetail .mylistNameContainer {
+      .dummyMylist .editFavorite {
         display: none;
       }
 
@@ -4214,11 +4214,13 @@
         }
       },
       openSearch: function() {
-          WatchApp.ns.init.VideoExplorerInitializer.expandButtonView.open();
+//          WatchApp.ns.init.VideoExplorerInitializer.expandButtonView.open();
 //        videoExplorer.openByCurrentCondition();
+        videoExplorer.changeState(true);
       },
       closeSearch: function() {
-        videoExplorer.close();
+        //videoExplorer.close();
+        videoExplorer.changeState(false);
       },
       openVideoOwnersVideo: function() {
         if (this.isChannelVideo()) {
@@ -7813,7 +7815,8 @@
         return parseInt(this.getUserId(), 10) === parseInt(myUserId, 10) && parseInt(this.getMylistId(), 10) > 0;
       }, content);
       content.getIsDummy         = $.proxy(function() {
-        return parseInt(this.getMylistId(), 10) <= 0;
+        var id = this.getMylistId();
+        return parseInt(id, 10) <= 0 || id.toString().indexOf('repo') === 0;
       }, content);
       content.getIsOwnerNicorepo = $.proxy(function() { return this._isOwnerNicorepo; }, content);
       content.getIsRanking       = $.proxy(function() { return this._isRanking;       }, content);
@@ -8022,6 +8025,18 @@
         }
       */});
       addStyle(__css__, 'mylistContentCss');
+
+      var MylistDetailView = WatchApp.ns.components.videoexplorer.view.content.parts.MylistDetailView;
+      MylistDetailView.prototype.update_org = MylistDetailView.prototype.update;
+      MylistDetailView.prototype.update = function(id, name, description, count) {
+        this.update_org(id, name, description, count);
+        if (id.toString().match(/repo-owner-(\d+)/)) {
+          this._$name.attr('href', '/user/' + RegExp.$1);
+        } else
+        if (parseInt(id, 10) <= 0) {
+          this._$name.attr('href', '');
+        }
+      };
 
       var
         overrideContentView = function(proto, watchingVideoView, grepOptionView) {
