@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131206
+// @version        1.131213
 // ==/UserScript==
 
 /**
@@ -39,6 +39,9 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+
+// * ver 1.131213
+// - マイリストメニューの位置を右下・左下から選べるようにした
 
 // * ver 1.131203
 // - コメントパネル下のソーシャルボタンを隠す設定を追加
@@ -271,6 +274,7 @@
       disableTagReload: false, //
       disableHorizontalScroll: false, // 横スクロールバーを出なくする
       hideCommentPanelSocialButtons: false, // コメントパネル下のソーシャルボタンを隠す
+      mylistPanelPosition: '',
 
       rankingCategory_g_ent2_Close:     true,
       rankingCategory_g_life2_Close:    true,
@@ -413,6 +417,15 @@
         position: fixed; right: 0; bottom: 0;
         transition: right 0.1s ease-out;
       }
+      .mylistPopupPanel.fixed.left {
+        right: auto;
+        left: 0;
+      }
+      .mylistPopupPanel.fixed.top {
+        bottom: auto;
+        top: 0;
+      }
+
       .mylistPopupPanel.fixed>* {
         transition: opacity 0.1s ease-out;
       }
@@ -431,6 +444,10 @@
         .full_with_browser .mylistPopupPanel.hideInFull.fixed:not(:hover) {
           right: -100px;
           transition: right 0.8s ease-in-out 0.5s;
+        }
+        .full_with_browser .mylistPopupPanel.hideInFull.fixed.right:not(:hover) {
+          left: -100px; right: auto;
+          transition: left 0.8s ease-in-out 0.5s;
         }
         .full_with_browser .mylistPopupPanel.hideInFull:not(:hover)>*{
           opacity: 0;
@@ -1033,6 +1050,26 @@
       #videoHeader .watchItLaterMenu {
         position: absolute; width: 100px; left: -55px; top: 32px;
       }
+      {* タイトルクリックでヘッダが開閉できるのをわかりやすく *}
+      .videoDetailToggleButton:hover {
+        text-decoration: underline;
+      }
+      .videoDetailToggleButton:hover:after {
+        content: '▼';
+        position: absolute;
+        width: 32px;
+        height: 20px;
+        top: 0;
+        bottom: 0;
+        right: -32px;
+        margin: auto;
+        color: #888;
+        font-size: 80%;
+      }
+      .infoActive .videoDetailToggleButton:hover:after {
+        content: '▲';
+      }
+
       {* プレイリスト出したり隠したり *}
       #playlist>* {
         -webkit-transition: opacity 0.6s; transition: opacity 0.6s;
@@ -1603,6 +1640,10 @@
 
       #yukkuriPanel {
         position: fixed; z-index: 1500; bottom: 0; left: 0; display: inline-block;
+        transition: bottom 0.2s ease;
+      }
+      #yukkuriPanel.mylistPanelLeft {
+        bottom: 24px;
       }
       body.w_noNicoru .nicoru-button{
         left: -9999; display: none !important;
@@ -2223,7 +2264,7 @@
         values: {'隠す': true, '隠さない': false}},
 
       {title: 'その他の設定', className: 'otherSetting'},
-      {title: '動画リンクにカーソルを重ねたらメニューを表示', varName: 'enableHoverPopup', reload: true,
+      {title: '動画リンクにカーソルを重ねたらマイリストメニューを表示', varName: 'enableHoverPopup', reload: true,
         description: 'マウスカーソルを重ねた時に出るのが邪魔な人はオフにしてください',
         values: {'する': true, 'しない': false}},
       {title: '動画リンクにカーソルを重ねてからメニューが出るまでの時間(秒)', varName: 'hoverMenuDelay',
@@ -2242,6 +2283,8 @@
       {title: 'タッチパネル向けモード(画面を右フリックで開始)', varName: 'enableQTouch',
         description: '指で操作しやすいように、一部のボタンやメニューが大きくなります',
         values: {'使う': true, '使わない': false}},
+      {title: 'マイリストメニューの位置', varName: 'mylistPanelPosition',
+        values: {'左下': 'left', '右下': ''}},
 
       {title: 'マウスとキーボードの設定', description: '※Chromeはコメント入力中も反応してしまいます', className: 'shortcut'},
       {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
@@ -9166,7 +9209,8 @@
               $link.attr(
                 'onclick',
                 'if (arguments[0].button > 0) return; arguments[0].preventDefault();' +
-                'WatchApp.ns.init.VideoExplorerInitializer.videoExplorerController.showOtherUserVideos(this.dataset.ownerid, this.title);'
+                'WatchApp.ns.init.VideoExplorerInitializer.videoExplorerController.showOtherUserVideos(this.dataset.ownerid, this.title);' +
+                'WatchApp.ns.util.WindowUtil.scrollFit($("#videoExplorer"));'
               );
             }
             if (info.nicorepo_log.length > 1) {
@@ -9215,7 +9259,8 @@
       w.document.body.appendChild(iframe);
       iframe.hide(); // ページの初期化が終わるまでは表示しない
 
-      $(iframe).find('.mylistSelect').attr('accesskey', ':');
+      var $iframe = $(iframe);
+      $iframe.find('.mylistSelect').attr('accesskey', ':');
 
       var toggleMylistMenuInFull = function(v) {
         $('.mylistPopupPanel')
@@ -9225,7 +9270,19 @@
       EventDispatcher.addEventListener('on.config.hideMenuInFull', toggleMylistMenuInFull);
       toggleMylistMenuInFull(conf.hideMenuInFull);
 
-      var $iframe = $(iframe), $footer = $('#footer'), $window = $(window);
+      var setMylistPanelPosition = function(v) {
+        $iframe
+          .toggleClass('left', v.indexOf('left') >= 0)
+          .toggleClass('top',  v.indexOf('top')  >= 0);
+        setTimeout(function() {
+          $('#yukkuriPanel')
+            .toggleClass('mylistPanelLeft', v.indexOf('left') >= 0 && v.indexOf('top') < 0);
+        }, 500);
+      };
+      EventDispatcher.addEventListener('on.config.mylistPanelPosition', setMylistPanelPosition);
+      if (conf.mylistPanelPosition !== '') setMylistPanelPosition(conf.mylistPanelPosition);
+
+      var $footer = $('#footer'), $window = $(window);
       var toggleMylistPanelStyle = function() {
         if ($footer.is(':visible')) {
           $iframe.toggleClass('black', $window.scrollTop() + $window.innerHeight() - $footer.offset().top >= 0);
