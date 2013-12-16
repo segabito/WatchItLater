@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131213
+// @version        1.131216
 // ==/UserScript==
 
 /**
@@ -39,6 +39,9 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+
+// * ver 1.131216
+// - 一部入力欄でオートコンプリートが効くようにした (Firefoxだけ？)
 
 // * ver 1.131213
 // - マイリストメニューの位置を右下・左下から選べるようにした
@@ -4180,7 +4183,7 @@
             'http://riapi.nicovideo.jp/api/watch/mylistvideo?id=' + id.toString()
           );
         } else {
-          watch.VideoExplorerInitializer.mylistVideoAPILoader._cache.clearCache();
+          watch.VideoExplorerInitializer.mylistVideoAPILoader._cache.clear();
         }
       },
       showDefMylist: function() {
@@ -4257,9 +4260,9 @@
         }
       },
       openSearch: function() {
-//          WatchApp.ns.init.VideoExplorerInitializer.expandButtonView.open();
+          WatchApp.ns.init.VideoExplorerInitializer.expandButtonView.open();
 //        videoExplorer.openByCurrentCondition();
-        videoExplorer.changeState(true);
+//        videoExplorer.changeState(true);
       },
       closeSearch: function() {
         //videoExplorer.close();
@@ -8877,7 +8880,7 @@
         $searchInput    = $('<input class="quickSearchInput" type="search" name="q" accesskey="q" required="required" />')
           .attr({'title': '検索ワードを入力', 'placeholder': '検索ワードを入力(Q)'}),
         $closeExplorer  = $('<div class="closeVideoExplorer"><a href="javascript:;">▲ 画面を戻す</a></div>'),
-        $inputForm      = $('<form />').append($searchInput),
+        $inputForm      = $('<form  action="javascript:void(0);" />').append($searchInput),
         $toggleCommentPanel = $('<button class="toggleCommentPanel">コメント</button>');
 
       // init search menu
@@ -8887,7 +8890,7 @@
         e.stopPropagation();
       });
       $inputForm.on('submit', function(e) {
-        e.preventDefault();
+        //e.preventDefault();
         var val = $.trim($searchInput.val());
         if (val.length > 0) {
           if (val.match(/(sm|nm|so)\d+/)) {
@@ -11298,8 +11301,8 @@
     function initInvisibleCommentInput($, conf, w) {
       var $view = $(Util.here(function() {/*
         <div class="invisibleInput">
-        <form>
-          <input type="text" value="" autocomplete="on" accesskey="c"
+        <form action="javascript: void(0);">
+          <input type="text" value="" autocomplete="on" name="chat" accesskey="c"
             list="myMylist" placeholder="コメント入力" class="invisibleCommentInput"
             maxlength="75"
             ></form>
@@ -11406,7 +11409,7 @@
 
       $form
         .on('submit', function(e) {
-          prevent(e);
+          //prevent(e);
           var val = $.trim($input.val());
 
           if (val.match(/^:m([0-9a-p])(.*)/)) {
@@ -11427,7 +11430,7 @@
             WatchController.postComment(val);
           }
 
-          $input.val('');
+          setTimeout(function() { $input.val(''); } , 100);
           $input.blur();
       });
 
