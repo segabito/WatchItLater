@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131216
+// @version        1.131224
 // ==/UserScript==
 
 /**
@@ -39,6 +39,9 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+
+// * ver 1.131224
+// - 本家のCSS更新に対応
 
 // * ver 1.131216
 // - 一部入力欄でオートコンプリートが効くようにした (Firefoxだけ？)
@@ -2048,7 +2051,8 @@
         margin-left: -30px;
         width: 30px;
         height: 30px;
-        background: url(http://res.nimg.jp/img/watch_zero/icon_nextplay.png);
+              {*background: url(http://res.nimg.jp/img/watch_zero/icon_nextplay.png);*}
+                background: url("http://res.nimg.jp/img/watch_zero/videoexplorer-s547dc55e88.png") no-repeat scroll -37px 0 rgba(0, 0, 0, 0);
         z-index: 100;
         cursor: pointer;
         text-indent: -999em;
@@ -2863,7 +2867,7 @@
         dic.target = '_blank';
         var icon = document.createElement('img');
         icon.className = 'icon';
-        icon.src = tag.dic ? 'http://res.nimg.jp/img/watch_zero/icon_dic.png' : 'http://res.nimg.jp/img/watch_zero/icon_disable_dic.png';
+        icon.src = tag.dic ? 'http://live.nicovideo.jp/img/2012/watch/tag_icon002.png' : 'http://live.nicovideo.jp/img/2012/watch/tag_icon003.png';
         dic.appendChild(icon);
         return dic;
       }
@@ -8689,7 +8693,7 @@
         }
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .contentItemList .folder .container,
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .suggestVideo .folder .container {
-          background-position: -15px 0; width: 130px; height: 100px;
+          background-position: -15px -60px; width: 130px; height: 100px;
         }
 
         body.size_small.no_setting_panel.videoExplorer #content #videoExplorerExpand { {*「閉じる」ボタン *}
@@ -8800,7 +8804,9 @@
         .thumbnailLoadSuccess .noimage {
           display: none;
         }
-
+        .videoExplorer #playerContainer.appli_panel #appliPanel {
+          width: auto !important; background: #333;
+        }
       */});
       return addStyle(__css__, 'videoExplorerStyleStatic');
     } // end setupVideoExplorerStaticCss
