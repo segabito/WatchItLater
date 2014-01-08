@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.131224
+// @version        1.140107
 // ==/UserScript==
 
 /**
@@ -39,6 +39,9 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+
+// * ver 1.140107
+// - ニコメンドまわりのコード除去
 
 // * ver 1.131224
 // - 本家のCSS更新に対応
@@ -272,7 +275,7 @@
       heatMapDisplayMode: 'hover', // 'always' 'hover'
       replacePopupMarquee: false, //
       enableRelatedTag: true, // 関連タグを表示するかどうか
-      playerTabAutoOpenNicommend: 'enable', // 終了時にニコメンドを自動で開くかどうか 'enable' 'auto' 'disable'
+//      playerTabAutoOpenNicommend: 'enable', // 終了時にニコメンドを自動で開くかどうか 'enable' 'auto' 'disable'
       autoPauseInvisibleInput: true, //
       customPlayerSize: '', //
       removeCommentPanelHoverEvent: false, //
@@ -294,7 +297,7 @@
       searchMusicDlFilter:       false, //
 
       hideVideoExplorerExpand: true, // 「動画をもっと見る」ボタンを小さくする
-      nicommendVisibility: 'visible', // ニコメンドの表示 'visible', 'underIchiba', 'hidden'
+//      nicommendVisibility: 'visible', // ニコメンドの表示 'visible', 'underIchiba', 'hidden'
       ichibaVisibility:    'visible', // 市場の表示 '',   'visible', 'hidden'
       reviewVisibility:    'visible', // レビューの表示   'visible', 'hidden'
       bottomContentsVisibility: 'hidden', // 動画下のコンテンツ表示表示非表示
@@ -936,9 +939,6 @@
       }
       .sidePanel.ichibaEmpty  .tab.ichiba, .sidePanel.reviewEmpty .tab.review {
         color: #ccc;
-      }
-      #playerTabWrapper.nicommendEmpty .playerTabHeader .playerTabItem.nicommend {
-        opacity: 0.5;
       }
 
       .sideIchibaPanel .ichibaPanelInner {
@@ -1760,7 +1760,7 @@
       body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerContainer {
         height: auto;
       }
-      #outline.noNicommend #nicommendContainer, #outline.noIchiba  #nicoIchiba, #outline.noReview  #videoReview{
+      #outline.noIchiba  #nicoIchiba, #outline.noReview  #videoReview{
         display: none;
       }
       #bottomContentTabContainer.noBottom .outer, #bottomContentTabContainer.noBottom #pageFooter {
@@ -1925,9 +1925,7 @@
       #outline.w_compact {
         border-bottom: 0; margin-bottom: 0;
       }
-      #outline.w_compact #nicommendList {
-        margin-top: 4px;
-      }
+
       #outline.w_compact .sidebar { width: 300px; }
 
       #outline.w_compact #ichibaMain dl.ichiba_mainitem {
@@ -2166,11 +2164,9 @@
       {title: 'ウィンドウがアクティブの時だけ自動再生する', varName: 'autoPlayIfWindowActive',
         description: 'QWatch側の設定パネルの自動再生はオフにしてください。\n■こんな人におすすめ\n・自動再生ONにしたいけど別タブで開く時は自動再生したくない\n・複数タブ開いたままブラウザ再起動したら全部のタブで再生が始まって「うるせー！」という経験のある人',
         values: {'する': 'yes', 'しない': 'no'}},
-      {title: '動画が切り替わる時、ポップアップで再生数を表示', varName: 'popupViewCounter',
+      {title: '動画が切り替わる時、ポップアップでタイトルと再生数を表示', varName: 'popupViewCounter',
         description: '全画面状態だと再生数がわからなくて不便、という時に',
         values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
-      {title: '終了時に自動でニコメンドを開く', varName: 'playerTabAutoOpenNicommend',
-        values: {'開かない': 'disable', '中身がある時だけ開く': 'auto', '開く': 'enable'}},
 
       {title: 'プレイヤーの設定', className: 'playerSetting'},
       {title: 'コメントパネルを広くする', varName: 'wideCommentPanel',
@@ -2241,8 +2237,6 @@
         values: {'する': true, 'しない': false}},
 
       {title: 'ページ下半身の設定', className: 'playerBottom'},
-      {title: 'ニコメンドの位置', varName: 'nicommendVisibility',
-        values: {'非表示': 'hidden', '市場の下': 'underIchiba', '市場の上(標準)': 'visible'}},
       {title: 'ニコニコ市場の表示', varName: 'ichibaVisibility',
         values: {'非表示': 'hidden', '表示': 'visible'}},
       {title: 'レビューの表示', varName: 'reviewVisibility',
@@ -2315,7 +2309,7 @@
       {title: 'ハードウェアアクセラレーションON/FF',  varName: 'shortcutToggleStageVideo',   type: 'keyInput'},
 
       {title: 'その他2(一発ネタ系)', description: 'いつのまにか消えるかもしれません', className: 'shortcut'},
-      {title: 'てれびちゃんメニュー内にランダム画像(左上)表示', varName: 'hidariue',
+      {title: 'テレビちゃんメニュー内にランダム画像(左上)表示', varName: 'hidariue',
         values: {'する': true, 'しない': false}},
       {title: 'ゆっくり再生(スロー再生)ボタンを表示', varName: 'enableYukkuriPlayButton',
         values: {'する': true, 'しない': false}},
@@ -4650,10 +4644,6 @@
           return false;
         }
       },
-      // ニコメンドの中身が空っぽかどうか？
-      isNicommendEmpty: function() {
-        return $('#nicommendList').find('.content').length         < 1;
-      },
       isIchibaEmpty: function() {
         return $('#ichibaMain')   .find('.ichiba_mainitem').length < 1;
       },
@@ -6505,63 +6495,6 @@
       return self;
     })($, conf, w);
 
-    var NicommendReader = (function($, conf, w) {
-      var self, dataCache = {};
-
-      function update() {
-        //console.log('nicommendreader update', $('#nicommendPanelContent').find('.nicommendItemList>.item'));// dataCache = {};
-        $('#nicommendPanelContent').find('.nicommendItemList>.item').each(function() {
-          var $item = $(this), url, img;
-          if ($item.hasClass('video')) {
-            url = $item.find('.itemThumb>a').attr('href').split('?')[0];
-            url = url.replace('www.nicovideo.jp', location.host);
-            dataCache[url] = {
-              type: 'video',
-              title: $.trim($item.find('.itemName a').text()),
-              thumbnail: [$item.find('.itemThumb img').attr('src')]
-            };
-          } else
-          if ($item.hasClass('mylist')) {
-            url = $item.find('.itemThumb>a').attr('href').split('?')[0];
-            img = $item.find('.itemThumb img');
-            url = url.replace('www.nicovideo.jp', location.host);
-            dataCache[url] = {
-              type: 'mylist',
-              title: $.trim($item.find('.itemName a').text()),
-              count: $item.find('.itemName .value').text().replace('件', ''),
-              thumbnail: []
-            };
-            if(img[0]) dataCache[url].thumbnail[0] = img[0].src;
-            if(img[1]) dataCache[url].thumbnail[1] = img[1].src;
-            if(img[2]) dataCache[url].thumbnail[2] = img[2].src;
-
-          }
-          if ($item.hasClass('illust')) {
-            url = $item.find('.itemThumb>a').attr('href').split('?')[0];
-            img = $item.find('.itemThumb img');
-            url = url.replace('www.nicovideo.jp', location.host);
-            dataCache[url] = {
-              type: 'illust',
-              title: $.trim($item.find('.itemName a').text()),
-              thumbnail: [$item.find('.itemThumb img').attr('src')]
-            };
-
-          }
-        });
-        //console.log(dataCache);
-      }
-
-      function info(url) {
-        return dataCache[url] || {};
-      }
-
-      self = {
-        update: update,
-        info: info
-      };
-      return self;
-    })($, conf, w);
-
     function onWindowResizeEnd() {
       setTimeout(function() {
         EventDispatcher.dispatch('onWindowResizeEnd');
@@ -6956,19 +6889,7 @@
       playerTab.playlist_org = playerTab.playlist;
       playerTab.playlist = {
         isContinuous: function() {
-          if (conf.playerTabAutoOpenNicommend === 'disable') {
-            if (conf.debugMode) console.log('ニコメンドキャンセル: "disabled"');
-            // 'disable'の時は常に「連続再生中」という嘘を返す事でパネルオープンを止める
-            return true;
-          } else
-          if (conf.playerTabAutoOpenNicommend === 'auto' && WatchController.isNicommendEmpty()) {
-            if (conf.debugMode) console.log('ニコメンドキャンセル: "auto"');
-            // 'auto' の時は、ニコメンドが空の時だけキャンセルする
-            return true;
-          } else
-          if (conf.playerTabAutoOpenNicommend === 'enable') {
-            return playerTab.playlist_org.isContinuous();
-          }
+          return true;
         }
       };
     } //
@@ -7104,41 +7025,9 @@
       $videoDescription.find('.videoDescriptionInner').append(create$videoDescription(watchInfoModel.description));
       $videoDescription.find('.watch').unbind('click');
 
-      NicommendReader.update();
 
-      $videoDescription.find('.videoDescriptionInner a').each(function() {
-        var url = this.href, info = NicommendReader.info(url), text, $this = $(this);
-        if (info.type === 'video') {
-            text = $this.text();
-            $this.after([
-              '<div class="nextPlayButton" title="次に再生" onclick="WatchItLater.WatchController.insertVideoToPlaylist(\'', $this.text(),'\')">次に再生</div>',
-              '<div class="descriptionThumbnail video" style="">',
-              '<img src="', info.thumbnail[0], '">',
-              '<p>', info.title, '</p>',
-              '</div>',
-            ''].join(''));
-        } else
-        if (info.type === 'mylist') {
-            text = $this.text();
-            var dom = [
-                '<div class="descriptionThumbnail mylist">',
-                '<p>', info.title, '</p>'
-            ];
-            if (info.thumbnail[0]) dom.push('<img src="' + info.thumbnail[0] + '">');
-            if (info.thumbnail[1]) dom.push('<img src="' + info.thumbnail[1] + '">');
-            if (info.thumbnail[2]) dom.push('<img src="' + info.thumbnail[2] + '">');
-            dom.push('</div>');
-            $this.after(dom.join(''));
-        } else
-        if (info.type === 'illust') {
-            text = $this.text();
-            $this.after([
-                '<div class="descriptionThumbnail illust" style="">',
-                '<img src="', info.thumbnail[0], '">',
-                '<p>', info.title, '</p>',
-                '</div>',
-            ''].join(''));
-        } else
+      $videoDescription.find('.videoDescriptionInner a').each(function() { return;
+        var url = this.href, text, $this = $(this);
         if (url.match(/\/watch\/((sm|nm|so|)\d+)$/)) {
           $this.after([
             '<div class="nextPlayButton" title="次に再生" onclick="WatchItLater.WatchController.insertVideoToPlaylist(\'', RegExp.$1, '\')">次に再生</div>',
@@ -7194,8 +7083,7 @@
       $sideInfoPanel.find('*').unbind();
 
       $sidePanel
-        .toggleClass('ichibaEmpty',    WatchController.isIchibaEmpty())
-        .toggleClass('nicommendEmpty', WatchController.isNicommendEmpty());
+        .toggleClass('ichibaEmpty',    WatchController.isIchibaEmpty());
 
       $sideInfoPanel
         .empty()
@@ -9851,7 +9739,7 @@
           console.trace();
         }
       } else
-      if ((conf.storagePlaylistMode === 'sessionStorage' || conf.storagePlaylistMode === 'localStorage') && w[conf.storagePlaylistMode]) {
+      if ((conf.storagePlaylistMode === 'sessionStorage' || conf.storagePlaylistMode === 'localStorage') && w[conf.storagePlaylistMode] && !playlist.isContinuous()) {
         try {
           if (conf.debugMode) console.log('restore playlist:' + conf.storagePlaylistMode);
           var list = JSON.parse(w[conf.storagePlaylistMode].getItem('watchItLater_playlist'));
@@ -10798,20 +10686,6 @@
       function updateHideVideoExplorerExpand(v) {
         $('#content, #outline').toggleClass('w_hideSearchExpand', v === true);
       }
-      function updateNicommendVisibility(v) {
-        var $nicommend = $('#nicommendContainer');
-        if (v === 'visible') {
-          $('#nicoIchiba').before($nicommend);
-          $('#outline').removeClass('noNicommend');
-        } else
-        if (v === 'underIchiba') {
-          $('#nicoIchiba').after($nicommend);
-          $('#outline').removeClass('noNicommend');
-        } else
-        if (v === 'hidden') {
-          $('#outline').addClass('noNicommend');
-        }
-      }
       function updateIchibaVisibility(v) {
         $('#outline').toggleClass('noIchiba', v === 'hidden');
       }
@@ -10823,12 +10697,10 @@
       }
 
       EventDispatcher.addEventListener('on.config.hideVideoExplorerExpand',     updateHideVideoExplorerExpand);
-      EventDispatcher.addEventListener('on.config.nicommendVisibility',         updateNicommendVisibility);
       EventDispatcher.addEventListener('on.config.ichibaVisibility',            updateIchibaVisibility);
       EventDispatcher.addEventListener('on.config.reviewVisibility',            updateReviewVisibility);
       EventDispatcher.addEventListener('on.config.bottomContentsVisibility',    updateBottomContentsVisibility);
       if (conf.hideVideoExplorerExpand === true) { updateHideVideoExplorerExpand(true); }
-      if (conf.nicommendVisibility !== 'visible') { updateNicommendVisibility(conf.nicommendVisibility); }
       if (conf.ichibaVisibility    !== 'visible') { updateIchibaVisibility(conf.ichibaVisibility); }
       if (conf.reviewVisibility    !== 'visible') { updateReviewVisibility(conf.reviewVisibility); }
       if (conf.bottomContentsVisibility !== 'visible') { updateBottomContentsVisibility(conf.bottomContentsVisibility); }
@@ -12184,6 +12056,21 @@
   //===================================================
   //===================================================
 
+WatchApp.ns.util.CommentListUtil.merge = function(a, b) {
+  var i, len, res, uniq = {};
+  for (i = a.length - 1; i >= 0; i--) {
+    res = a[i];
+    if (uniq[res.resNo]) {
+      a.splice(i, 1);
+    }
+    uniq[res.resNo] = true;
+  }
+  for (i = 0, len = b.length; i < len; i++) {
+    res = b[i];
+    if (uniq[res.resNo]) { continue; }
+    a.push(res)
+  }
+};
 
   }); // end of monkey();
 
