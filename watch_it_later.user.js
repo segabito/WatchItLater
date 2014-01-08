@@ -255,6 +255,7 @@
       enableNewsHistory: false, // ニコニコニュースの履歴を保持する
       defaultSearchOption: '', // 検索時のデフォルトオプション
       autoPlayIfWindowActive: 'no', // 'yes' = ウィンドウがアクティブの時だけ自動再生する
+      autoPlay2ndVideo: false, // 2本目以降の動画だけ自動再生
       enableYukkuriPlayButton: false, // スロー再生ボタンを表示する
       noNicoru: false, // ニコるボタンをなくす
       enoubleTouchPanel: false, // タッチパネルへの対応を有効にする
@@ -1733,10 +1734,10 @@
       body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerTabWrapper {
         height: auto !important; position: absolute; bottom: 18px;
       }
-      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews              #playerTabContainer {
+      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerTabContainer {
         bottom: -17px;
       }
-      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews .appli_panel #playerTabContainer {
+      body:not(.videoExplorer):not(.setting_panel):not(.full_with_browser) #content.noNews #playerContainer.appli_panel #playerTabContainer {
         bottom:  20px;
       }
       #playerTabWrapper.w_videoInfo #playerTabContainer, #playerTabWrapper.w_ichiba #playerTabContainer, #playerTabWrapper.w_review #playerTabContainer {
@@ -2316,7 +2317,10 @@
 
       {title: '実験中の設定', debugOnly: true, className: 'forDebug'},
       {title: 'プレイリスト消えないモード(※実験中)',       varName: 'hashPlaylistMode', debugOnly: true, reload: true,
-        values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}}
+        values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}},
+      {title: '2本目以降の動画だけ自動再生', varName: 'autoPlay2ndVideo', debugOnly: true, reload: true,
+        values: {'する': true, 'しない': false}}
+
 
     ];
 
@@ -4331,7 +4335,7 @@
       },
       setPlaylistItems: function(items, currentItem) {
         var playlist = watch.PlaylistInitializer.playlist;
-        var isAutoPlay = playlist.isContinuous();//.isAutoPlay();
+//        var isAutoPlay = playlist.isContinuous();//.isAutoPlay();
         playlist.reset(
           items,
           'WatchItLater',
@@ -4340,9 +4344,9 @@
         );
         if (currentItem) { playlist.playingItem = currentItem; }
         else { playlist.playingItem = items[0]; }
-        if (!isAutoPlay) { // 本家側の更新でリセット時に勝手に自動再生がONになるようになったので、リセット前の状態を復元する
-          playlist.disableContinuous();
-        }
+//        if (!isAutoPlay) { // 本家側の更新でリセット時に勝手に自動再生がONになるようになったので、リセット前の状態を復元する
+//          playlist.disableContinuous();
+//        }
       },
       shufflePlaylist: function(target) {
         var x = this.getPlaylistItems(), items = [], i, currentIndex = -1, currentItem = null;
@@ -7026,7 +7030,7 @@
       $videoDescription.find('.watch').unbind('click');
 
 
-      $videoDescription.find('.videoDescriptionInner a').each(function() { return;
+      $videoDescription.find('.videoDescriptionInner a').each(function() {
         var url = this.href, text, $this = $(this);
         if (url.match(/\/watch\/((sm|nm|so|)\d+)$/)) {
           $this.after([
@@ -11705,6 +11709,23 @@
         return PlayerApp.ns.player.Nicoplayer.getInstance().getCommentNicoruCount(name, num);
       };
 
+      var playerConfig = watch.PlayerInitializer.nicoPlayerConnector.playerConfig;
+      if (conf.autoPlayIfWindowActivei === 'yes') {
+        playerConfig.set({autoPlay: false});
+      }
+      if (conf.autoPlay2ndVideo) {
+        playerConfig.set({autoPlay: false});
+        EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
+          WatchController.pause();
+          WatchController.vpos(0);
+          setTimeout(function() {
+            playerConfig.set({autoPlay: true});
+          }, 3000);
+        });
+        $(window).on('beforeunload.watchItLater.autoPlay2ndVideo', function(e) {
+          playerConfig.set({autoPlay: false});
+        });
+      }
 
       if (conf.debugMode) {
         watch.PopupMarqueeInitializer.popupMarqueeViewController.itemList.addEventListener('popup', function(body) {
@@ -12056,21 +12077,19 @@
   //===================================================
   //===================================================
 
-WatchApp.ns.util.CommentListUtil.merge = function(a, b) {
-  var i, len, res, uniq = {};
-  for (i = a.length - 1; i >= 0; i--) {
-    res = a[i];
-    if (uniq[res.resNo]) {
-      a.splice(i, 1);
+if (WatchApp && WatchJsApi) {
+  // コメントの重複を殺すやつ(暫定)
+  WatchApp.ns.util.CommentListUtil.merge = function(a, b) {
+    var uniq = {}, tmp = a.concat(b);
+    a.length = 0;
+    for (var i = 0, len = tmp.length; i < len; i++) {
+      var res = tmp[i], resNo = res.resNo;
+      if (uniq[resNo]) { continue; }
+      a.push(res);
+      uniq[resNo] = true;
     }
-    uniq[res.resNo] = true;
-  }
-  for (i = 0, len = b.length; i < len; i++) {
-    res = b[i];
-    if (uniq[res.resNo]) { continue; }
-    a.push(res)
-  }
-};
+  };
+}
 
   }); // end of monkey();
 
