@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140107
+// @version        1.140110
 // ==/UserScript==
 
 /**
@@ -40,8 +40,10 @@
  */
 
 
-// * ver 1.140107
+// * ver 1.140110
+// - 検索フォームのオートコンプリートを調整
 // - ニコメンドまわりのコード除去
+// - 微妙にNicorenizerとの相性を改善
 
 // * ver 1.131224
 // - 本家のCSS更新に対応
@@ -3676,7 +3678,7 @@
 
   var FavTags = (function() {
     var lastUpdate = 0;
-    var favTagList = [];
+    var favTagList = [], favTagTextList = [];
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
     var $ = w.$;
     var pt = function(){};
@@ -3702,10 +3704,13 @@
           if ($result.length >= 1) {
             favTagList = [];
             $result.find('.outer').each(function() {
-              var $a = $(this).find('h5 a');
+              var $a = $(this).find('h5 a'), text = $a.text();
               favTagList.push({href: $a.attr('href'), name: $a.text()});
+              favTagTextList.push(text);
             });
+            EventDispatcher.dispatch('onFavTagsLoad', favTagTextList.concat());
           }
+          $result = null;
           if (typeof callback === 'function') { callback(favTagList); }
         }
       });
@@ -4723,6 +4728,11 @@
       };
 
     var Closure = {
+      outScope: function(func) {
+        return new Function([
+          '(' + func.toString() + ').apply(this, arguments);'
+        ].join(''));
+      },
       openVideoOwnersVideo: function() {
         return function(e) {
           if (isMetaKey(e)) { return; }
@@ -8706,15 +8716,17 @@
     function initAutoComplete($searchInput) {
       var
         $suggestList = $('<datalist id="quickSearchSuggestList"></datalist>'),
+        wordSuggest = '',
+        favTagsSuggest = '',
         loading = false,
         val = '',
-        suggestLoader = new NicoSearchSuggest({});
+        suggestLoader = new NicoSearchSuggest({}),
         update = WatchApp.ns.event.EventDispatcher.debounce(function() {
           if (loading) {
             return;
           }
           var value = $searchInput.val();
-          if (value.length >= 2 && val !== value) {
+          if (value.length >= 1 && val !== value) {
             val = $searchInput.val();
             loading = true;
             suggestLoader.load(val, onSuggestLoaded);
@@ -8728,15 +8740,18 @@
           }
           if (result.candidates) {
             if (conf.debugMode) console.log(result.candidates);
-            var candidates = result.candidates, suggestList = $suggestList[0];
-            $suggestList.empty();
+            var candidates = result.candidates;
+            var options = [];
             for (var i = candidates.length - 1; i >= 0; i--) {
-              var opt = document.createElement('option');
-              opt.setAttribute('value', candidates[i]);
-              suggestList.appendChild(opt);
+              options.unshift(['<option value="', candidates[i], '"></option>'].join(''));
             }
+            wordSuggest = options.join('');
+            refresh();
           }
           loading = false;
+        },
+        refresh = function() {
+          $suggestList.html(wordSuggest + favTagsSuggest);
         },
         bind = function($elm) {
           $elm
@@ -8756,6 +8771,14 @@
          // }
         };
 
+      EventDispatcher.addEventListener('onFavTagsLoad', function(tags) {
+        var options = [];
+        for (var i = tags.length - 1; i >= 0; i--) {
+          options.unshift(['<option value="', tags[i], '"></option>'].join(''));
+        }
+        favTagsSuggest = options.join('');
+        refresh();
+      });
       $('body').append($suggestList);
 
       bind($searchInput);
@@ -8999,7 +9022,7 @@
       WatchApp.ns.model.state.WatchPageState.prototype.isPushState = function(a) {
         if (conf.videoExplorerHack) { return true; }
         return this.isPushState_org(a);
-      }
+      };
 
 
     } // end initVideoExplorer
@@ -9311,7 +9334,8 @@
       var wheelCounter = 0, wheelTimer = null;
       EventDispatcher.addEventListener('onWheelNoButton', function(e, delta) {
         if (!conf.enableFullScreenMenu) return;
-        if (e.target.tagName !== 'OBJECT' || !WatchController.isFullScreen()) return;
+        if ((e.target.tagName !== 'OBJECT' && e.target.tagName !== 'HTML') ||
+          !WatchController.isFullScreen()) return;
         if (wheelTimer) {
           wheelCounter += delta;
        } else {
@@ -12010,6 +12034,19 @@
     if (conf.debugMode) {
       initTest(WatchItLater.test);
     }
+
+      // コメントの重複を殺すやつ(暫定)
+      WatchApp.ns.util.CommentListUtil.merge = function(a, b) {
+        var uniq = {}, tmp = a.concat(b);
+        a.length = 0;
+        for (var i = 0, len = tmp.length; i < len; i++) {
+          var res = tmp[i], resNo = res.resNo;
+          if (uniq[resNo]) { continue; }
+          a.push(res);
+          uniq[resNo] = true;
+        }
+      };
+
   })(w);
 
 
@@ -12076,20 +12113,6 @@
   //===================================================
   //===================================================
   //===================================================
-
-if (WatchApp && WatchJsApi) {
-  // コメントの重複を殺すやつ(暫定)
-  WatchApp.ns.util.CommentListUtil.merge = function(a, b) {
-    var uniq = {}, tmp = a.concat(b);
-    a.length = 0;
-    for (var i = 0, len = tmp.length; i < len; i++) {
-      var res = tmp[i], resNo = res.resNo;
-      if (uniq[resNo]) { continue; }
-      a.push(res);
-      uniq[resNo] = true;
-    }
-  };
-}
 
   }); // end of monkey();
 
