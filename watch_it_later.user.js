@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140110
+// @version        1.140122
 // ==/UserScript==
 
 /**
@@ -39,6 +39,8 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+// * ver 1.140122
+// - テレビちゃんメニューをShinjukuWatch仕様に
 
 // * ver 1.140110
 // - 検索フォームのオートコンプリートを調整
@@ -244,7 +246,7 @@
       nicoSSeekCount: -1, // @ジャンプによるシーク(ループなど)を許可する回数 -1=無限 0以上はその回数だけ許可
       doubleClickScroll: true, // 空白部分ををダブルクリックで動画の位置にスクロールする
       hidePlaylist: true, // プレイリストを閉じる
-      hidariue: true, // てれびちゃんメニュー内に、原宿以前のランダム画像復活
+      hidariue: false, // てれびちゃんメニュー内に、原宿以前のランダム画像復活
       videoExplorerHack: true, // 検索画面を乗っ取る
       squareThumbnail: true, // 検索画面のサムネを4:3にする
       enableFavTags: false, // 動画検索画面にお気に入りタグを表示
@@ -2110,6 +2112,48 @@
       .w_noSocial .nicoSpotAds {
         bottom: 8px;
       }
+
+
+      {* テレビちゃんメニュー スライドをやめる *}
+      body #videoHeader #videoMenuWrapper{
+        position: absolute; width: 324px; height: auto !important;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        right: 0px;
+      }
+      body #videoHeader.menuOpened #videoMenuWrapper{
+        z-index: 1000 !important;
+        border: 1px solid #000;
+        background: white;
+        box-shadow: 0px 0px 4px #000;
+        top: 62px;
+        bottom: auto;
+        opacity: 1;
+      }
+      body #videoHeader.infoActive.menuOpened #videoMenuWrapper{
+        top: auto;
+        bottom: 48px;
+      }
+      body #videoHeader #videoMenuWrapper .defmylistButton, body #videoHeader #videoMenuWrapper .mylistButton {
+        display: none !important;
+      }
+      body #videoHeader #videoMenuTopList{
+        position: relative;
+        width: auto;
+      }
+      body #videoHeader.menuOpened #videoMenuWrapper .videoMenuList{
+        display: inline-block;
+        width: 60px;
+      }
+
+      {* テレビちゃんメニューのスライド殺す *}
+      body #videoHeader.menuOpened #videoMenuWrapper {
+        margin-bottom: 0;
+      }
+      body #videoHeader.menuOpened #videoHeaderDetail {
+        margin-top: 8px;
+      }
+
 
   */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
@@ -4145,7 +4189,8 @@
       isZeroWatch:  _false,
       isQWatch:     _false,
       isFullScreen: _false,
-      isSearchMode: _false
+      isSearchMode: _false,
+      getTid2Vid: function(threadId) { return threadId;}
     };
     var
       watch          = (WatchApp && WatchApp.ns.init) || {},
@@ -4672,6 +4717,18 @@
             Popup.alert('コメント投稿に失敗しました');
           }
         }, 0);
+      },
+      // スレッドIDから動画IDに変換。出来なかった時はそのまま返す
+      getTid2Vid: function(threadId, callback) {
+        if (threadId.match()) {
+          return callback(threadId);
+        }
+        WatchItLater.VideoInfoLoader.load(id).pipe(function(info) {
+            callback(info.id);
+          },
+          function() {
+            callback(threadId);
+          });
       }
     };
   })(w); // end WatchController
@@ -5479,6 +5536,7 @@
         return def.promise();
       }
 
+      // タグ検索APIの「もしかして: xxx」を使って動画情報を取得する
       WatchApp.ns.util.HTTPUtil.loadXDomainAPI({ // videoId
         url: VideoInfoLoader.BASE_URL,
         type: 'GET',
@@ -7205,15 +7263,17 @@
     } //
 
     function initHidariue() {
+      // 再生終了時に勝手にメニューが開閉するのを止める
+      window.WatchApp.ns.init.PlayerInitializer.videoendViewController.videoHeaderViewController = {openVideoMenu: function(){}, closeVideoMenu: function() {}};
       var hidariue = null;
       var resetHidariue = function() {
-        var dt = new Date();
-        if (dt.getMonth() < 1 && dt.getDate() <=1) {
-          $('#videoMenuTopList').append('<li style="position:absolute;left:300px;font-size:50%">　＼　│　／<br>　　／‾＼　　 ／‾‾‾‾‾‾‾‾‾<br>─（ ゜ ∀ ゜ ）＜　しんねんしんねん！<br>　　＼＿／　　 ＼＿＿＿＿＿＿＿＿＿<br>　／　│　＼</li>');
-        }
+//        var dt = new Date();
+//        if (dt.getMonth() < 1 && dt.getDate() <=1) {
+//          $('#videoMenuTopList').append('<li style="font-size:50%">　＼　│　／<br>　　／‾＼　　 ／‾‾‾‾‾‾‾‾‾<br>─（ ゜ ∀ ゜ ）＜　しんねんしんねん！<br>　　＼＿／　　 ＼＿＿＿＿＿＿＿＿＿<br>　／　│　＼</li>');
+//        }
         if (!conf.hidariue) { return; }
         if (!hidariue) {
-          $('#videoMenuTopList').append('<li class="hidariue" style="position:absolute;top:21px;left:0px;"><a href="http://userscripts.org/scripts/show/151269" target="_blank" style="color:black;"><img id="hidariue" style="border-radius: 8px; box-shadow: 1px 1px 2px #ccc;"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:GINZA"></a></p></li>');
+          $('#videoMenuTopList').append('<li class="hidariue" style="text-align: center;"><a href="http://userscripts.org/scripts/show/151269" target="_blank" style="color:black;"><img id="hidariue" style="border-radius: 8px; box-shadow: 1px 1px 2px #ccc;"></a><p id="nicodou" style="padding-left: 4px; display: inline-block"><a href="http://www.nicovideo.jp/video_top" target="_top"><img src="http://res.nimg.jp/img/base/head/logo/q.png" alt="ニコニコ動画:GINZA"></a></p></li>');
           hidariue = $('#hidariue')[0];
         }
         hidariue.src = 'http://res.nimg.jp/img/base/head/icon/nico/' +
@@ -7787,6 +7847,13 @@
         this.setFilter(null);
         this.clear_org();
         grepOptionView.clear();
+      }, content);
+
+      content.getNickname = $.proxy(function() {
+        if (this._nickname && this._nickname.length > 0) {
+          return this._nickname;
+        }
+        return 'no-name';
       }, content);
 
       content.onLoad_org = content.onLoad;
@@ -8919,6 +8986,7 @@
         $('.videoExplorerMenu').addClass('initialized');
       });
       EventDispatcher.addEventListener('onVideoExplorerRefreshEnd', function(content) {
+        window.history.replaceState('', '', location.href.replace('/videoExplorer', ''));
         if (content.getType() === ContentType.USER_VIDEO) {
           var items = content.getItems();
           if (items.length === 1 && items[0].getContentItemType() !== ContentItemType.VIDEO) {
@@ -9016,7 +9084,7 @@
       //adjustVideoExplorerSize(true);
 
       // TODO: ニコメンド編集ボタンが押されたら検索画面解除
-      EventDispatcher.addEventListener('onVideoExplorerUpdated', function(req) { });
+      //EventDispatcher.addEventListener('onVideoExplorerUpdated', function(req) { });
 
       WatchApp.ns.model.state.WatchPageState.prototype.isPushState_org = WatchApp.ns.model.state.WatchPageState.prototype.isPushState;
       WatchApp.ns.model.state.WatchPageState.prototype.isPushState = function(a) {
@@ -11724,6 +11792,10 @@
           Advertisement: function() { return {set: function() {}}; }
         };
       }
+
+      EventDispatcher.addEventListener('onWatchInfoReset', function() {
+        window.history.replaceState('', '', location.href.replace('/videoExplorer', ''));
+      });
 
       // ニコる数を取得するためにコメントパネルがめちゃくちゃ重くなってるのを改善
       WatchApp.ns.model.player.NicoPlayerConnector.getCommentNicoruCount = function(name, num) {
