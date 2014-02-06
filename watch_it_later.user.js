@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140122
+// @version        1.140207
 // ==/UserScript==
 
 /**
@@ -35,9 +35,14 @@
  * ・軽量化
  * ・綺麗なコード
  *
- * ・テレビちゃんメニューをShinjukuWatch形式にする
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
+
+// * ver 1.140207
+// - テレビちゃんメニューの表示修正
+// - スレッドIDのリンクからもタグを取得できるように(watchページ内のみ)
+// - マイリスト選択メニューの右クリックでとりマイの位置に戻る隠し機能
+
 
 // * ver 1.140122
 // - テレビちゃんメニューをShinjukuWatch仕様に
@@ -2134,9 +2139,9 @@
         top: auto;
         bottom: 48px;
       }
-      body #videoHeader #videoMenuWrapper .defmylistButton, body #videoHeader #videoMenuWrapper .mylistButton {
+      {* body #videoHeader #videoMenuWrapper .defmylistButton, body #videoHeader #videoMenuWrapper .mylistButton {
         display: none !important;
-      }
+      } *}
       body #videoHeader #videoMenuTopList{
         position: relative;
         width: auto;
@@ -2144,8 +2149,17 @@
       body #videoHeader.menuOpened #videoMenuWrapper .videoMenuList{
         display: inline-block;
         width: 60px;
+        min-height: 72px;
       }
-
+      body #videoMenuTopList li.videoMenuListNicoru {
+        float: right;
+        min-height: 72px;
+      }
+      body #videoHeader.isAdult .videoMenuToggle, body #videoHeader.noAudioDownload .downloadButton {
+        display: inline-block;
+        opacity: 0.5;
+        pointer-events: none !important;
+      }
       {* テレビちゃんメニューのスライド殺す *}
       body #videoHeader.menuOpened #videoMenuWrapper {
         margin-bottom: 0;
@@ -2747,17 +2761,23 @@
     var lastPopup = null;
 
     pt.get = function(watchId, callback) {
-      var url = 'http://' + host + '/tag_edit/' + watchId + '/?res_type=json&cmd=tags';
-      //http://www.nicovideo.jp/tag_edit/sm9/?res_type=json&cmd=tags
-      var req = {
-        method: 'GET',
-        url: url,
-        onload: function(resp) {
-          var result = JSON.parse(resp.responseText);
-          if (typeof callback === "function") callback(result.status, result);
-        }
+      var _get = function(watchId, callback) {
+        var url = 'http://' + host + '/tag_edit/' + watchId + '/?res_type=json&cmd=tags';
+        //http://www.nicovideo.jp/tag_edit/sm9/?res_type=json&cmd=tags
+        var req = {
+          method: 'GET',
+          url: url,
+          onload: function(resp) {
+            var result = JSON.parse(resp.responseText);
+            if (typeof callback === 'function') callback(result.status, result);
+          }
+        };
+        GM_xmlhttpRequest(req);
       };
-      GM_xmlhttpRequest(req);
+
+      WatchController.getTid2Vid(watchId, function(videoId) {
+        _get(videoId, callback);
+      });
     };
 
     pt.hidePopup = function() {
@@ -3298,6 +3318,9 @@
 
       var extArea = document.createElement('span');
 
+
+      var isWatchPage = (window.WatchApp && window.WatchJsApi) ? true : false;
+
       body.watchId = function(w, v) {
         if (w) {
           _watchId = w;
@@ -3311,7 +3334,7 @@
           } else {
             deleteDef.style.display = 'none';
           }
-          if (isThreadId) {
+          if (!isWatchPage && isThreadId) {
             tagBtn.style.display = 'none'; // スレッドIDから動画IDを取る手段がないためタグ取得が難しい
           } else {
             tagBtn.style.display = '';
@@ -3339,39 +3362,60 @@
 
       function createSelector() {
         var sel = document.createElement('select');
+        var lastSelect = 0;
+
         sel.className = 'mylistSelect';
-        function appendO(sel, text, value) {
+        var appendO = function(sel, text, value) {
           var opt = document.createElement('option');
           opt.appendChild(document.createTextNode(text));
           opt.value = value;
           sel.appendChild(opt);
           return opt;
-        }
-        appendO(sel, '0:とりマイ', 'default');
-        sel.selectedIndex = 0;
-        setTimeout(function() {
+        },
+        createOptions = function() {
           for (var i = 0, len = mylistlist.length; i < len; i++) {
             var mylist = mylistlist[i];
             appendO(sel, (i + 1).toString(36) + ':' +  mylist.name, mylist.id);
           }
-        }, initialized ? 0 : 3000);
-        sel.addEventListener('change', function() {
-          // jQueryは全てのページにあるわけではないので気をつける
+        },
+        onSelect = function() {
+          // jQueryは全てのページにあるわけではないので気をつける。忘れると原宿が死ぬ
           if (sel.selectedIndex === 0) {
             body.className = body.className.replace('mylistSelected', 'deflistSelected');
           } else {
+            lastSelect = sel.selectedIndex;
             body.className = body.className.replace('deflistSelected', 'mylistSelected');
           }
-        }, false);
-
-        function ondblclick() {
+        },
+        selectDeflist = function() {
           sel.selectedIndex = 0;
-          body.className = body.className.replace('mylistSelected', 'deflistSelected');
-        }
+          onSelect();
+        },
+        onContextMenu = function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (lastSelect === 0) return;
+          if (sel.selectedIndex === 0) {
+            sel.selectedIndex = lastSelect;
+          } else {
+            sel.selectedIndex = 0;
+          }
+          onSelect();
+        };
+
+        appendO(sel, '0:とりマイ', 'default');
+        sel.selectedIndex = 0;
+        setTimeout(createOptions, initialized ? 0 : 3000);
+
+        sel.addEventListener('change', onSelect, false);
+        sel.addEventListener('contextmenu', onContextMenu, false);
+
+
         if (w.jQuery) {
-          w.jQuery(body).dblclick(ondblclick);
+          w.jQuery(body).on('dblclick', selectDeflist);
         } else {
-          body.addEventListener('dblclick', ondblclick, false);
+          body.addEventListener('dblclick', selectDeflist, false);
         }
         return sel;
       }
@@ -3720,18 +3764,14 @@
   })();
 
 
-  var FavTags = (function() {
+  var FavTags = (function(w) {
     var lastUpdate = 0;
     var favTagList = [], favTagTextList = [];
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
     var $ = w.$;
     var pt = function(){};
 
-    /**
-     *  お気に入りタグの取得。 jQueryのあるページでしか使えない
-     *  マイページを無理矢理パースしてるので突然使えなくなるかも
-     */
-    function load(callback) {
+    var load = function(callback) {
       if (!w.jQuery) return; //
       var now = Date.now();
       if (now - lastUpdate < 60 * 1000) {
@@ -3739,30 +3779,32 @@
         return;
       }
       lastUpdate = now;
-
-      var url = 'http://' + host + '/my/fav/tag';
-      GM_xmlhttpRequest({
-        url: url,
-        onload: function(resp) {
-          var $result = $(resp.responseText).find('#favTag');
-          if ($result.length >= 1) {
-            favTagList = [];
-            $result.find('.outer').each(function() {
-              var $a = $(this).find('h5 a'), text = $a.text();
-              favTagList.push({href: $a.attr('href'), name: $a.text()});
-              favTagTextList.push(text);
-            });
-            EventDispatcher.dispatch('onFavTagsLoad', favTagTextList.concat());
+      var api = 'http://' + host + '/api/favtag/list?t=' + now;
+      $.ajax({
+        url: api,
+        complete: function(result) {
+          if (result.status !== 200) {
+            return;
           }
-          $result = null;
-          if (typeof callback === 'function') { callback(favTagList); }
+          try {
+            var json = JSON.parse(result.responseText), items = json.favtag_items;
+            for (var i = 0, len = items.length; i < len; i++) {
+              var text = items[i]['tag'];
+              favTagList.push({href: '/tag/' + encodeURIComponent(text), name: items[i]['tag']});
+              favTagTextList.push(text);
+            }
+            EventDispatcher.dispatch('onFavTagsLoad', favTagTextList.concat());
+            if (typeof callback === 'function') { callback(favTagList); }
+          } catch (e) {
+            console.log('tag parse error!', e);
+          }
         }
       });
-    }
+    };
 
     pt.load = load;
     return pt;
-  })();
+  })(w);
 
 
   /**
@@ -3770,8 +3812,8 @@
    *
    */
   var Popup = (function(){
-    function Popup() {
-    }
+    var console = conf.debugMode ? window.console : {log: function() {}};
+    function Popup() {}
 
     Popup.show = function(text) {
       console.log('%c' + text, 'background: cyan;');
@@ -4190,7 +4232,7 @@
       isQWatch:     _false,
       isFullScreen: _false,
       isSearchMode: _false,
-      getTid2Vid: function(threadId) { return threadId;}
+      getTid2Vid: function(threadId, callback) { return callback(threadId);}
     };
     var
       watch          = (WatchApp && WatchApp.ns.init) || {},
@@ -4719,15 +4761,15 @@
         }, 0);
       },
       // スレッドIDから動画IDに変換。出来なかった時はそのまま返す
-      getTid2Vid: function(threadId, callback) {
-        if (threadId.match()) {
-          return callback(threadId);
+      getTid2Vid: function(watchId, callback) {
+        if (!watchId.match(/^[0-9]+$/)) {
+          return callback(watchId);
         }
-        WatchItLater.VideoInfoLoader.load(id).pipe(function(info) {
+        WatchItLater.VideoInfoLoader.load(watchId).pipe(function(info) {
             callback(info.id);
           },
           function() {
-            callback(threadId);
+            callback(watchId);
           });
       }
     };
@@ -6466,7 +6508,7 @@
 
 
   /**
-   *  QWatch上でのあれこれ
+   *  GINZAwatch上でのあれこれ
    *  無計画に増築中
    *
    *  watch.jsを解析すればわかる
@@ -8986,7 +9028,7 @@
         $('.videoExplorerMenu').addClass('initialized');
       });
       EventDispatcher.addEventListener('onVideoExplorerRefreshEnd', function(content) {
-        window.history.replaceState('', '', location.href.replace('/videoExplorer', ''));
+        //window.history.replaceState('', '', location.href.replace('/videoExplorer', ''));
         if (content.getType() === ContentType.USER_VIDEO) {
           var items = content.getItems();
           if (items.length === 1 && items[0].getContentItemType() !== ContentItemType.VIDEO) {
@@ -10138,6 +10180,8 @@
       });
 
       watchInfoModel.addEventListener('reset', onWatchInfoReset);
+      watchInfoModel.addEventListener('beforeReset', function() { EventDispatcher.dispatch('onWatchInfoBeforeReset'); });
+      watchInfoModel.addEventListener('afterReset',  function() { EventDispatcher.dispatch('onWatchInfoAfterReset'); });
       watch.PlayerInitializer.playerScreenMode.addEventListener('change', onScreenModeChange);
 
       var explorer = watch.VideoExplorerInitializer.videoExplorer;
@@ -11723,6 +11767,33 @@
     } //
 
 
+    function initScroll($, conf, w) {
+      // 動画切り換え時にページの一番上までスクロールするようになったのを強引に阻止する
+      window.WatchApp.ns.model.state.WatchPageRouter.getInstance()._scroll = function() {};
+
+
+      // 動画選択画面閉じた時にページの一番上までスクロールするようになったのを強引に阻止する
+      window.WatchApp.ns.util.WindowUtil.scroll_org = window.WatchApp.ns.util.WindowUtil.scroll;
+
+      var no_thanks = function() {
+        window.WatchApp.ns.util.WindowUtil.scroll = function() {};
+      };
+      var restore = function() {
+        window.WatchApp.ns.util.WindowUtil.scroll = window.WatchApp.ns.util.WindowUtil.scroll_org;
+      };
+
+      var vv = window.WatchApp.ns.init.BottomContentInitializer.videoExplorerModeViewController;
+      vv.onVideoExplorerClose_org = vv.onVideoExplorerClose;
+      vv.onVideoExplorerClose = $.proxy(function() {
+        no_thanks();
+          this.onVideoExplorerClose_org();
+        restore();
+        window.WatchApp.ns.util.WindowUtil.scrollFit('#playerContainerWrapper');
+      }, vv);
+
+      $ = conf = w = videoExplorerModeViewController = null;
+    } //
+
     function initOther() {
       if (conf.headerViewCounter) $('#siteHeaderInner').width($('#siteHeaderInner').width() + 200);
 
@@ -12099,6 +12170,7 @@
     initHeatMap($, conf, w);
     initPopupMarquee();
     initMylistPanel($, conf, w);
+    initScroll($, conf, w);
     initOther();
 
     onWindowResizeEnd();
