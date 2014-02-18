@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140207
+// @version        1.140218
 // ==/UserScript==
 
 /**
@@ -38,11 +38,14 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
+// * ver 1.140218
+// - コメント重複を勝手に直してたけど不要になったので除去
+// - 二本目以降の動画だけ自動再生を追加
+
 // * ver 1.140207
 // - テレビちゃんメニューの表示修正
 // - スレッドIDのリンクからもタグを取得できるように(watchページ内のみ)
-// - マイリスト選択メニューの右クリックでとりマイの位置に戻る隠し機能
-
+// - マイリスト選択メニュー部分の右クリックでとりマイの位置に戻る隠し機能
 
 // * ver 1.140122
 // - テレビちゃんメニューをShinjukuWatch仕様に
@@ -343,6 +346,7 @@
       searchSortType: 'n', //
       searchSortOrder: 'd', // 'd'=desc 'a' = asc
       fxInterval: 40, // アニメーションのフレームレート 40 = 25fps
+      enableGpuLayer: false, // 一部の要素でGPU描画を有効にしてみる？
       debugMode: false
     };
 
@@ -2007,6 +2011,7 @@
         top: auto !important; bottom: 3000px !important; right: 50px !important;
         transition: bottom 0.2s ease-out; max-height: 500px;
       }
+
       body.full_with_browser.w_fullScreenMenu:not(.videoExplorer) #playerTabWrapper {
         top: auto !important; bottom:  200px !important; right: 50px !important;
       }
@@ -2168,8 +2173,7 @@
         margin-top: 8px;
       }
 
-
-  */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
+   */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
         .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
     addStyle(__css__, 'watchItLaterStyle');
   })(); // end of watchItLaterStyle
@@ -2324,6 +2328,9 @@
         values: {'する': true, 'しない': false}},
       {title: 'コメントパネル下のソーシャルボタン', varName: 'hideCommentPanelSocialButtons',
         values: {'隠す': true, '隠さない': false}},
+      {title: 'GPUレイヤーを使用してみる(上級者用)', varName: 'enableGpuLayer', reload: true, debugOnly: true,
+        description: '環境によっては軽くなる かも しれません',
+        values: {'する': true, 'しない': false}},
 
       {title: 'その他の設定', className: 'otherSetting'},
       {title: '動画リンクにカーソルを重ねたらマイリストメニューを表示', varName: 'enableHoverPopup', reload: true,
@@ -2347,6 +2354,8 @@
         values: {'使う': true, '使わない': false}},
       {title: 'マイリストメニューの位置', varName: 'mylistPanelPosition',
         values: {'左下': 'left', '右下': ''}},
+      {title: '2本目以降の動画だけ自動再生', varName: 'autoPlay2ndVideo', reload: true,
+        values: {'する': true, 'しない': false}},
 
       {title: 'マウスとキーボードの設定', description: '※Chromeはコメント入力中も反応してしまいます', className: 'shortcut'},
       {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
@@ -2378,8 +2387,6 @@
       {title: '実験中の設定', debugOnly: true, className: 'forDebug'},
       {title: 'プレイリスト消えないモード(※実験中)',       varName: 'hashPlaylistMode', debugOnly: true, reload: true,
         values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}},
-      {title: '2本目以降の動画だけ自動再生', varName: 'autoPlay2ndVideo', debugOnly: true, reload: true,
-        values: {'する': true, 'しない': false}}
 
 
     ];
@@ -3412,11 +3419,7 @@
         sel.addEventListener('contextmenu', onContextMenu, false);
 
 
-        if (w.jQuery) {
-          w.jQuery(body).on('dblclick', selectDeflist);
-        } else {
-          body.addEventListener('dblclick', selectDeflist, false);
-        }
+        body.addEventListener('dblclick', selectDeflist, false);
         return sel;
       }
 
@@ -10224,11 +10227,14 @@
         EventDispatcher.dispatch('onWindowResizeEnd');
       }, 1000));
 
+      //$(document).on('scroll', WatchApp.ns.event.EventDispatcher.throttle(function() {
       $(document).on('scroll', function() {
-        $('body').addClass('w_noHover');
+        //$('body').addClass('w_noHover');
+        document.body.style.pointerEvents = 'none';
       });
       $(document).on('scroll', WatchApp.ns.event.EventDispatcher.debounce(function() {
-        $('body').removeClass('w_noHover');
+        //$('body').removeClass('w_noHover');
+        document.body.style.pointerEvents = '';
         EventDispatcher.dispatch('onScrollEnd');
       }, 500));
 
@@ -11096,6 +11102,31 @@
       EventDispatcher.addEventListener('onWindowResizeEnd', function() {
         updateDynamicCss();
       });
+
+      var __gpuLayer__ = (function() {/*
+        body.videoExplorer.content-fix #playerTabWrapper,
+        body.videoExplorer.content-fix .videoExplorerMenu,
+        body.videoExplorer.content-fix #playlist,
+        body.videoExplorer.content-fix #leftPanel,
+        {*#playerTabWrapper  .playerCommentPanel*}
+        body:not(.full_with_browser) .mylistPopupPanel.fixed
+        {
+          -moz-transform: translateZ(0);
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
+        }
+        {* Firefoxだと問題がある要素はこちら *}
+        body.videoExplorer.content-fix #content,
+        #popupMarquee
+        {
+          -webkit-transform: translateZ(0);
+        }
+      */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
+          .replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
+      if (conf.enableGpuLayer) {
+        addStyle(__gpuLayer__, 'watchItLaterGpuLayer');
+      }
+
       var __debug_css__ = Util.here(function() {/*
         .videoExplorer        #playerContainerWrapper, .videoExplorer        #external_nicoplayer,
         .videoExplorerOpening #playerContainerWrapper, .videoExplorerOpening #external_nicoplayer
@@ -12178,19 +12209,6 @@
     if (conf.debugMode) {
       initTest(WatchItLater.test);
     }
-
-      // コメントの重複を殺すやつ(暫定)
-      WatchApp.ns.util.CommentListUtil.merge = function(a, b) {
-        var uniq = {}, tmp = a.concat(b);
-        a.length = 0;
-        for (var i = 0, len = tmp.length; i < len; i++) {
-          var res = tmp[i], resNo = res.resNo;
-          if (uniq[resNo]) { continue; }
-          a.push(res);
-          uniq[resNo] = true;
-        }
-      };
-
   })(w);
 
 
