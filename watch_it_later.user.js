@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140218
+// @version        1.140219
 // ==/UserScript==
 
 /**
@@ -2064,8 +2064,8 @@
         margin-left: -30px;
         width: 30px;
         height: 30px;
-              {*background: url(http://res.nimg.jp/img/watch_zero/icon_nextplay.png);*}
-                background: url("http://res.nimg.jp/img/watch_zero/videoexplorer-s547dc55e88.png") no-repeat scroll -37px 0 rgba(0, 0, 0, 0);
+              background: url(http://res.nimg.jp/img/watch_q9/icon_nextplay.png);
+              {*background: url("http://res.nimg.jp/img/watch_zero/videoexplorer-s90d011f9a7.png") no-repeat scroll -37px 0 rgba(0, 0, 0, 0);*}
         z-index: 100;
         cursor: pointer;
         text-indent: -999em;
