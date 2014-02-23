@@ -2136,9 +2136,15 @@
         border: 1px solid #000;
         background: white;
         box-shadow: 0px 0px 4px #000;
-        top: 62px;
+        top: 110px;
         bottom: auto;
         opacity: 1;
+      }
+      body .tag1Line  #videoHeader.menuOpened #videoMenuWrapper{
+        top: 62px;
+      }
+      body .tag2Lines #videoHeader.menuOpened #videoMenuWrapper{
+        top: 86px;
       }
       body #videoHeader.infoActive.menuOpened #videoMenuWrapper{
         top: auto;
@@ -2482,7 +2488,7 @@
         $chk.attr({type: 'radio', name: varName, value: JSON.stringify(v)});
 
         if (currentValue === v) {
-          $chk.attr('checked', 'checked');
+          $chk.prop('checked', 'checked');
         }
         $chk.click(function() {
           var newValue = JSON.parse(this.value), oldValue = conf.getValue(varName);
@@ -5803,7 +5809,7 @@
     if (!WatchController.isZeroWatch()) return {};
 
     var CACHE_TIME = 1000 * 60 * 10;
-    var WatchApp = w.WatchApp, escapeHTML = WatchApp.ns.util.StringUtil.escapeHTML;
+    var WatchApp = w.WatchApp;
 
     var getNicorepoTitle = function(type, param) {
       var base = '【ニコレポ】';
@@ -5876,7 +5882,7 @@
         _info: {
           first_retrieve: postedAt,
           nicorepo_className: src.className,
-          nicorepo_log: [escapeHTML(description_short)],
+          nicorepo_log: [_.escape(description_short)],
           nicorepo_owner: {
             id: ownerId,
             icon: ownerIcon,
@@ -6535,7 +6541,15 @@
       vs    = watch.VideoExplorerInitializer.videoExplorerController.getVideoExplorer(),
       videoExplorer  = vs,
       watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
-
+    if (!window._) {
+      window._ = {
+        debounce: WatchApp.ns.event.EventDispatcher.debounce,
+        throttle: WatchApp.ns.event.EventDispatcher.throttle,
+        noop: function() {},
+        escape:   WatchApp.ns.util.StringUtil.escapeHTML,
+        unescape: WatchApp.ns.util.StringUtil.unescapeHTML
+      };
+    }
 
     /**
      *  ゆっくり再生(スロー再生)メニュー
@@ -6677,7 +6691,7 @@
             $('<div/>')
               .append(
                 $('<a/>')
-                .text(WatchApp.ns.util.StringUtil.unescapeHTML(title))
+                .text(_.unescape(title))
                 .attr('href', 'http://nico.ms/' + watchId)
               )
               .html() +
@@ -7744,7 +7758,7 @@
       },
       clear: function() {
         this._$input.val('');
-        this._$community.attr('checked', false);
+        this._$community.prop('checked', false);
       },
       update: function() {
         var list = this._content.getRawList();
@@ -7774,7 +7788,7 @@
       },
       _submit: function() {
         var word = this._getWord();
-        var communityFilter = !!this._$community.attr('checked');
+        var communityFilter = !!this._$community.prop('checked');
 
         if (word.length > 0 || communityFilter) {
           this._content.setFilter(this._getFilter());
@@ -7801,7 +7815,7 @@
           return /^so|^\d+$/.test(str);
         };
         var word = to_h(this._getWord());
-        var communityFilter = !!this._$community.attr('checked');
+        var communityFilter = !!this._$community.prop('checked');
 
         return function(item) {
           if (communityFilter && word.length <= 0) {
@@ -10470,7 +10484,7 @@
         },
         onVideoOwnerChange: function(ownerInfo) {
           this._content.setOwnerFilter(false);
-          this._$ownerFilter.attr('checked', false);
+          this._$ownerFilter.prop('checked', false);
           this._$ownerName.text(ownerInfo.name);
         },
         _onStartTimeRangeSelect: function() {
@@ -10482,11 +10496,11 @@
           this.contentRefresh();
         },
         _onMusicDlFilterChange: function() {
-          this._content.setMusicDlFilter(!!this._$musicDlFilter.attr('checked'));
+          this._content.setMusicDlFilter(!!this._$musicDlFilter.prop('checked'));
           this.contentRefresh();
         },
         _onOwnerFilterChange: function() {
-          this._content.setOwnerFilter(!!this._$ownerFilter.attr('checked'));
+          this._content.setOwnerFilter(!!this._$ownerFilter.prop('checked'));
           this.contentRefresh();
         },
         contentRefresh: function() {
@@ -10499,8 +10513,8 @@
           //console.log('refresh!', this._content.getOwnerFilter(), this._content.getMusicDlFilter(false));
           this._$startTimeRange    .val(this._content.getStartTimeRange('') || '');
           this._$lengthSecondsRange.val(this._content.getLengthSecondsRange('') || '');
-          this._$musicDlFilter     .attr('checked', !!this._content.getMusicDlFilter(false));
-          this._$ownerFilter       .attr('checked', !!this._content.getOwnerFilter());
+          this._$musicDlFilter     .prop('checked', !!this._content.getMusicDlFilter(false));
+          this._$ownerFilter       .prop('checked', !!this._content.getOwnerFilter());
         },
         reset: function() {
           var v = this._$startTimeRange.val() + this._$lengthSecondsRange.val();
@@ -10510,7 +10524,7 @@
             this._content.setMusicDlFilter(false);
             this._$startTimeRange.val('');
             this._$lengthSecondsRange.val('');
-            this._$musicDlFilter.attr('checked', false);
+            this._$musicDlFilter.prop('checked', false);
             this._content.changeState({ page: 1 });
             //this._content.refresh({ page: 1 });
           }
@@ -11180,6 +11194,10 @@
          left: {$songriumCategoryLeft}px !important;
         }
 
+        body.size_normal .tag1Line  #videoHeader.menuOpened #videoMenuWrapper{
+          right: {$videoMenuWrapperRight}px;
+        }
+
         */});
       var PROFILE_SET = {
         'WQHD':   [2560, 1440],
@@ -11199,6 +11217,7 @@
       var CONTROL_HEIGHT = 46, INPUT_HEIGHT = 30, PLAYER_TAB_WIDTH = 326 + 10, PLAYER_TAB_WIDTH_WIDE = 420 + 10, TAB_MARGIN = 0;
       var SONGRIUM_WIDTH = 898;
       var HORIZONTAL_MARGIN = 1.05; // 両端に 2.5% x 2 のマージンがある
+      var $videoHeader = $('#videoHeader');
 
       var getTargetSize = function(targetWidth, targetHeight) {
         var plWidth  = Math.round(targetWidth * HORIZONTAL_MARGIN);
@@ -11212,7 +11231,8 @@
           alignmentAreaWideWidth: alWidthW,
           heatMapScale:           plWidth / 100,
           songriumScale:          plWidth / SONGRIUM_WIDTH,
-          songriumCategoryLeft:   plWidth + 32
+          songriumCategoryLeft:   plWidth + 32,
+          videoMenuWrapperRight:  (Math.max($videoHeader.outerWidth(), 1234) - alWidth) / 2
         };
       };
       var suggestProfile = function() {
@@ -11227,7 +11247,7 @@
           if (w * HORIZONTAL_MARGIN <= iw && h <= ih) {
             return {w: w, h: h, name: v};
           }
-        };
+        }
         return null;
       };
       var generateCss = function() {
@@ -11381,11 +11401,11 @@
       var $dataList = $('<datalist id="myMylist"></datalist>');
       var $form      = $view.find('form');
       var $input     = $view.find('input');
-      var $autoPause = $view.find('.autoPause').attr('checked', conf.autoPauseInvisibleInput);
+      var $autoPause = $view.find('.autoPause').prop('checked', conf.autoPauseInvisibleInput);
 
       var prevent = function(e) { e.stopPropagation(); e.preventDefault(); };
       var preventEsc = function(e) { if (e.keyCode === 27) { prevent(e); } };
-      var isAutoPause = function() { return !!$autoPause.attr('checked'); };
+      var isAutoPause = function() { return !!$autoPause.prop('checked'); };
 
       var mylistList = [];
       var
@@ -11453,7 +11473,7 @@
       }).on('keydown', preventEsc).on('keyup', preventEsc);
 
       $autoPause.on('click', function() {
-        conf.setValue('autoPauseInvisibleInput', !!$autoPause.attr('checked'));
+        conf.setValue('autoPauseInvisibleInput', !!$autoPause.prop('checked'));
       });
 
       $form
