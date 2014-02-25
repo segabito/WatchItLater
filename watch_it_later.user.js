@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140223
+// @version        1.140225
 // ==/UserScript==
 
 /**
@@ -8847,7 +8847,7 @@
         loading = false,
         val = '',
         suggestLoader = new NicoSearchSuggest({}),
-        update = WatchApp.ns.event.EventDispatcher.debounce(function() {
+        update = _.debounce(function() {
           if (loading) {
             return;
           }
@@ -8914,13 +8914,15 @@
       setupVideoExplorerStaticCss();
 
       var
+        _vp = WatchApp.ns.components.videoexplorer,
         initializer     = watch.VideoExplorerInitializer,
         controller      = initializer.videoExplorerController,
         explorer        = controller.getVideoExplorer(),
-        explorerConfig  = WatchApp.ns.components.videoexplorer.config.VideoExplorerConfig,
+        explorerConfig  = _vp.config.VideoExplorerConfig,
         menu            = explorer.getMenu(),
-        ContentItemType = WatchApp.ns.components.videoexplorer.model.ContentItemType,
-        ContentType     = WatchApp.ns.components.videoexplorer.model.ContentType,
+        ContentItemType = _vp.model.ContentItemType,
+        ContentType     = _vp.model.ContentType,
+        watchPageRouter = WatchApp.ns.model.state.WatchPageRouter.getInstance(),
         playerConnector = watch.PlayerInitializer.nicoPlayerConnector,
         searchType      = 'tag',
         $menu           = $('.videoExplorerMenu'),
@@ -9023,6 +9025,22 @@
         this.searchVideo_org(word, type);
       }, controller);
 
+//      explorer.removeEventListener('select', controller._onVideoExplorerSelect);
+//      controller._onVideoExplorerSelect_org = controller._onVideoExplorerSelect;
+//      controller._onVideoExplorerSelect = $.proxy(function(e) {
+//        var item = e.item;
+//        if (conf.videoExplorerHack && item.getContentItemType() === ContentType.VIDEO) {
+//          watchPageRouter.dispatch(
+//            {state: {video: {id: item.getId(), query: {access_from: 'watchItLater'}}}},
+//            function() {
+//
+//            });
+//        } else {
+//          return this._onVideoExplorerSelect_org(e);
+//        }
+//      }, controller);
+//      explorer.addEventListener('select',
+//        $.proxy(controller._onVideoExplorerSelect, controller));
 
 
 
@@ -9142,11 +9160,23 @@
       toggleVideoExplorerHack(conf.videoExplorerHack);
       //adjustVideoExplorerSize(true);
 
-      // TODO: ニコメンド編集ボタンが押されたら検索画面解除
-      //EventDispatcher.addEventListener('onVideoExplorerUpdated', function(req) { });
 
-      WatchApp.ns.model.state.WatchPageState.prototype.isPushState_org = WatchApp.ns.model.state.WatchPageState.prototype.isPushState;
-      WatchApp.ns.model.state.WatchPageState.prototype.isPushState = function(a) {
+      watchPageRouter._prepareState_org = watchPageRouter._prepareState;
+      watchPageRouter._prepareState = $.proxy(function(state) {
+        if (conf.videoExplorerHack) {
+          state.prepare({
+            video: {id: this._watchInfoModel.v}
+          });
+          return state;
+       } else {
+          return this._prepareState_org(state);
+        }
+      }, watchPageRouter);
+
+      var WatchPageState = WatchApp.ns.model.state.WatchPageState;
+
+      WatchPageState.prototype.isPushState_org = WatchPageState.prototype.isPushState;
+      WatchPageState.prototype.isPushState = function(a) {
         if (conf.videoExplorerHack) { return true; }
         return this.isPushState_org(a);
       };
@@ -9218,28 +9248,12 @@
       // 動画情報表示の拡張
       var ItemView = WatchApp.ns.components.videoexplorer.view.content.item.AbstractVideoContentItemView;
       ItemView.prototype._setView_org = ItemView.prototype._setView;
-      // 一列の時は投稿時間を秒まで表示  銀座で不要になった
-//      ItemView.prototype._setView = function($item) {
-//        this._setView_org($item);
-//        //this._$createdTime     = $item.find('.column4 .createdTime span');
-//        this._$createdTimeFull = $item.find('.column1 .createdTime span');
-//      };
-//      ItemView.prototype._setItem_org = ItemView.prototype._setItem;
-//      ItemView.prototype._setItem = function(item) {
-//        this._setItem_org(item);
-//      };
+
       ItemView.prototype.update_org = ItemView.prototype.update;
       ItemView.prototype.update = function() {
         // 動画情報表示をゴリゴリいじる場所
         var item = this._item, $item = this._$item;
         this.update_org(item);
-
-//        this._$createdTimeFull.html(
-//          WatchApp.ns.util.DateFormat.strftime(
-//            "%Y年%m月%d日 %H:%M:%S",
-//            new Date(item.getFirstRetrieve().replace(/-/g, '/'))
-//          )
-//        );
 
         this._$item.find('.deleteFromMyMylist').data('watchId', this._item.getId());
         if (item._mylistComment) { // マイリストコメント
@@ -10236,7 +10250,7 @@
 
       $(window).on('beforeunload.watchItLater', function(e) {
         conf.setValue('lastCommentVisibility', WatchController.commentVisibility() ? 'visible' : 'hidden');
-      }).on('resize', WatchApp.ns.event.EventDispatcher.debounce(function() {
+      }).on('resize', _.debounce(function() {
         AnchorHoverPopup.hidePopup();
         EventDispatcher.dispatch('onWindowResizeEnd');
       }, 1000));
@@ -10246,7 +10260,7 @@
         //$('body').addClass('w_noHover');
         document.body.style.pointerEvents = 'none';
       });
-      $(document).on('scroll', WatchApp.ns.event.EventDispatcher.debounce(function() {
+      $(document).on('scroll', _.debounce(function() {
         //$('body').removeClass('w_noHover');
         document.body.style.pointerEvents = '';
         EventDispatcher.dispatch('onScrollEnd');
@@ -10651,10 +10665,10 @@
       content.getParams = $.proxy(function() {
         var params = this.getParams_org();
         params = $.extend(true, {
-            l:           this.getLengthSecondsRange(),
-            u:           this.getStartTimeRange(),
-            m:           this.getMusicDlFilter(),
-            size:        this._pager._pageItemCount
+            l:    this.getLengthSecondsRange(),
+            u:    this.getStartTimeRange(),
+            m:    this.getMusicDlFilter(),
+            size: this._pager._pageItemCount
         }, params);
         if (this.getOwnerFilter()) {
           if (WatchController.isChannelVideo()) {
@@ -11194,10 +11208,6 @@
          left: {$songriumCategoryLeft}px !important;
         }
 
-        body.size_normal .tag1Line  #videoHeader.menuOpened #videoMenuWrapper{
-          right: {$videoMenuWrapperRight}px;
-        }
-
         */});
       var PROFILE_SET = {
         'WQHD':   [2560, 1440],
@@ -11231,8 +11241,7 @@
           alignmentAreaWideWidth: alWidthW,
           heatMapScale:           plWidth / 100,
           songriumScale:          plWidth / SONGRIUM_WIDTH,
-          songriumCategoryLeft:   plWidth + 32,
-          videoMenuWrapperRight:  (Math.max($videoHeader.outerWidth(), 1234) - alWidth) / 2
+          songriumCategoryLeft:   plWidth + 32
         };
       };
       var suggestProfile = function() {
