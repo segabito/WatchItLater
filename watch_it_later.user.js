@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140225
+// @version        1.140227
 // ==/UserScript==
 
 /**
@@ -37,6 +37,9 @@
  *
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
+
+// * ver 1.140227
+// - タグ検索のソート順が毎回リセットされるようになったのに対抗
 
 // * ver 1.140218
 // - コメント重複を勝手に直してたけど不要になったので除去
@@ -10600,6 +10603,7 @@
           }
         }
         AnchorHoverPopup.hidePopup();
+
         EventDispatcher.dispatch('onSearchStart', this._originalWord, type);
         this.changeState_org(params, callback);
       }, content);
@@ -10680,6 +10684,12 @@
         return params;
       }, content);
 
+      // タグ検索だけ毎回ソート順がデフォルトにリセットされるようになったので、
+      // デフォルト値を書き換えるという力技で対抗
+      SearchSortOrder.TAG_DEFAULT_SORT  = conf.searchSortType;
+      SearchSortOrder.TAG_DEFAULT_ORDER = conf.searchSortOrder;
+      content._searchSortOrder.getSortFromCookie  = function() { return conf.searchSortType; };
+      content._searchSortOrder.getOrderFromCookie = function() { return conf.searchSortOrder; };
 
       content.load_org = content.load;
       content.load = $.proxy(function(params, callback) {
@@ -10687,6 +10697,8 @@
         if (this.getSearchEngineType() !== 'sugoi' || word.length <= 0 || word.match(/(sm|nm|so)\d+/)) {
           // 新検索ではもしかして～が取得できないため、検索ワードに動画IDっぽい文字列が含まれてる場合は旧タグ検索を使う。
           this.setLastSearchEngineType('normal');
+          params.sort  = 'n';
+          params.order = 'd';
           this.load_org(params, callback);
         } else {
           this.setLastSearchEngineType('sugoi');
@@ -10721,6 +10733,7 @@
           proto.setSort_org  = proto.setSort;
           proto.setSort = function(type, sort)  {
             conf.setValue('searchSortType', sort);
+            SearchSortOrder.TAG_DEFAULT_SORT = sort;
             this.setSort_org(type, sort);
           };
 
@@ -10732,6 +10745,7 @@
           proto.setOrder_org = proto.setOrder;
           proto.setOrder = function(type, order) {
             if (content.getLastSearchEngineType() === 'sugoi') { // 新検索の時だけソート順を記憶
+              SearchSortOrder.TAG_DEFAULT_ORDER = order;
               conf.setValue('searchSortOrder', order);
             }
             this.setOrder_org(type, order);
