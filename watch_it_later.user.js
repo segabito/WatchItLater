@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140227
+// @version        1.140303
 // ==/UserScript==
 
 /**
@@ -37,6 +37,11 @@
  *
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
+
+// * ver 1.140303
+// - 動画選択画面で再生リストの開閉が記憶されなくなったのに対抗
+// - 動画切換え時に一番上までスクロールするようになったのに対抗
+// - 本家の内部仕様変更(jQuery ver up等)に対応
 
 // * ver 1.140227
 // - タグ検索のソート順が毎回リセットされるようになったのに対抗
@@ -257,6 +262,7 @@
       nicoSSeekCount: -1, // @ジャンプによるシーク(ループなど)を許可する回数 -1=無限 0以上はその回数だけ許可
       doubleClickScroll: true, // 空白部分ををダブルクリックで動画の位置にスクロールする
       hidePlaylist: true, // プレイリストを閉じる
+      hidePlaylistInVideoExplorer: true, // 動画選択画面でプレイリストを閉じる
       hidariue: false, // てれびちゃんメニュー内に、原宿以前のランダム画像復活
       videoExplorerHack: true, // 検索画面を乗っ取る
       squareThumbnail: true, // 検索画面のサムネを4:3にする
@@ -2691,14 +2697,14 @@
         };
 
         if (name) {
-          promise = promise.pipe(con(name)).pipe(wrap(this, name), onFail);
+          promise = promise.then(con(name)).then(wrap(this, name), onFail);
         } else {
           for(var v in this.spec) {
             if (!v.match(/^test/)) continue;
-            promise = promise.pipe(con(v)) .pipe(wrap(this,    v), onFail);
+            promise = promise.then(con(v)) .then(wrap(this,    v), onFail);
           }
         }
-        promise.pipe(
+        promise.then(
           function() { console.log('%cテスト完了', 'background: #8ff'); },
           function() { console.log('%cテスト失敗', 'background: #f00'); }
         );
@@ -4254,7 +4260,6 @@
       videoExplorer           = videoExplorerController.getVideoExplorer(),
       videoExplorerContentType = WatchApp.ns.components.videoexplorer.model.ContentType,
       $ = w.$, WatchJsApi = w.WatchJsApi;
-    //  var flashVars = pim.playerInitializeModel.flashVars;
     return {
       isZeroWatch: function() {
         return (WatchApp && WatchJsApi) ? true : false;
@@ -4538,7 +4543,7 @@
         this.setPlaylistItems(items, currentItem);
       },
       insertVideoToPlaylist: function(id) {
-        WatchItLater.VideoInfoLoader.load(id).pipe(function(info) {
+        WatchItLater.VideoInfoLoader.load(id).then(function(info) {
             var item = new WatchApp.ns.model.playlist.PlaylistItem(info);
             watch.PlaylistInitializer.playlist.insertNextPlayingItem(item);
           }, function(err) {
@@ -4777,7 +4782,7 @@
         if (!watchId.match(/^[0-9]+$/)) {
           return callback(watchId);
         }
-        WatchItLater.VideoInfoLoader.load(watchId).pipe(function(info) {
+        WatchItLater.VideoInfoLoader.load(watchId).then(function(info) {
             callback(info.id);
           },
           function() {
@@ -5946,11 +5951,11 @@
       var def = new $.Deferred, p = def.promise();
 
       for (var i = maxPages; i >= 0; i--) {
-        p = p.pipe(loadPage);
-        if (i > 0) p = p.pipe(Util.Deferred.wait(300));
+        p = p.then(loadPage);
+        if (i > 0) p = p.then(Util.Deferred.wait(300));
       }
 
-      p.pipe(
+      p.then(
         function() {
           var uniq = {}, uniq_items = [];
           for (var i = result.rawData.list.length - 1; i >= 0; i--) {
@@ -6013,14 +6018,14 @@
 
     var load = function(callback, param) {
       return request(param)
-        .pipe(function(result) {
+        .then(function(result) {
           var viewPage = (param && typeof param.page === 'number') ? param.page : 1;
           result.sortItem(param.sort || 1, true);
           result.setPage(viewPage);
           if (typeof result === 'function') { callback(result); }
-          return this.resolve(result);
+          return this.done(result);
         }, function() {
-          return this.reject({message: 'ニコレポの取得に失敗しました', status: 'fail'});
+          return this.fail({message: 'ニコレポの取得に失敗しました', status: 'fail'});
         });
     };
 
@@ -6233,7 +6238,7 @@
               beforeSend: function(xhr) {
                 xhr.setRequestHeader('X-Requested-With', {toString: function(){ return ''; }});
               }
-            }).pipe(function(resp) {
+            }).then(function(resp) {
               var res = rss2mylist(resp);
               for (var i = 0, len = res.rawData.list.length; i < len; i++) {
                 result.push(res.rawData.list[i]);
@@ -6243,8 +6248,8 @@
       };
 
       for (var i = page; i <= maxPage; i++) {
-        p = p.pipe(getPipe(result, baseUrl, i));
-        if (i < maxPage) { p = p.pipe(Util.Deferred.wait(300)); }
+        p = p.then(getPipe(result, baseUrl, i));
+        if (i < maxPage) { p = p.then(Util.Deferred.wait(300)); }
       }
 
       def.resolve();
@@ -6265,7 +6270,7 @@
         id: '-100'
       });
 
-      pipeRequest(baseUrl, result, page, maxPage).pipe(
+      pipeRequest(baseUrl, result, page, maxPage).then(
         function() {
           def.resolve(Util.Cache.set(baseUrl, result, CACHE_TIME));
         },
@@ -6306,27 +6311,27 @@
     var loadRanking = function(param) {
       var p = parseParam(param);
       return request(p.baseUrl, 1, p.maxRssPage)
-        .pipe(function(result) {
+        .then(function(result) {
           result.name = p.genreName;
           result.setPage(p.viewPage);
 
-          this.resolve(result);
+          this.done(result);
         });
     };
 
     var load = function(onload, param) {
       var p = parseParam(param);
       return request(p.baseUrl, 1, p.maxRssPage)
-        .pipe(function(result) {
+        .then(function(result) {
           result.name = p.genreName;
           result.setPage(p.viewPage);
 
           if (typeof onload === 'function') {
             onload(result);
           }
-          return this.resolve(result);
+          return this.done(result);
         }, function() {
-          return this.reject({message: 'ランキングの取得に失敗しました', status: 'fail'});
+          return this.fail({message: 'ランキングの取得に失敗しました', status: 'fail'});
         });
     };
 
@@ -6401,7 +6406,7 @@
           var url = baseUrl + '?page=' + page;
           if (conf.debugMode) console.log('load page', url);
 
-          $.ajax({url: url}).pipe(function(resp) {
+          $.ajax({url: url}).then(function(resp) {
             var hasNextPage = parseItems(resp, result);
             def.resolve(hasNextPage);
           }, function(err) {
@@ -6415,12 +6420,12 @@
 
         var maxPage = MAX_PAGE;
         for (var i = 1; i <= maxPage; i++) {
-          p = p.pipe(getPipe(baseUrl, result, i));
-          if (i < maxPage) { p = p.pipe(Util.Deferred.wait(300)); }
+          p = p.then(getPipe(baseUrl, result, i));
+          if (i < maxPage) { p = p.then(Util.Deferred.wait(300)); }
         }
 
-        p.pipe(function() {
-          this.resolve(result);
+        p.then(function() {
+          this.done(result);
         });
 
         def.resolve(true);
@@ -6455,7 +6460,7 @@
           user_name: 'ニコニコ動画'
         });
 
-        pipeRequest(url, result).pipe(function() {
+        pipeRequest(url, result).then(function() {
           Util.Cache.set(CACHE_KEY, result, CACHE_TIME);
           if (typeof callback === 'function') callback(result);
           def.resolve(result);
@@ -6498,7 +6503,7 @@
           ownerName: WatchController.getOwnerName()
         };
         var def = new $.Deferred();
-        load(callback, params).pipe(function(result) {
+        load(callback, params).then(function(result) {
             if (typeof callback === 'function') callback(result);
             def.resolve(result);
           }, function() {
@@ -6537,22 +6542,8 @@
       WatchApp = w.WatchApp, WatchJsApi = w.WatchJsApi,
       isTouchActive = false,
       watch = WatchApp.ns.init,
-      tagv  = watch.TagInitializer.tagViewController,
-      pim   = watch.PlayerInitializer.playerInitializeModel,
-      npc   = watch.PlayerInitializer.nicoPlayerConnector,
-      pac   = watch.PlayerInitializer.playerAreaConnector,
-      vs    = watch.VideoExplorerInitializer.videoExplorerController.getVideoExplorer(),
-      videoExplorer  = vs,
       watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
-    if (!window._) {
-      window._ = {
-        debounce: WatchApp.ns.event.EventDispatcher.debounce,
-        throttle: WatchApp.ns.event.EventDispatcher.throttle,
-        noop: function() {},
-        escape:   WatchApp.ns.util.StringUtil.escapeHTML,
-        unescape: WatchApp.ns.util.StringUtil.unescapeHTML
-      };
-    }
+
 
     /**
      *  ゆっくり再生(スロー再生)メニュー
@@ -6762,7 +6753,6 @@
       watch = WatchApp.ns.init;
       AnchorHoverPopup.hidePopup().updateNow();
       tagv = watch.TagInitializer.tagViewController;
-      pim  = watch.PlayerInitializer.playerInitializeModel;
       WatchCounter.add();
 
       if (isFirst) {
@@ -6868,7 +6858,7 @@
         },
         changeTab = function(selection) {
           $sidePanel.removeClass('videoInfo ichiba').addClass(selection);
-         if (selection === 'ichiba') {
+          if (selection === 'ichiba') {
             resetIchiba(false);
           }
         },
@@ -7991,7 +7981,7 @@
             if (typeof VideoRanking.getGenreName(id) === 'string') {
               //if (conf.debugMode)console.log('load VideoRanking: ', VideoRanking.getGenreName(id));
               isRanking = true;
-              VideoRanking.load(null, {id: id}).pipe(onload, onerror);
+              VideoRanking.load(null, {id: id}).then(onload, onerror);
               return;
             }
             // TODO: マジックナンバーを
@@ -8003,23 +7993,23 @@
                 VideoRecommendations.load(onload);
                 break;
               case -3:
-                ChannelVideoList.loadOwnerVideo(null).pipe(onload, onerror);
+                ChannelVideoList.loadOwnerVideo(null).then(onload, onerror);
                 break;
               case NicorepoVideo.REPO_ALL:
-                NicorepoVideo.loadAll()   .pipe(onload, onerror);
+                NicorepoVideo.loadAll()   .then(onload, onerror);
                 break;
               case NicorepoVideo.REPO_USER:
-                NicorepoVideo.loadUser()  .pipe(onload, onerror);
+                NicorepoVideo.loadUser()  .then(onload, onerror);
                 break;
               case NicorepoVideo.REPO_CHCOM:
-                NicorepoVideo.loadChCom() .pipe(onload, onerror);
+                NicorepoVideo.loadChCom() .then(onload, onerror);
                 break;
               case NicorepoVideo.REPO_MYLIST:
-                NicorepoVideo.loadMylist().pipe(onload, onerror);
+                NicorepoVideo.loadMylist().then(onload, onerror);
                 break;
               case NicorepoVideo.REPO_OWNER:
                 isOwnerNicorepo = true;
-                NicorepoVideo.loadOwner() .pipe(onload, onerror);
+                NicorepoVideo.loadOwner() .then(onload, onerror);
                 break;
               default:
                 throw {message: '未定義のIDです:' + id, status: 'fail'};
@@ -9933,12 +9923,18 @@
       });
 
       EventDispatcher.addEventListener('onVideoExplorerOpened', function() {
-        // 2013/09/26 本家側で開閉を記録するようになった
+        // 2013/09/26 本家側で開閉を記録するようになった -> 2014/03/03 また記憶しなくなった
 
         // 通常画面でプレイリストを表示にしてるなら、開いた状態をデフォルトにする
-        //if ($('#playlist').hasClass('w_show') === $('#playlist').find('.browserFullOption .browserFullPlaylistOpen').is(':visible')) {
-        //  $('#playlist').find('.browserFullOption a:visible').click();
-        //}
+        if (conf.hidePlaylistInVideoExplorer === false) {
+          playlist.open();
+          //$('#playlist').find('.browserFullOption a:visible').click();
+        }
+      });
+      $('#playlist .browserFullOption a').on('click', function() {
+        if (WatchController.isSearchMode()) {
+          conf.setValue('hidePlaylistInVideoExplorer', !conf.hidePlaylistInVideoExplorer);
+        }
       });
 
       EventDispatcher.addEventListener('on.config.hashPlaylistMode', function(v) {
@@ -11374,6 +11370,8 @@
         }
       });
 
+      var pac = watch.PlayerInitializer.playerAreaConnector;
+
       pac.addEventListener('onStageVideoAvailabilityUpdated', onStageVideoAvailabilityUpdated);
 
       // console.log('StageVideo', $('#external_nicoplayer')[0].isStageVideoSupported() ? 'supported' : 'not supported');
@@ -11845,10 +11843,22 @@
       // 動画切り換え時にページの一番上までスクロールするようになったのを強引に阻止する
       window.WatchApp.ns.model.state.WatchPageRouter.getInstance()._scroll = function() {};
 
+      var beforePlayerOffsetTop = 0, $playerAlignmentArea = $('#playerAlignmentArea');
+      var beforeReset = function() {
+         beforePlayerOffsetTop = $playerAlignmentArea.offset().top;
+      };
+      var afterReset = function() {
+        var diff = $playerAlignmentArea.offset().top - beforePlayerOffsetTop;
+        var scrollTop = $('body, html').scrollTop();
+        $('body, html').scrollTop(scrollTop + diff);
+      };
+      var watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
+      watchInfoModel.addEventListener('beforeReset', beforeReset);
+      watchInfoModel.addEventListener('afterReset',  afterReset);
+
 
       // 動画選択画面閉じた時にページの一番上までスクロールするようになったのを強引に阻止する
       window.WatchApp.ns.util.WindowUtil.scroll_org = window.WatchApp.ns.util.WindowUtil.scroll;
-
       var no_thanks = function() {
         window.WatchApp.ns.util.WindowUtil.scroll = function() {};
       };
@@ -12098,7 +12108,7 @@
 
           var d = new $.Deferred;
           d.promise()
-            .pipe(function() {
+            .then(function() {
               var d = new $.Deferred();
               Mylist.loadMylistList(function(mylistList) {
                 expect(mylistList.length > 0).toBeTruthy('マイリスト一覧が1件以上');
@@ -12112,7 +12122,7 @@
               });
               return d.promise();
             })
-            .pipe(function(groupId) {
+            .then(function(groupId) {
               var d = new $.Deferred();
               Mylist.reloadMylist(groupId, function(mylist) {
                 expect(mylist.length > 0).toBeTruthy('マイリストアイテムが一個以上');
@@ -12123,7 +12133,7 @@
               });
               return d.promise();
             })
-            .pipe(function(watchId, groupId) {
+            .then(function(watchId, groupId) {
               var d = new $.Deferred();
               Mylist.updateMylistItem(watchId, groupId, function(result) {
                 expect(result).toEqual('ok', 'updateMylistItem() result=ok');
@@ -12131,8 +12141,8 @@
               }, randomMessage);
               return d.promise();
             })
-            .pipe(Util.Deferred.wait(500))
-            .pipe(function(watchId, groupId) {
+            .then(Util.Deferred.wait(500))
+            .then(function(watchId, groupId) {
               var d = new $.Deferred();
               Mylist.reloadMylist(groupId, function(newlist) {
                 console.log('reloadMylist', groupId, newlist);
@@ -12141,14 +12151,14 @@
                 d.resolve();
               });
               return d.promise();
-            }).pipe(function() {
+            }).then(function() {
               def.resolve();
             });
           d.resolve();
         },
         testVideoRanking: function(def) {
           VideoRanking.load(null, {id: -4000})
-            .pipe(function(result) {
+            .then(function(result) {
               console.log('VideoRanking.load result:', result);
               expect(result.name).toEqual('カテゴリ合算', 'ダミーマイリストの名前が一致');
               expect(result.list.length).toEqual(300, 'カテゴリ合算ランキングは300件');
@@ -12162,7 +12172,7 @@
         },
         testNicorepoVideo: function(def) {
           NicorepoVideo.loadAll(null, null)
-            .pipe(function(result) {
+            .then(function(result) {
               console.log('NicorepoVideo.loadAll result:', result);
               expect(result.name).toEqual('【ニコレポ】すべての動画', 'ダミーマイリストの名前が一致');
               expect(result.list).toBeTruthy('ニコレポがある');
@@ -12175,27 +12185,26 @@
         testVideoInfoLoader: function(def) {
           var loader = new VideoInfoLoader({});
           $.when(
-
-            loader.load('sm9').pipe(function(result) {
+            loader.load('sm9').then(function(result) {
               expect(result.id).toEqual('sm9', '存在する動画ID');
               expect(result.length).toEqual('5:19', 'length');
-              return this.resolve();
+              return this.done();
             }, function(err) {
-              return this.reject();
+              return this.fail();
             }),
 
-            loader.load('sm1').pipe(function(result) {
+            loader.load('sm1').then(function(result) {
               return new $.Deferred().reject().promise();
             }, function(resp) {
               expect(resp.status).toEqual('fail', '存在しない動画ID');
               return new $.Deferred().resolve().promise();
             })
 
-          ).pipe(function() { def.resolve(); }, function() { def.reject(); });
+          ).then(function() { def.resolve(); }, function() { def.reject(); });
         },
         testRelatedVideo: function(def) {
           var loader = new RelatedVideo({});
-          loader.load('sm9').pipe(function(result) {
+          loader.load('sm9').then(function(result) {
             console.log('RelatedVideo', result);
             expect(result.list).toBeTruthy('関連動画がある');
             expect(result.list[0].title).toBeTruthy('タイトルがある');
