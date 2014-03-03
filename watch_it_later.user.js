@@ -11849,8 +11849,8 @@
       };
       var afterReset = function() {
         var diff = $playerAlignmentArea.offset().top - beforePlayerOffsetTop;
-        var scrollTop = $('body, html').scrollTop();
-        $('body, html').scrollTop(scrollTop + diff);
+        var scrollTop = $(window).scrollTop();
+        $(window).scrollTop(scrollTop + diff);
       };
       var watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
       watchInfoModel.addEventListener('beforeReset', beforeReset);
