@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140303
+// @version        1.140304
 // ==/UserScript==
 
 /**
@@ -4376,8 +4376,8 @@
 //        videoExplorer.changeState(true);
       },
       closeSearch: function() {
-        //videoExplorer.close();
         videoExplorer.changeState(false);
+        videoExplorer.close();
       },
       openVideoOwnersVideo: function() {
         if (this.isChannelVideo()) {
@@ -6532,7 +6532,6 @@
    *
    */
   (function(w) { // Zero Watch
-    //var $ = w.$, $$ = w.$$;
     if (!w.WatchApp || !w.WatchJsApi) return;
 
 //    $.fx.interval = conf.fxInterval;
@@ -9156,23 +9155,27 @@
 
       watchPageRouter._prepareState_org = watchPageRouter._prepareState;
       watchPageRouter._prepareState = $.proxy(function(state) {
-        if (conf.videoExplorerHack) {
-          state.prepare({
-            video: {id: this._watchInfoModel.v}
-          });
-          return state;
-       } else {
+        if (
+          conf.videoExplorerHack &&
+          WatchController.isSearchMode() &&
+          state.getVideoId() !== this._currentState.getVideoId()
+          ) {
+            state.prepare({
+              video: {id: this._watchInfoModel.v}
+            });
+            return state;
+        } else {
           return this._prepareState_org(state);
         }
       }, watchPageRouter);
 
-      var WatchPageState = WatchApp.ns.model.state.WatchPageState;
-
-      WatchPageState.prototype.isPushState_org = WatchPageState.prototype.isPushState;
-      WatchPageState.prototype.isPushState = function(a) {
-        if (conf.videoExplorerHack) { return true; }
-        return this.isPushState_org(a);
-      };
+//      var WatchPageState = WatchApp.ns.model.state.WatchPageState;
+//
+//      WatchPageState.prototype.isPushState_org = WatchPageState.prototype.isPushState;
+//      WatchPageState.prototype.isPushState = function(a) {
+//        if (conf.videoExplorerHack) { return true; }
+//        return this.isPushState_org(a);
+//      };
 
 
     } // end initVideoExplorer
@@ -11844,13 +11847,14 @@
       window.WatchApp.ns.model.state.WatchPageRouter.getInstance()._scroll = function() {};
 
       var beforePlayerOffsetTop = 0, $playerAlignmentArea = $('#playerAlignmentArea');
+      var $window = $(window);
       var beforeReset = function() {
          beforePlayerOffsetTop = $playerAlignmentArea.offset().top;
       };
       var afterReset = function() {
         var diff = $playerAlignmentArea.offset().top - beforePlayerOffsetTop;
-        var scrollTop = $(window).scrollTop();
-        $(window).scrollTop(scrollTop + diff);
+        var scrollTop = $window.scrollTop();
+        $window.scrollTop(scrollTop + diff);
       };
       var watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
       watchInfoModel.addEventListener('beforeReset', beforeReset);
@@ -11948,9 +11952,17 @@
         };
       }
 
-      EventDispatcher.addEventListener('onWatchInfoReset', function() {
-        window.history.replaceState('', '', location.href.replace('/videoExplorer', ''));
-      });
+      var overrideGenerateURL = function() {
+        var wpc = WatchApp.ns.init.WatchPageInitializer.watchPageController;
+        wpc.generateWatchURL_org = wpc.generateWatchURL;
+        wpc.generateWatchURL = $.proxy(function(s) {
+          var ret = this.generateWatchURL_org(s);
+          // これのせいで既読リンクの色が変わらないので除去
+          ret = ret.replace(/\/(videoExplorer|ichiba)/, '');
+          return ret;
+        }, wpc);
+      };
+      overrideGenerateURL();
 
       // ニコる数を取得するためにコメントパネルがめちゃくちゃ重くなってるのを改善
       WatchApp.ns.model.player.NicoPlayerConnector.getCommentNicoruCount = function(name, num) {
