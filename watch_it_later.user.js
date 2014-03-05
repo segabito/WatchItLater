@@ -17,7 +17,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140304
+// @version        1.140305
 // ==/UserScript==
 
 /**
@@ -6880,12 +6880,16 @@
       $tab.on('click', onTabSelect).on('touchend', onTabSelect);
       changeTab(conf.lastLeftTab);
 
-      EventDispatcher.addEventListener('onVideoInitialized', function() {
+      var refreshPanel = function(isFirst) {
+        if (isFirst) { return; }
+
         sidePanelRefresh($infoPanel, $ichibaPanel, $sidePanel, $sideInfoPanelTemplate.clone());
         if ($ichibaPanel.is(':visible')) {
           resetIchiba(true);
         }
-      });
+      };
+      EventDispatcher.addEventListener('onVideoInitialized', refreshPanel);
+      refreshPanel();
 
     } // end of initLeftPanel
 
@@ -7109,15 +7113,23 @@
       EventDispatcher.addEventListener('onWindowResizeEnd',           onOuterResize);
       EventDispatcher.addEventListener('onPlayerAlignmentAreaResize', onOuterResize);
 
-      EventDispatcher.addEventListener('onVideoInitialized', function() {
+      var refreshPanel = function(isFirst) {
+
+        window.setTimeout(function() {
+          $sidePanel.toggleClass('reviewEmpty', $('#videoReview').find('.stream').length < 1);
+        }, 2000);
+
+        if (isFirst) { return; }
+
         sidePanelRefresh($infoPanel, $ichibaPanel, $sidePanel, $sideInfoPanelTemplate.clone());
         if ($ichibaPanel.is(':visible')) {
           resetIchiba(true);
         }
-        setTimeout(function() {
-          $sidePanel.toggleClass('reviewEmpty', $('#videoReview').find('.stream').length < 1);
-        }, 2000);
-      });
+      };
+      EventDispatcher.addEventListener('onVideoInitialized', refreshPanel);
+
+      refreshPanel();
+
     } // end of initRightPanelVerticalTab
 
 
@@ -7136,9 +7148,6 @@
 
 
       $template.find('.videoTitle').html(watchInfoModel.title);
-
-      //var $videoDetails = $template.find('.videoDetails');
-      //$videoDetails.css({overflowY: 'hidden', minHeight: 0});
 
       assignVideoCountToDom($template, watchInfoModel);
       $template.find('.videoPostedAt').text($('.videoPostedAt:last').text());
@@ -8342,7 +8351,10 @@
 
     function onVideoExplorerOpening(params) {
       var target = params.target, contentList = params.contentList, content = params.content;
-      EventDispatcher.dispatch('onVideoExplorerOpening', content);
+      if (videoExplorerOpenCount === 0) {
+        EventDispatcher.dispatch('onFirstVideoExplorerOpening', params);
+      }
+      EventDispatcher.dispatch('onVideoExplorerOpening', params);
     }
 
     function onVideoExplorerClosing(params) {
@@ -8542,7 +8554,7 @@
           overflow-y: scroll;
         }
         body.videoExplorerOpening .videoExplorerMenu {
-          display: none;
+          {* display: none; *}
         }
         body.videoExplorerOpening #playerTabWrapper {
           visibility: hidden;
@@ -9017,23 +9029,11 @@
         this.searchVideo_org(word, type);
       }, controller);
 
-//      explorer.removeEventListener('select', controller._onVideoExplorerSelect);
-//      controller._onVideoExplorerSelect_org = controller._onVideoExplorerSelect;
-//      controller._onVideoExplorerSelect = $.proxy(function(e) {
-//        var item = e.item;
-//        if (conf.videoExplorerHack && item.getContentItemType() === ContentType.VIDEO) {
-//          watchPageRouter.dispatch(
-//            {state: {video: {id: item.getId(), query: {access_from: 'watchItLater'}}}},
-//            function() {
-//
-//            });
-//        } else {
-//          return this._onVideoExplorerSelect_org(e);
-//        }
-//      }, controller);
-//      explorer.addEventListener('select',
-//        $.proxy(controller._onVideoExplorerSelect, controller));
-
+      EventDispatcher.addEventListener('onBottomContentTabViewReset', function(name) {
+        if (name === 'outline') {
+          WatchController.closeSearch();
+        }
+      });
 
 
       EventDispatcher.addEventListener('on.config.enableFavTags',
@@ -9044,9 +9044,7 @@
       EventDispatcher.addEventListener('onVideoExplorerOpened', function(content) {
         setTimeout(function() {
           if (conf.videoExplorerHack) {
-           // adjustVideoExplorerSize();
             watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
-            //watch.PlayerInitializer.commentPanelViewController.contentManager.activeContent().changeState();
             playerConnector.updatePlayerConfig({playerViewSize: ''}); // ノーマル画面モード
           }
         }, 100);
@@ -9055,7 +9053,6 @@
         $('.videoExplorerMenu').addClass('initialized');
       });
       EventDispatcher.addEventListener('onVideoExplorerRefreshEnd', function(content) {
-        //window.history.replaceState('', '', location.href.replace('/videoExplorer', ''));
         if (content.getType() === ContentType.USER_VIDEO) {
           var items = content.getItems();
           if (items.length === 1 && items[0].getContentItemType() !== ContentItemType.VIDEO) {
@@ -9087,12 +9084,9 @@
         }
       });
 
-
       EventDispatcher.addEventListener('onFirstVideoExplorerOpened', function() {
-        //setTimeout(function() {
-          EventDispatcher.addEventListener('onWindowResizeEnd',  adjustVideoExplorerSize);
-          EventDispatcher.addEventListener('onVideoInitialized', adjustVideoExplorerSize);
-        //}, 1000);
+        EventDispatcher.addEventListener('onWindowResizeEnd',  adjustVideoExplorerSize);
+        EventDispatcher.addEventListener('onVideoInitialized', adjustVideoExplorerSize);
       });
 
       var duration_match = /^([0-9]+):([0-9]+)/;
@@ -9150,7 +9144,6 @@
       };
       EventDispatcher.addEventListener('on.config.videoExplorerHack', toggleVideoExplorerHack);
       toggleVideoExplorerHack(conf.videoExplorerHack);
-      //adjustVideoExplorerSize(true);
 
 
       watchPageRouter._prepareState_org = watchPageRouter._prepareState;
@@ -9169,14 +9162,6 @@
         }
       }, watchPageRouter);
 
-//      var WatchPageState = WatchApp.ns.model.state.WatchPageState;
-//
-//      WatchPageState.prototype.isPushState_org = WatchPageState.prototype.isPushState;
-//      WatchPageState.prototype.isPushState = function(a) {
-//        if (conf.videoExplorerHack) { return true; }
-//        return this.isPushState_org(a);
-//      };
-
 
     } // end initVideoExplorer
 
@@ -9192,17 +9177,13 @@
             '</div>', $menu = $(menu);
 
           var $template = $('<div/>').html(watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html());
-          //console.log($template.html());
             $template.find('.column1 .thumbnailContainer').append($menu);
-            $template.find('.column4 .balloon').before($menu.clone());//.before($template.find('.column4 .videoInformation'));
-            //$template.find('.column4 .createdTime').after($template.find('.column4 .videoInformationOuter'));
-            //$template.find('.column4 .balloon').before($template.find('.column4 .videoInformationOuter'));
+            $template.find('.column4 .balloon').before($menu.clone());
             $template.find('.column4 .balloon').remove();
             $template.find('.column1')
               .find('.descriptionShort').after($('<p class="itemMylistComment mylistComment"/>'))
               .end().find('.createdTime').after($('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>'));
             watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html($template.html());
-          //console.log($template.html());
             $template = $menu = null;
 
         },
@@ -9257,6 +9238,9 @@
         } else {
           $item.find('.itemMylistComment').remove();
         }
+
+        this._$item.find('.thumbnailContainer')
+          .css('background-image', 'url(' + item.getThumbnailUrl() + ')');
 
         if (item._seed && item._seed._info) {
           var info = item._seed._info;
@@ -10242,6 +10226,11 @@
         }
       });
 
+      var bottomContentTabView = WatchApp.ns.view.BottomContentTabView.getInstance();
+      bottomContentTabView.addEventListener('changeContent', function(name) {
+        EventDispatcher.dispatch('onBottomContentTabViewReset', name);
+      });
+
 
       Mylist.onDefMylistUpdate(function() {
         //WatchController.clearDeflistCache();
@@ -10839,26 +10828,24 @@
       if (isSquare && !isSquareCssInitialized) {
         var __css__ = Util.here(function() {/*
           {* 元のCSSを打ち消すためにやや冗長 *}
-
-          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .item .thumbnailContainer {
+          .item.thumbnailLoadSuccess .noImage, #videoExplorer.w_adjusted .item .thumbnail {
+            display: none !important;
+          }
+          #videoExplorer .thumbnailContainer {
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center center;
+          }
+          #videoExplorer.w_adjusted .item .thumbnailContainer {
             width: 130px; height: 100px;
-          }
-          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .item .thumbnailContainer .link {
-            width: 130px; height: 100px;
-          }
-          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .item .thumbnailContainer,
-          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .item .thumbnailContainer .thumbnail {
-            max-width: 130px; height: auto; top: 0; left: 0; margin-right: 8px;
-          }
-          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .item .thumbnailContainer img.playingIcon {
-            top: 50%; left: 50%;
+            {*max-width: 130px; height: auto; top: 0; left: 0;*} margin-right: 8px;
           }
 
-          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .uadFrame {
+          #videoExplorer.w_adjusted .uadFrame {
             width: 130px; height: 100px;
             background-size: 100% 100%;
           }
-          body.videoExplorer #videoExplorer.w_adjusted.squareThumbnail .uadTagRelated .default .itemList .item .imageContainer {
+          #videoExplorer.w_adjusted .uadTagRelated .default .itemList .item .imageContainer {
             width: 130px; height: 100px;
           }
         */});
@@ -11964,12 +11951,29 @@
       };
       overrideGenerateURL();
 
+      // 再現性不明のエラーをとりあえず握りつぶしつつ自動再生を3/2までの仕様に戻す
+      var overrrideWindowUtil = function() {
+        var wu = WatchApp.ns.util.WindowUtil;
+        wu.checkInview_org = wu.checkInview;
+        wu.checkInview = function() { return true; };
+        //wu.checkInview = $.proxy(function(a) {
+        //  if (a.length < 0) { return true; }
+        //  try {
+        //    this.checkInview_org(a);
+        //  } catch (e) {
+        //    console.log('%cerror in WindowUtil.checkInview', 'color: red; ', e, a);
+        //    console.trace();
+        //  }
+        //}, wu);
+      };
+      overrrideWindowUtil();
+
       // ニコる数を取得するためにコメントパネルがめちゃくちゃ重くなってるのを改善
       WatchApp.ns.model.player.NicoPlayerConnector.getCommentNicoruCount = function(name, num) {
         if (conf.noNicoru) {
           return 0;
         }
-        return PlayerApp.ns.player.Nicoplayer.getInstance().getCommentNicoruCount(name, num);
+        return window.PlayerApp.ns.player.Nicoplayer.getInstance().getCommentNicoruCount(name, num);
       };
 
       var playerConfig = watch.PlayerInitializer.nicoPlayerConnector.playerConfig;
