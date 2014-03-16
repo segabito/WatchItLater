@@ -3,6 +3,7 @@
 // @namespace      https://github.com/segabito/
 // @description    動画を見る前にマイリストに登録したいGreasemonkey (Chrome/Fx用)
 // @include        http://www.nicovideo.jp/*
+// @include        http://i.nicovideo.jp/*
 // @include        http://ch.nicovideo.jp/*
 // @include        http://ext.nicovideo.jp/thumb/*
 // @exclude        http://ads*.nicovideo.jp/*
@@ -13,11 +14,12 @@
 // @exclude        http://ch.nicovideo.jp/tool/*
 // @match          http://www.nicovideo.jp/*
 // @match          http://ch.nicovideo.jp/*
+// @match          http://i.nicovideo.jp/*
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140305
+// @version        1.140315
 // ==/UserScript==
 
 /**
@@ -575,6 +577,16 @@
       {* ポイントが無いときは表示しない *}
       .item:not(.silver):not(.gold) .uadContainer {
         display: none !important;
+      }
+
+      .watchItLaterAPILoaderFrame {
+        width: 1px;
+        height: 1px;
+        position: fixed;
+        top: -100px;
+        left: -100px;
+        border: 0;
+        overflow: hidden;
       }
 
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
@@ -4236,6 +4248,132 @@
   })();
 
 
+  //===================================================
+  //===================================================
+  //===================================================
+
+  WatchItLater.VideoArrayAPILoader = (function() {
+    var sessionId = 0;
+    var deferredList = {};
+    var cacheData = {};
+    var loaderFrame, loaderWindow;
+    var BASE_URL = 'http://i.nicovideo.jp/v3/video.array?v=';
+
+    //WatchItLater.VideoArrayAPILoader.load('sm9').then(function(info) { console.log(info); });
+
+    var load = function(watchId) {
+      var ids = [], result = {}, def = new $.Deferred();
+
+      initialize();
+
+      $(typeof watchId !== 'string' ? watchId : [watchId]).each(function(i, id) {
+        if (cacheData[id]) {
+          result[id] = cacheData[id];
+        } else {
+          ids.push(id);
+        }
+      });
+      if (ids.length < 1) {
+        return def.resolve(result);
+      }
+      sessionId++;
+
+      sendRequest(ids, sessionId)
+        .then(function(infoList) {
+        $(ids).each(function(i, id) {
+          result[id] = result[id] || infoList[id];
+        });
+        def.resolve(result);
+      });
+
+      return def.promise();
+    };
+
+    var sendRequest = function(ids, sessionId) {
+      var def = new $.Deferred();
+      deferredList[sessionId] = def;
+
+      loaderWindow.location.replace(BASE_URL + ids.join(',') + '#' + sessionId);
+      return def.promise();
+    };
+
+    var parseVideoArray = function(xml) {
+      var $xml = $(xml), infoList = {};
+      $xml.find('video_info').each(function() {
+        var info = new parseVideoInfo($(this));
+        infoList[info.id] = cacheData[info.id] = cacheData[info.default_thread] = info;
+        if (info.threadIds && info.threadIds.length > 1) {
+          $(info.threadIds).each(function(i, threadId) {
+            infoList[threadId] = cacheData[threadId] = info;
+          });
+        }
+      });
+      return infoList;
+    };
+
+    var parseVideoInfo = function($xml) {
+      var info = {threadIds: []};
+      var elements = [
+        'id', 'user_id', 'title', 'description', 'length_in_seconds',
+        'thumbnail_url', 'first_retrieve', 'default_thread',
+        'view_counter', 'mylist_counter'];
+
+      $(elements).each(function(i, elm) {
+        info[elm] = $xml.find(elm + ':first').text();
+      });
+
+      info['num_res'] = $xml.find('thread:first num_res').text();
+
+      var duration = parseInt(info['length_in_seconds'], 10);
+      info['length'] = parseInt(duration / 60, 10) + ':' + (duration % 60);
+
+      info['first_retrieve'] =
+        window.WatchApp.ns.util.DateFormat.strftime(
+          '%Y-%m-%d %H:%M:%S',
+          new Date(info['first_retrieve'])
+        );
+
+      $('thread id, channel_thread id').each(function() {
+        info.threadIds.push(this.innerHTML);
+      });
+      return info;
+    };
+
+
+    var initialize = function() {
+      initialize = window._.noop;
+
+      loaderFrame = document.createElement('iframe');
+      loaderFrame.name      = 'watchItLaterAPILoader';
+      loaderFrame.className = 'watchItLaterAPILoaderFrame';
+      document.body.appendChild(loaderFrame);
+
+      loaderWindow = loaderFrame.contentWindow;
+
+      EventDispatcher.addEventListener('onMessage', function(data, type) {
+        if (type !== 'VideoArrayAPILoader') { return; }
+        try {
+          var session = data.session, xml = data.xml;
+
+          if (deferredList[session]) {
+            deferredList[session].resolve(parseVideoArray(xml));
+            delete deferredList[session];
+          }
+        } catch (e) {
+          console.log('JSON parse error', e);
+        }
+      });
+
+    };
+
+    // sample URL
+    // http://i.nicovideo.jp/v3/video.array?v=sm9,sm3393520,sm5909863,so23023492,1394173596
+    //initialize();
+    return {
+      load: load
+    };
+  })();
+
 
 
 
@@ -5109,7 +5247,7 @@
     push: function(item) {
       if (!item.create_time) {
         var tm = this._baseCreateTime - 60000 * this.itemCount;
-        item.create_time = tm;//WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date(tm));
+        item.create_time = tm;
       }
       this.rawData.list.push(item);
       this.itemCount = this.rawData.list.length;
@@ -5118,7 +5256,7 @@
     unshift: function(item) {
       if (!item.create_time) {
         var tm = this._baseCreateTime + 60000 * this.itemCount;
-        item.create_time = tm;//WatchApp.ns.util.DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date(tm));
+        item.create_time = tm;
       }
       this.rawData.list.unshift(item);
       this.itemCount = this.rawData.list.length;
@@ -10061,8 +10199,11 @@
         }
       };
 
-      EventDispatcher.addEventListener('onVideoInitialized', onTagReset);
+      EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
+        EventDispatcher.addEventListener('onVideoInitialized', onTagReset);
+      });
       watch.TagInitializer.tagList.addEventListener('reset', onTagReset);
+      window.setTimeout(onTagReset, 1000);
 
       $videoHeaderTagEditLinkArea = $toggleTagEditText = null;
 
@@ -10241,18 +10382,16 @@
 
       $(window).on('beforeunload.watchItLater', function(e) {
         conf.setValue('lastCommentVisibility', WatchController.commentVisibility() ? 'visible' : 'hidden');
-      }).on('resize', _.debounce(function() {
+      }).on('resize', window._.debounce(function() {
         AnchorHoverPopup.hidePopup();
         EventDispatcher.dispatch('onWindowResizeEnd');
       }, 1000));
 
       //$(document).on('scroll', WatchApp.ns.event.EventDispatcher.throttle(function() {
       $(document).on('scroll', function() {
-        //$('body').addClass('w_noHover');
         document.body.style.pointerEvents = 'none';
       });
-      $(document).on('scroll', _.debounce(function() {
-        //$('body').removeClass('w_noHover');
+      $(document).on('scroll', window._.debounce(function() {
         document.body.style.pointerEvents = '';
         EventDispatcher.dispatch('onScrollEnd');
       }, 500));
@@ -10261,6 +10400,22 @@
         pac.addEventListener('onVideoChangeStatusUpdated', onVideoChangeStatusUpdated);
       });
 
+      var messageCallback = {};
+      window.addEventListener('message', function(event) {
+        if (event.origin.indexOf('nicovideo.jp') < 0) return;
+        try {
+          var data = JSON.parse(event.data);
+          if (data.id !== 'WatchItLater') { return; }
+
+          EventDispatcher.dispatch('onMessage', data.body, data.type);
+
+        } catch (e) {
+          console.log(
+            '%cError: window.onMessage - ',
+            'color: red; background: yellow',
+            e);
+        }
+      });
     } //
 
     function initAdditionalButtons() {
@@ -12346,10 +12501,41 @@
 
   }); // end of monkey();
 
+  /**
+   * スマートフォン用APIを利用して動画情報を取得する
+   */
+  var spapi = function() {
+    if (window.name !== 'watchItLaterAPILoader') { return; }
+    var resp    = document.getElementsByTagName('nicovideo_video_response');
+    var session = location.hash.length > 1 ? location.hash.substr(1) : location.search;
+    var origin  = 'http://' + location.host.replace(/^.*?\./, 'www.');
+    var xml = '';
+    if (resp.length > 0) {
+      xml = resp[0].outerHTML;
+    }
+
+    try {
+      parent.postMessage(JSON.stringify({
+          id: 'WatchItLater',
+          type: 'VideoArrayAPILoader',
+          body: {
+            session: session,
+            xml: xml
+          }
+        }),
+        origin);
+    } catch (e) {
+      alert(e);
+      console.log('err', e);
+    }
+  };
 
   // Chromeに対応させるための処理
   // いったん<script>として追加してから実行する
   try {
+    if (location.host === 'i.nicovideo.jp') {
+      spapi();
+    } else
     if (location.host.indexOf('localhost.') === 0 || location.host.indexOf('www.') === 0 || !this.GM_getValue || this.GM_getValue.toString().indexOf("not supported")>-1) {
       isNativeGM = false;
       var inject = document.createElement("script");
@@ -12360,7 +12546,8 @@
       inject.appendChild(document.createTextNode("(" + monkey + ")(false)"));
 //      inject.appendChild(document.createTextNode("try {(" + monkey + ")(false) } catch(e) { console.log(e); }"));
 
-      document.body.appendChild(inject);
+      document.documentElement.appendChild(inject);
+      //document.body.appendChild(inject);
     } else {
       // やや古いFirefoxはここらしい
       monkey(true);
