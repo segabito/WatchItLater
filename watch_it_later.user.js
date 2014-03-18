@@ -19,7 +19,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140315
+// @version        1.140319
 // ==/UserScript==
 
 /**
@@ -39,6 +39,10 @@
  *
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
+
+// * ver 1.140303
+// - 謎の技術によって、ニコメンドがなくても説明文の動画リンクにサムネイルを出せるように
+// - 細かなスタイル調整
 
 // * ver 1.140303
 // - 動画選択画面で再生リストの開閉が記憶されなくなったのに対抗
@@ -297,7 +301,7 @@
       enableFullScreenMenu: true, // 全画面時にホイールでメニューを出す
       enableHeatMap: false, //
       heatMapDisplayMode: 'hover', // 'always' 'hover'
-      replacePopupMarquee: false, //
+      replacePopupMarquee: true, //
       enableRelatedTag: true, // 関連タグを表示するかどうか
 //      playerTabAutoOpenNicommend: 'enable', // 終了時にニコメンドを自動で開くかどうか 'enable' 'auto' 'disable'
       autoPauseInvisibleInput: true, //
@@ -308,6 +312,7 @@
       disableHorizontalScroll: false, // 横スクロールバーを出なくする
       hideCommentPanelSocialButtons: false, // コメントパネル下のソーシャルボタンを隠す
       mylistPanelPosition: '',
+      enableDescriptionThumbnail: false, // 説明文の動画リンクにサムネイルとタイトル表示
 
       rankingCategory_g_ent2_Close:     true,
       rankingCategory_g_life2_Close:    true,
@@ -758,10 +763,10 @@
       }
       .sidePanel .sideVideoInfo .videoTitleContainer {
         background: #ddd; text-align: center;  color: #000; margin: 6px 6px 0;
-        border: solid; border-width: 1px 1px 0; border-color: #888;
+        border: solid; border-width: 2px 2px 0; border-color: #888;
       }
       .sidePanel .sideVideoInfo .videoOwnerInfoContainer {
-        margin: 0 6px; border: solid; border-width: 0 1px 0; border-color: #888;
+        margin: 0 6px; border: solid; border-width: 0 2px 0; border-color: #888;
       }
       .sidePanel .sideVideoInfo .videoThumbnailContainer {
         background: #ddd; text-align: center; color: #000; margin: 0;
@@ -770,7 +775,7 @@
         cursor: pointer;
       }
       .sidePanel .sideVideoInfo .videoTitle {
-
+        padding: 8px;
       }
       .sidePanel .sideVideoInfo .videoPostedAt {
         color: #333;
@@ -789,7 +794,7 @@
       }
       .sidePanel .sideVideoInfo .videoInfo{
         background: #ddd; text-align: center; padding: 4px; margin: 0 6px 6px;
-        border: solid; border-width: 0 1px 1px; border-color: #888;
+        border: solid; border-width: 0 2px 2px; border-color: #888;
       }
       .sideVideoInfo .sideVideoInfoInner{
         -webkit-transition: opacity 1s ease-out, color 3s ease-out;
@@ -827,7 +832,7 @@
         overflow-x: hidden; text-align: left;
       }
       .sidePanel .sideVideoInfo .videoDescriptionInner{
-        margin: 0 4px;
+        margin: 0 8px;
       }
       .sidePanel .sideVideoInfo .videoDetails{
         min-width: 150px;
@@ -841,6 +846,7 @@
       }
       .sideVideoInfo .userName, .sideVideoInfo .channelName{
         display: block;
+        font-size: 120%;
       }
       .sideVideoInfo .userIconContainer, .sideVideoInfo .channelIconContainer {
         background: #ddd; width: 100%; text-align: center; float: none;
@@ -849,21 +855,24 @@
         min-width: 128px; max-width: 150px; width: auto; height: auto; border: 0;
         box-shadow: 0 0 4px #666;
       }
-      .sidePanel .sideVideoInfo .descriptionThumbnail {
+      .sideVideoInfo .descriptionThumbnail {
         text-align: left; font-size: 90%; padding: 4px; background: #ddd;
-        min-height: 60px; margin: 4px 16px; font-weight: normal; color: black;
+        min-height: 50px; margin: 4px 8px; font-weight: normal; color: black;
+      }
+      .sideVideoInfo .descriptionThumbnail p {
+        margin: 8px;
       }
 
-      .sidePanel .sideVideoInfo .descriptionThumbnail.video img{
+      .sideVideoInfo .descriptionThumbnail.video img{
         height: 50px; cursor: pointer; float: left;
       }
-      .sidePanel .sideVideoInfo .descriptionThumbnail.mylist img{
+      .sideVideoInfo .descriptionThumbnail.mylist img{
         height: 40px; cursor: pointer;
       }
-      .sidePanel .sideVideoInfo .descriptionThumbnail.illust img{
-        height: 60px; cursor: pointer; float: left;
+      .sideVideoInfo .descriptionThumbnail.illust img{
+        height: 60px; cursor: pointer;
       }
-      .sidePanel .sideVideoInfo a.otherSite {
+      .sideVideoInfo a.otherSite {
         font-weight: bolder; text-decoration: underline;
       }
       body:not(.videoExplorer) #leftPanel.removed {
@@ -941,13 +950,13 @@
         display: block;
       }
       #leftPanelTabContainer .tab{
-        display: inline-block; cursor: pointer; background: #999; padding: 2px 4px 0px; border-width: 1px 1px 0px;
+        display: inline-block; cursor: pointer; background: #999; padding: 2px 4px 0px; border-width: 2px 2px 0px;
       }
         #leftPanelTabContainer.w_touch .tab, #sidePanelTabContainer.w_touch .tab {
           padding: 8px 12px 8px;
         }
       #sidePanelTabContainer .tab {
-        background: none repeat scroll 0 0 #999999; border-width: 1px 1px 0; cursor: pointer;
+        background: none repeat scroll 0 0 #999999; border-width: 2px 2px 0; cursor: pointer;
         display: inline-block; font-size: 13px; padding: 5px 10px 8px;
         border-radius: 8px 8px 0px 0px;
       }
@@ -964,9 +973,7 @@
       {
         background: #dfdfdf; border-style: outset;
       }
-      body.videoExplorer .sidePanel:not(:hover) .sidePanelInner {
-        overflow: hidden;
-      }
+
       #playerTabWrapper.w_videoInfo #playerCommentPanel,
       #playerTabWrapper.w_ichiba #playerCommentPanel,
       #playerTabWrapper.w_review #playerCommentPanel {
@@ -2009,7 +2016,14 @@
         content: ' | '; color: white;
       }
       #footer.noBottom br { display: none; }
-       html { background: #141414; }
+      html { background: #141414; }
+      .videoExplorer #videoExplorer,
+      .videoExplorer #videoExplorer .videoExplorerBody,
+      .videoExplorerContentWrapper
+        {
+        background: none;
+      }
+
       .animateBlink {
         -webkit-transition: 1s ease-in; transition: 1s ease-in;
       }
@@ -2291,6 +2305,9 @@
             {'ウィンドウを閉じるまで': 'sessionStorage', 'ずっと保持': 'localStorage', 'しない': ''} :
             {'有効(ウィンドウを閉じるまで)': 'sessionStorage', '無効': ''})
       },
+      {title: '説明文中の動画IDにサムネイル表示(実験中)',  varName: 'enableDescriptionThumbnail', reload: true,
+        values: {'有効': true, '無効': false}},
+
 
       {title: '検索モードの設定', className: 'videoExplorer'},
       {title: '検索モードを無効化', varName: 'disableVideoExplorer',
@@ -2638,7 +2655,7 @@
   /**
    * 通信用
    */
-  var WatchItLater = {
+  window.WatchItLater = {
     config: {
       get: function(varName) {
         return conf.getValue(varName);
@@ -2727,7 +2744,7 @@
   w.WatchItLater = WatchItLater;
 
 
-  var EventDispatcher = (function(conf, w) {
+  var EventDispatcher = (function(conf) {
     var events = {};
 
     function addEventListener(name, callback) {
@@ -2759,7 +2776,7 @@
       dispatch: dispatch,
       _dispatch: _dispatch // コンソール汚したくない用
     };
-  })(conf, w);
+  })(conf);
   WatchItLater.event = EventDispatcher;
 
   /*
@@ -4256,13 +4273,14 @@
     var sessionId = 0;
     var deferredList = {};
     var cacheData = {};
+    var currentRequestIds = '', currentPromise;
     var loaderFrame, loaderWindow;
     var BASE_URL = 'http://i.nicovideo.jp/v3/video.array?v=';
 
     //WatchItLater.VideoArrayAPILoader.load('sm9').then(function(info) { console.log(info); });
 
     var load = function(watchId) {
-      var ids = [], result = {}, def = new $.Deferred();
+      var ids = [], result = {}, def = new $.Deferred(), resolved = false, timeoutTimer = null;
 
       initialize();
 
@@ -4273,26 +4291,48 @@
           ids.push(id);
         }
       });
+      ids = window._.unique(ids);
       if (ids.length < 1) {
-        return def.resolve(result);
+        window.setTimeout(function() { def.resolve(result); }, 0);
+        return def;
       }
+      var _ids = JSON.stringify(ids);
+      var onSuccess = function(infoList) {
+        $(ids).each(function(i, id) {
+          result[id] = result[id] || infoList[id] || cacheData[id];
+        });
+
+        clearTimeout(timeoutTimer);
+        resolved = true;
+        currentRequestIds = ''; currentPromise = null;
+        def.resolve(result);
+      };
+      var onFail = function() {
+        currentRequestIds = ''; currentPromise = null;
+        if (!resolved) {
+          def.fail();
+        }
+      };
+
       sessionId++;
 
-      sendRequest(ids, sessionId)
-        .then(function(infoList) {
-        $(ids).each(function(i, id) {
-          result[id] = result[id] || infoList[id];
-        });
-        def.resolve(result);
-      });
+      timeoutTimer = window.setTimeout(onFail, 30 * 1000);
+
+      if (_ids === currentRequestIds) {
+        currentPromise.then(onSuccess, onFail);
+        return def;
+      }
+
+      currentRequestIds = _ids;
+      sendRequest(ids, sessionId).then(onSuccess, onFail);
 
       return def.promise();
     };
 
     var sendRequest = function(ids, sessionId) {
       var def = new $.Deferred();
+      currentPromise = def;
       deferredList[sessionId] = def;
-
       loaderWindow.location.replace(BASE_URL + ids.join(',') + '#' + sessionId);
       return def.promise();
     };
@@ -4325,7 +4365,7 @@
       info['num_res'] = $xml.find('thread:first num_res').text();
 
       var duration = parseInt(info['length_in_seconds'], 10);
-      info['length'] = parseInt(duration / 60, 10) + ':' + (duration % 60);
+      info['length'] = parseInt(duration / 60, 10) + ':' + (100 + (duration % 60)).toString().substr(1);
 
       info['first_retrieve'] =
         window.WatchApp.ns.util.DateFormat.strftime(
@@ -4333,7 +4373,7 @@
           new Date(info['first_retrieve'])
         );
 
-      $('thread id, channel_thread id').each(function() {
+      $xml.find('thread id, channel_thread id').each(function() {
         info.threadIds.push(this.innerHTML);
       });
       return info;
@@ -4358,6 +4398,7 @@
           if (deferredList[session]) {
             deferredList[session].resolve(parseVideoArray(xml));
             delete deferredList[session];
+            currentPromise = null;
           }
         } catch (e) {
           console.log('JSON parse error', e);
@@ -6822,7 +6863,7 @@
             $('<div/>')
               .append(
                 $('<a/>')
-                .text(_.unescape(title))
+                .text(window._.unescape(title))
                 .attr('href', 'http://nico.ms/' + watchId)
               )
               .html() +
@@ -7282,8 +7323,7 @@
 
     function sidePanelRefresh($sideInfoPanel, $ichibaPanel, $sidePanel, $template) {
       var isFavorite = WatchController.isFavoriteOwner();
-      var h = $sideInfoPanel.innerHeight() - 100; //, $inner = $('<div/>');
-
+      //var h = $sideInfoPanel.innerHeight() - 100;
 
       $template.find('.videoTitle').html(watchInfoModel.title);
 
@@ -7293,23 +7333,7 @@
       var $videoDescription = $template.find('.videoDescription');
 
       $videoDescription.find('.videoDescriptionInner').append(create$videoDescription(watchInfoModel.description));
-      $videoDescription.find('.watch').unbind('click');
 
-
-      $videoDescription.find('.videoDescriptionInner a').each(function() {
-        var url = this.href, text, $this = $(this);
-        if (url.match(/\/watch\/((sm|nm|so|)\d+)$/)) {
-          $this.after([
-            '<div class="nextPlayButton" title="次に再生" onclick="WatchItLater.WatchController.insertVideoToPlaylist(\'', RegExp.$1, '\')">次に再生</div>',
-          ''].join(''));
-        }
-      });
-
-      $videoDescription.find('.descriptionThumbnail img').on(
-        'click',
-        function() { showLargeThumbnail(this.src); });
-
-      var $videoOwnerInfoContainer = $template.find('.videoOwnerInfoContainer');
       var $userIconContainer       = $template.find('.userIconContainer');
       var $channelIconContainer    = $template.find('.channelIconContainer');
 
@@ -7362,14 +7386,74 @@
         .toggleClass('isChannel', WatchController.isChannelVideo())
         .append($template);
 
-      setTimeout(function() {
+      window.setTimeout(function() {
         $sideInfoPanel.addClass('show');
         $sideInfoPanel = $ichibaPanel = $sidePanel = $template =
-        $videoDescription = $videoOwnerInfoContainer = $userIconContainer =
+        $videoDescription  = $userIconContainer =
         $channelIconContainer = null;
       }, 100);
 
     } // end of sidePanelRefresh
+
+    /**
+     * 説明文中の動画リンク類を加工
+     */
+    function decorateVideoDescriptionLink($videoDescription) {
+      var watchLinks = [], watchIds = [];
+      var videoReg = /\/watch\/((sm|nm|so|)\d+)$/;
+      var seigaReg = /seiga\/im(\d+)/;
+      $videoDescription.find('a').each(function() {
+        var url = this.href, text, $this = $(this);
+        if (videoReg.test(url)) {
+          var watchId = RegExp.$1;
+          var $nextButton = $([
+            '<div class="nextPlayButton" title="次に再生" onclick="WatchItLater.WatchController.insertVideoToPlaylist(\'', watchId, '\')">次に再生</div>',
+            ''].join(''));
+          $this.after($nextButton);
+
+          watchLinks.push({id: watchId, $target: $nextButton});
+          watchIds.push(watchId);
+        }
+        else if (seigaReg.test(url)) {
+          var illustId = RegExp.$1;
+          var $thumbnail = $([
+            '<div class="descriptionThumbnail illust">',
+              '<img src="http://lohas.nicoseiga.jp/thumb/',
+                illustId,
+              'z" onclick="WatchItLater.WatchController.showLargeThumbnail(this.src);">',
+            '</div>',
+            ''].join(''));
+          $this.after($thumbnail);
+        }
+      });
+
+      if (conf.enableDescriptionThumbnail && watchIds.length > 0) {
+        var onWatchIdInfoReady = function(result) {
+          $(watchLinks).each(function(i, watchLink) {
+            var id = watchLink.id, $target = watchLink.$target;
+            if (result[id]) {
+              var info = result[id];
+              var $thmb = $([
+                '<div class="descriptionThumbnail video">',
+                '<img src="', info.thumbnail_url, '" onclick="WatchItLater.WatchController.showLargeThumbnail(this.src);">',
+                '<p>', info.title, ' (', info.length,  ')</p>',
+                '</div>'].join(''));
+              $target.after($thmb);
+            }
+          });
+          watchIds = watchLinks = null;
+        };
+        var onWatchIdInfoFail = function() {
+          watchIds = watchLinks = null;
+        };
+        window.setTimeout(function() {
+          window.WatchItLater.VideoArrayAPILoader.load(watchIds).then(onWatchIdInfoReady, onWatchIdInfoFail);
+        }, 1000);
+      } else {
+        watchIds = watchLinks = null;
+      }
+      $videoDescription = null;
+    }
 
 
     function create$videoDescription(html) {
@@ -7379,6 +7463,9 @@
         links.push(n);
         html = html.replace(n, ' <!----> ');
       }
+
+      // (htttp://example.com) -> ( htttp://example.com )  にして、 閉じカッコがリンクされるのを抑止
+      html = html.replace(/\((https?:\/\/[\x21-\x3b\x3d-\x7e]+)\)/gi, '( $1 )');
       html = html.replace(/(https?:\/\/[\x21-\x3b\x3d-\x7e]+)/gi, '<a href="$1" target="_blank" class="otherSite">$1</a>');
       for (var i = 0, len = links.length; i < len; i++) {
         html = html.replace(' <!----> ', links[i]);
@@ -7405,6 +7492,9 @@
           }
         }
       });
+
+      $description.find('.watch').unbind('click');
+      decorateVideoDescriptionLink($description);
       return $description;
     } //
 
@@ -8597,9 +8687,12 @@
           'margin-top: ', availableHeight, 'px !important; left: ', (xdiff - 2), 'px; ',
           'max-height: ', bottomHeight + 'px; overflow-y: auto; overflow-x: hidden; height: auto;',
         '}\n',
-        'body.videoExplorer #videoExplorer.w_adjusted { margin-left: ', availableWidth,  'px !important; background: #f4f4f4;}\n',
+        'body.videoExplorer #videoExplorer.w_adjusted { ',
+          'margin-left: ', availableWidth,  'px !important;',
+          'min-height: ', (windowHeight + 200) ,'px !important;',
+          'overflow-x: hidden;',
+        ' }\n',
         'body.videoExplorer #content.w_adjusted #playlist { margin-left: ', xdiff, 'px; }\n',
-        'body.videoExplorer #videoExplorer.w_adjusted { min-height: ', (windowHeight + 200) ,'px !important; }\n',
 
         'body.videoExplorer #content.w_adjusted #nicoHeatMap {',
           '-webkit-transform: scaleX(', availableWidth / 100, ');',
@@ -8631,16 +8724,16 @@
         ((xdiff >= 400) ?
           [
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoTitleContainer{',
-              'margin-left: 154px; border-radius: 0 0 ;background: #ddd; border: solid; border-color: #ccc; border-width: 1px 1px 0;',
+              'margin-left: 158px; border-radius: 0 0 ;background: #ddd; border: solid; border-color: #ccc; border-width: 1px 1px 0;',
             '}',
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoThumbnailContainer{',
               'position: absolute; max-width: 150px; top: 0; ',
             '}',
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoInfo{',
-              'background: #ddd; margin-left: 154px; border-radius: 0 0; border: solid; border-color: #ccc; border-width: 0 1px 1px;',
+              'background: #ddd; margin-left: 158px; border-radius: 0 0; border: solid; border-color: #ccc; border-width: 0 1px 1px;',
             '}',
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoDetails{',
-              'margin-left: 154px; height: 100%; ',
+              'margin-left: 158px; height: 100%; ',
             '}',
             'body.videoExplorer #content.w_adjusted #leftPanel .sideVideoInfo .videoOwnerInfoContainer{',
               'position: absolute; width: 150px; top: 0; border: 1px solid #ccc; margin: 0;',
@@ -8801,7 +8894,7 @@
           width: 24%;
         }
         #videoExplorer.w_adjusted .videoExplorerBody #searchResultContainer {
-          background: #fff;
+          {*background: #fff;*}
         }
 
 
@@ -8827,14 +8920,14 @@
         body.videoExplorer #content.w_adjusted .videoExplorerMenuInner
           { position: static !important; top: 0 !important; left: 0 !important; }
 
-        body.videoExplorer #bottomContentTabContainer.w_adjusted { background: #ccc; }
+        body.videoExplorer #bottomContentTabContainer.w_adjusted { {*background: #ccc;*} }
         body:not(.videoExplorer)      .videoExplorerMenu { display: none; }
 
         body.videoExplorer #content.w_adjusted #nicoplayerContainer {
           z-index: 100;
         }
         body.videoExplorer #content.w_adjusted #playerTabWrapper {
-          top: 0px !important; {*height: 50px !important;*} background: #dfdfdf; border-radius: 4px;
+          top: 0px !important; background: #dfdfdf; border-radius: 4px;
           z-index: 99;
           transition: right 0.3s ease-out;
         }
@@ -8859,7 +8952,7 @@
           width: 130px; text-align: center;
         }
         .w_adjusted .createdTime {
-          white-space: nowrap; background: #fff;
+          white-space: nowrap; {*background: #fff;*}
         }
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .contentItemList .folder .container,
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .suggestVideo .folder .container {
@@ -8976,6 +9069,9 @@
         }
         .videoExplorer #playerContainer.appli_panel #appliPanel {
           width: auto !important; background: #333;
+        }
+        .videoExplorerContent {
+          background: #fff;
         }
       */});
       return addStyle(__css__, 'videoExplorerStyleStatic');
@@ -10389,7 +10485,9 @@
 
       //$(document).on('scroll', WatchApp.ns.event.EventDispatcher.throttle(function() {
       $(document).on('scroll', function() {
-        document.body.style.pointerEvents = 'none';
+        if (document.body.style.pointerEvents !== 'none') {
+          document.body.style.pointerEvents = 'none';
+        }
       });
       $(document).on('scroll', window._.debounce(function() {
         document.body.style.pointerEvents = '';
@@ -10413,7 +10511,7 @@
           console.log(
             '%cError: window.onMessage - ',
             'color: red; background: yellow',
-            e);
+            e, event.origin, event.data);
         }
       });
     } //
@@ -12383,7 +12481,22 @@
             expect(typeof result.list[0].type === 'number').toBeTrue('type属性がある');
             def.resolve();
           });
+        },
+        testVideoArray: function(def) {
+          window.WatchItLater.VideoArrayAPILoader.load(['sm9', 'sm13']).then(function(result) {
+            console.log('VideoArrayAPILoader', result);
+            expect(result['sm9']).toBeTruthy('動画情報');
+            expect(result['sm13'].title).toBeTruthy('タイトルがある');
+            expect(result['sm13'].title.length >= 0).toBeTrue('タイトル長がある');
+            window.WatchItLater.VideoArrayAPILoader.load(['sm13', '1394785382']).then(function(result) {
+              console.log('VideoArrayAPILoader', result);
+              expect(result['1394785382']).toBeTruthy('スレッドIDでも引ける');
+              expect(result['1394785382'].title).toEqual('鬼灯の冷徹　第10話「十王の晩餐」「ダイエットは地獄みたいなもの」', '動画タイトル一致');
+              def.resolve();
+            });
+          });
         }
+
 
       }); // end WatchApp.mixin
 
@@ -12504,8 +12617,8 @@
   /**
    * スマートフォン用APIを利用して動画情報を取得する
    */
-  var spapi = function() {
-    if (window.name !== 'watchItLaterAPILoader') { return; }
+  var spapi = (function() {
+    if (window.name.indexOf('watchItLaterAPILoader') < 0 ) { return; }
     var resp    = document.getElementsByTagName('nicovideo_video_response');
     var session = location.hash.length > 1 ? location.hash.substr(1) : location.search;
     var origin  = 'http://' + location.host.replace(/^.*?\./, 'www.');
@@ -12528,7 +12641,7 @@
       alert(e);
       console.log('err', e);
     }
-  };
+  });
 
   // Chromeに対応させるための処理
   // いったん<script>として追加してから実行する
@@ -12546,8 +12659,11 @@
       inject.appendChild(document.createTextNode("(" + monkey + ")(false)"));
 //      inject.appendChild(document.createTextNode("try {(" + monkey + ")(false) } catch(e) { console.log(e); }"));
 
-      document.documentElement.appendChild(inject);
-      //document.body.appendChild(inject);
+      if (document.body) {
+        document.body.appendChild(inject);
+      } else {
+        document.documentElement.appendChild(inject);
+      }
     } else {
       // やや古いFirefoxはここらしい
       monkey(true);
