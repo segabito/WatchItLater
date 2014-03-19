@@ -19,7 +19,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140319
+// @version        1.140320
 // ==/UserScript==
 
 /**
@@ -40,7 +40,7 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 
-// * ver 1.140303
+// * ver 1.140319
 // - 謎の技術によって、ニコメンドがなくても説明文の動画リンクにサムネイルを出せるように
 // - 細かなスタイル調整
 
@@ -840,6 +840,9 @@
       .sidePanel .sideVideoInfo .videoDetails a{
         margin: auto 4px;
       }
+      .sidePanel .sideVideoInfo .videoDetails a:visited{
+        color: #04618c;
+      }
       .sidePanel .sideVideoInfo .videoDetails a.watch{
         margin: auto 30px auto 4px;
         display:inline-block;
@@ -860,7 +863,12 @@
         min-height: 50px; margin: 4px 8px; font-weight: normal; color: black;
       }
       .sideVideoInfo .descriptionThumbnail p {
-        margin: 8px;
+        margin: 0 8px;
+        font-weight: bolder;
+      }
+      .sideVideoInfo .descriptionThumbnail .uploadAt {
+        font-size: 90%;
+        margin: 4px;
       }
 
       .sideVideoInfo .descriptionThumbnail.video img{
@@ -4367,6 +4375,7 @@
       var duration = parseInt(info['length_in_seconds'], 10);
       info['length'] = parseInt(duration / 60, 10) + ':' + (100 + (duration % 60)).toString().substr(1);
 
+      info['first_retrieve_t'] = info['first_retrieve'];
       info['first_retrieve'] =
         window.WatchApp.ns.util.DateFormat.strftime(
           '%Y-%m-%d %H:%M:%S',
@@ -7089,7 +7098,6 @@
           var css = [
             'body.videoExplorer #content.w_adjusted #playerTabWrapper { width: ', targetWidth,'px; }\n',
             'body:not(.full_with_browser) .w_wide #playerTabWrapper { width: ', targetWidth,'px; }\n',
-            //'body:not(.videoExplorer) .w_wide #playerTabWrapper.w_wide { right: -140px;}\n'
             'body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea             { width: 1100px; }\n', //  960 + 140
             'body:not(.videoExplorer):not(.full_with_browser) .w_wide #playerAlignmentArea.size_normal { width: 1326px; }\n\n'  // 1186 + 140
           ];
@@ -7189,15 +7197,15 @@
     } // end initRightPanel
 
     function initRightPanelHorizontalTab($, conf, w) {
-      var playerTab = WatchApp.ns.init.PlayerInitializer.playerTab;
-      // 終了時にニコメンドが勝手に開かなくするやつ
-      // 連続再生中はニコメンドパネルが開かない事を利用する
-      playerTab.playlist_org = playerTab.playlist;
-      playerTab.playlist = {
-        isContinuous: function() {
-          return true;
-        }
-      };
+//      var playerTab = WatchApp.ns.init.PlayerInitializer.playerTab;
+//      // 終了時にニコメンドが勝手に開かなくするやつ
+//      // 連続再生中はニコメンドパネルが開かない事を利用する
+//      playerTab.playlist_org = playerTab.playlist;
+//      playerTab.playlist = {
+//        isContinuous: function() {
+//          return true;
+//        }
+//      };
     } //
 
     function initRightPanelVerticalTab($sidePanel) {
@@ -7295,7 +7303,9 @@
       var refreshPanel = function(isFirst) {
 
         window.setTimeout(function() {
-          $sidePanel.toggleClass('reviewEmpty', $('#videoReview').find('.stream').length < 1);
+          $sidePanel
+            .toggleClass('reviewEmpty', $('#videoReview').find('.stream').length < 1)
+            .toggleClass('ichibaEmpty', WatchController.isIchibaEmpty());
         }, 2000);
 
         if (isFirst) { return; }
@@ -7436,6 +7446,7 @@
               var $thmb = $([
                 '<div class="descriptionThumbnail video">',
                 '<img src="', info.thumbnail_url, '" onclick="WatchItLater.WatchController.showLargeThumbnail(this.src);">',
+                '<span class="uploadAt">', info.first_retrieve ,' 投稿</span>',
                 '<p>', info.title, ' (', info.length,  ')</p>',
                 '</div>'].join(''));
               $target.after($thmb);
