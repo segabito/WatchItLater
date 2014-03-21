@@ -19,7 +19,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140320
+// @version        1.140321
 // ==/UserScript==
 
 /**
@@ -869,6 +869,22 @@
       .sideVideoInfo .descriptionThumbnail .uploadAt {
         font-size: 90%;
         margin: 4px;
+        color: #333;
+      }
+      .sideVideoInfo .descriptionThumbnail .counterContainer {
+        text-align: center;
+      }
+      .sideVideoInfo .descriptionThumbnail .view,
+      .sideVideoInfo .descriptionThumbnail .comment,
+      .sideVideoInfo .descriptionThumbnail .mylist
+      {
+        font-size: 90%;
+        white-space: nowrap;
+        margin-right: 4px;
+        color: #333;
+      }
+      .sideVideoInfo .descriptionThumbnail .count {
+        font-weight: bolder;
       }
 
       .sideVideoInfo .descriptionThumbnail.video img{
@@ -1360,16 +1376,13 @@
         max-height: 2000px;
         transition: max-height   1s ease-in-out;
       }
-      .videoExplorerMenu #favoriteTagsMenu a,             .videoExplorerMenu #favoriteMylistsMenu a,
-      .videoExplorerMenu #mylistListMenu   a,             .videoExplorerMenu #videoRankingMenu a{
+      .videoExplorerMenu .toggleVideoExplorerMenu a {
         color: black; display: block;
       }
-      .videoExplorerMenu #favoriteTagsMenu a:after,       .videoExplorerMenu #favoriteMylistsMenu a:after,
-      .videoExplorerMenu #mylistListMenu   a:after,       .videoExplorerMenu #videoRankingMenu a:after{
+      .videoExplorerMenu .toggleVideoExplorerMenu a:after {
         content: "▼"; position: absolute; background: none; top: 0px; right: 10px; color: #ccc;
       }
-      .videoExplorerMenu #favoriteTagsMenu.open a:after,  .videoExplorerMenu #favoriteMylistsMenu.open a:after,
-      .videoExplorerMenu #mylistListMenu.open   a:after,  .videoExplorerMenu #videoRankingMenu.open a:after{
+      .videoExplorerMenu .toggleVideoExplorerMenu.open a:after {
         content: "▲";
       }
 
@@ -2259,6 +2272,18 @@
   };
   conf.load();
 
+  var console = (function(conf) {
+    if (conf.debugMode) { return window.console; }
+    var noop = function() {};
+    return {
+      log: noop,
+      error: noop,
+      trace: noop,
+      warn: noop,
+      table: noop
+    };
+  })(conf);
+
   var ConfigPanel = (function($, conf, w) {
     var pt = function(){};
     var $panel = null, $shadow = null;
@@ -2272,9 +2297,9 @@
         values: {'する': true, 'しない': false}},
       {title: '動画の位置に自動スクロール(自動全画面化オフ時)', varName: 'autoScrollToPlayer',
         values: {'する': true, 'しない': false}},
-      {title: '終了時に全画面モードを解除(原宿と同じにする)', varName: 'autoNotFull',
-        values: {'する': true, 'しない': false},
-        description: '連続再生中は解除しません'},
+//    {title: '終了時に全画面モードを解除(原宿と同じにする)', varName: 'autoNotFull',
+//      values: {'する': true, 'しない': false},
+//      description: '連続再生中は解除しません'},
       {title: 'ウィンドウがアクティブの時だけ自動再生する', varName: 'autoPlayIfWindowActive',
         description: 'QWatch側の設定パネルの自動再生はオフにしてください。\n■こんな人におすすめ\n・自動再生ONにしたいけど別タブで開く時は自動再生したくない\n・複数タブ開いたままブラウザ再起動したら全部のタブで再生が始まって「うるせー！」という経験のある人',
         values: {'する': 'yes', 'しない': 'no'}},
@@ -2675,20 +2700,21 @@
         ConfigPanel.open();
       }
     },
+    loader: {},
     debug: {},
     init: {},
     test: {
       assert: function(v, m) {
         if (v === true) {
-          console.log('%c OK: ',  'color: black; background: lime;',  m);
+          window.console.log('%c OK: ',  'color: black; background: lime;',  m);
         } else {
-          console.log('%cFail: ', 'color: white; background: red;',   m);
+          window.console.log('%cFail: ', 'color: white; background: red;',   m);
           throw {message: 'Fail'};
         }
       },
       expect: function(a) {
         try {
-          var assert = WatchItLater.test.assert, exp = {
+          var assert = window.WatchItLater.test.assert, exp = {
             toBeTrue:    function(   desc) { assert(a === true      , desc); },
             toBeFalse:   function(   desc) { assert(a === false     , desc); },
             toEqual:     function(b, desc) { assert(a === b         , desc); },
@@ -2699,7 +2725,7 @@
           };
           return exp;
         } catch(e) {
-          console.log('%c', a);
+          window.console.log('%c', a);
         }
       },
       spec: {},
@@ -2707,9 +2733,9 @@
         var def = (new $.Deferred()), promise = def.promise();
         var con = function(name) {
           return function() {
-            var d = new $.Deferred;
+            var d = new $.Deferred();
             setTimeout(function() {
-              console.log('%c RUN: ' + name, 'background: #8ff;');
+              window.console.log('%c RUN: ' + name, 'background: #8ff;');
               d.resolve();
             }, 100);
             return d.promise();
@@ -2717,12 +2743,12 @@
         };
         var wrap = function(self, name) {
           return function() {
-            var d = new $.Deferred;
+            var d = new $.Deferred();
             setTimeout(function() {
               try {
               $.proxy(self.spec[name], self)(d);
               } catch (e) {
-                console.log(e);
+                window.console.log(e);
                 d.reject();
               }
             }, 0);
@@ -2730,7 +2756,7 @@
           };
         };
         var onFail = function(e) {
-          console.log('%c fail : ','background: red;', e);
+          window.console.log('%c fail : ','background: red;', e);
         };
 
         if (name) {
@@ -2742,14 +2768,14 @@
           }
         }
         promise.then(
-          function() { console.log('%cテスト完了', 'background: #8ff'); },
-          function() { console.log('%cテスト失敗', 'background: #f00'); }
+          function() { window.console.log('%cテスト完了', 'background: #8ff'); },
+          function() { window.console.log('%cテスト失敗', 'background: #f00'); }
         );
         def.resolve();
      }
     }
   };
-  w.WatchItLater = WatchItLater;
+//  w.WatchItLater = window.WatchItLater;
 
 
   var EventDispatcher = (function(conf) {
@@ -2776,7 +2802,7 @@
       }
     }
     function dispatch(name) {
-      if (conf.debugMode) console.log('%cevent:', 'background: blue; color: white;', name);//, arguments);
+      console.log('%cevent:', 'background: blue; color: white;', name);//, arguments);
       _dispatch.apply(null, arguments);
     }
     return {
@@ -2785,7 +2811,7 @@
       _dispatch: _dispatch // コンソール汚したくない用
     };
   })(conf);
-  WatchItLater.event = EventDispatcher;
+  window.WatchItLater.event = EventDispatcher;
 
   /*
   * 通算視聴回数をカウント。 カウントしても意味はないけど、どれだけ無駄な時間を費やしたかを知りたくて実装。
@@ -2798,7 +2824,7 @@
     function add() {
       var v = get() + 1;
       w.localStorage.setItem(key, JSON.stringify(v));
-      if (conf.debugMode) console.log('%cwatchCounter: %c%d', 'color: orange;', 'font-weight: bolder;', v);
+      console.log('%cwatchCounter: %c%d', 'color: orange;', 'font-weight: bolder;', v);
       return v;
     }
     var self ={
@@ -2807,7 +2833,7 @@
     };
     return self;
   })(conf, w);
-  WatchItLater.counter = WatchCounter;
+  window.WatchItLater.counter = WatchCounter;
 
   /**
    *  動画タグ取得とポップアップ
@@ -3009,6 +3035,7 @@
 
 
 
+
   /**
    *  マイリスト登録API
    *
@@ -3018,7 +3045,7 @@
    *
    *  …と思っていたのだが、(9)からQになった今でもポップアップウィンドウは廃止されないようだ。
    */
-  var Mylist = (function(){
+  var Mylist = window.WatchItLater.Mylist = (function(){
     var mylistlist = [];
     var initialized = false;
     var defListItems = [], mylistItems = {};
@@ -3115,7 +3142,6 @@
     pt.isMine = function(id) {
       if (!initialized) { return false;}
       for (var i = 0, len = mylistlist.length; i < len; i++) {
-        //console.log('mylist.ismine?', mylistlist[i].id, id);
         if (mylistlist[i].id == id) { return true; }
       }
       return false;
@@ -3129,8 +3155,8 @@
           try {
             JSON.parse(resp.responseText);
           } catch (e) {
-            console.log(e);
-            console.log(resp.responseText);
+            window.console.log(e);
+            window.console.log(resp.responseText);
           }
           if (!resp.responseText) return;
           var result = JSON.parse(resp.responseText);
@@ -3714,10 +3740,8 @@
     };
     return self;
   })(conf, w);
-  WatchItLater.Mylist = Mylist;
 
-
-  var FavMylists = (function() {
+  window.WatchItLater.loader.favMylists = (function() {
     var lastUpdate = 0;
     var favMylistList = [];
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
@@ -3819,7 +3843,7 @@
   })();
 
 
-  var FavTags = (function(w) {
+  window.WatchItLater.loader.favTags = (function(w) {
     var lastUpdate = 0;
     var favTagList = [], favTagTextList = [];
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
@@ -3867,7 +3891,6 @@
    *
    */
   var Popup = (function(){
-    var console = conf.debugMode ? window.console : {log: function() {}};
     function Popup() {}
 
     Popup.show = function(text) {
@@ -4288,7 +4311,7 @@
     //WatchItLater.VideoArrayAPILoader.load('sm9').then(function(info) { console.log(info); });
 
     var load = function(watchId) {
-      var ids = [], result = {}, def = new $.Deferred(), resolved = false, timeoutTimer = null;
+      var ids = [], result = {}, def = new $.Deferred(), timeoutTimer = null;
 
       initialize();
 
@@ -4310,16 +4333,19 @@
           result[id] = result[id] || infoList[id] || cacheData[id];
         });
 
-        clearTimeout(timeoutTimer);
-        resolved = true;
+        window.clearTimeout(timeoutTimer);
         currentRequestIds = ''; currentPromise = null;
         def.resolve(result);
+        def = null;
       };
       var onFail = function() {
+        window.clearTimeout(timeoutTimer);
+        console.log('%cVideoArrayAPILoader.onFail', 'color: red;');
         currentRequestIds = ''; currentPromise = null;
-        if (!resolved) {
-          def.fail();
+        if (def) {
+          def.reject();
         }
+        def = null;
       };
 
       sessionId++;
@@ -4403,14 +4429,20 @@
         if (type !== 'VideoArrayAPILoader') { return; }
         try {
           var session = data.session, xml = data.xml;
-
+          console.log('VideoArrayAPILoader.onMessage', data.session, data.xml);
           if (deferredList[session]) {
+            console.log('resolve!');
             deferredList[session].resolve(parseVideoArray(xml));
             delete deferredList[session];
             currentPromise = null;
           }
         } catch (e) {
-          console.log('JSON parse error', e);
+          console.log('message parse error', e);
+          if (deferredList[session]) {
+            deferredList[session].reject();
+            delete deferredList[session];
+            currentPromise = null;
+          }
         }
       });
 
@@ -4431,7 +4463,7 @@
   //===================================================
   //===================================================
 
-  var WatchController = (function(w) {
+  window.WatchController = (function(w) {
     var WatchApp = w.WatchApp, _false = function() { return false; };
     if (!w.WatchApp) return {
       isZeroWatch:  _false,
@@ -4485,7 +4517,7 @@
           watch.VideoExplorerInitializer.mylistVideoAPILoader._cache.clear();
         }
       },
-      showDefMylist: function() {
+      showDeflist: function() {
         videoExplorerController.showDeflist();
       },
       changeScreenMode: function(mode) {
@@ -4796,7 +4828,7 @@
           var exp = w.document.getElementById('external_nicoplayer');
           return exp.isStageVideoSupported();
         } catch(e) {
-          if (conf.debugMode) console.log(e);
+          console.log(e);
           return false;
         }
       },
@@ -4805,7 +4837,7 @@
           var exp = w.document.getElementById('external_nicoplayer');
           return exp.isStageVideoAvailable();
         } catch(e) {
-          if (conf.debugMode) console.log(e);
+          console.log(e);
           return false;
         }
       },
@@ -4956,7 +4988,7 @@
         setTimeout(function() {
           try {
             var exp = w.document.getElementById('external_nicoplayer');
-            if (conf.debugMode) console.log('postComment: ', [comment, command]);
+            console.log('postComment: ', [comment, command]);
             if (!exp.externalPostChat(comment, command)) {
               Popup.alert('コメント投稿に失敗しました');
             }
@@ -4979,28 +5011,28 @@
       }
     };
   })(w); // end WatchController
-  WatchItLater.WatchController = WatchController;
+  WatchItLater.WatchController = window.WatchController;
 
   var Util = (function(WatchItLater, WatchController) {
     var Cache = {
       storage: {},
       get: function(key) {
         if (!this.storage[key]) {
-          if (conf.debugMode) console.log('no cache');
+          console.log('no cache');
           return false;
         } else
         if (this.storage[key].cachedUntil <= Date.now()){
-          if (conf.debugMode) console.log('cache timeout');
+          console.log('cache timeout');
           delete this.storage[key];
           return false;
         } else {
-          if (conf.debugMode) console.log('cache exist');
+          console.log('cache exist');
           return this.storage[key].data;
         }
       },
       set: function(key, data, cacheTimeMs) {
         cacheTimeMs = cacheTimeMs || 1000 * 60 * 10;
-        if (conf.debugMode) console.log('set cache', key, cacheTimeMs);
+        console.log('set cache', key, cacheTimeMs);
         this.storage[key] = {
           data: data,
           cachedUntil: Date.now() + cacheTimeMs
@@ -5061,7 +5093,7 @@
         return function(e) {
           if (isMetaKey(e)) { return; }
           prevent(e);
-          WatchController.showDefMylist();
+          WatchController.showDeflist();
           scrollToVideoExplorer();
         };
       },
@@ -5480,7 +5512,7 @@
         type: 'POST',
         data: JSON.stringify(data),
         complete: function(result) {
-          if (conf.debugMode) console.log('result', result);
+          console.log('result', result);
           if (result.status !== 200) {
             callback('fail', 'HTTP status:' + result.status);
             return;
@@ -5498,7 +5530,7 @@
             }
             Util.Cache.set(cache_key, data);
           } catch(e) {
-            if (conf.debugMode) console.log('Exception: ', e, result);
+            console.log('Exception: ', e, result);
             callback('fail', 'JSON syntax');
             return;
           }
@@ -5614,14 +5646,13 @@
     },
     load: function(params, callback) {
       var query = this._buildSearchQuery(params);
-      //console.log('searchQuery', params, query);
       this._search.load(query, $.proxy(function(err, result) {
         this.onLoad(err, result, params, query, callback);
       }, this));
     },
     onLoad: function(err, result, params, query, callback) {
       if (err) {
-        if (conf.debugMode) {console.log('load fail', err, result);}
+        console.log('load fail', err, result);
         callback('fail', {message: '通信に失敗しました1'});
         return;
       }
@@ -5699,7 +5730,7 @@
           try {
             data = JSON.parse(result.responseText);
           } catch(e) {
-            if (conf.debugMode) console.log('Exception: ', e, result);
+            console.log('Exception: ', e, result);
             callback('fail', 'JSON syntax');
           }
           Util.Cache.set(cache_key, data, cache_time);
@@ -5739,7 +5770,7 @@
             var lines = result.responseText.split('\n');
             data = JSON.parse(lines[0]);
           } catch(e) {
-            if (conf.debugMode) console.log('Exception: ', e, result);
+            console.log('Exception: ', e, result);
             callback('fail', 'JSON syntax');
             return;
           }
@@ -5850,7 +5881,7 @@
           $ = w.$; url = '/my/history';
           myNick = WatchController.getMyNick(); myId = WatchController.getMyUserId();
       } catch (e) {
-        if (conf.debugMode) console.log(e);
+        console.log(e);
         throw { message: 'エラーが発生しました', status: 'fail'};
       }
 
@@ -5923,7 +5954,7 @@
           myNick = WatchController.getMyNick();
           myId = WatchController.getMyUserId();
       } catch (e) {
-        if (conf.debugMode) console.log(e);
+        console.log(e);
         throw { message: 'エラーが発生しました', status: 'fail'};
       }
       var CACHE_KEY = 'recommend', CACHE_TIME = 1000 * 60 * 1, cacheData = Util.Cache.get(CACHE_KEY);
@@ -6102,7 +6133,7 @@
       } else {
         url += nextLink ? ('&last_timeline=' + nextLink) : '';
       }
-      if (conf.debugMode) console.log('load Url=', url);
+      console.log('load Url=', url);
 
       $.ajax({
         url: url,
@@ -6178,7 +6209,7 @@
             baseUrl = '/user/'+ param.userId +'/top?innerPage=1&mode=next_page';
           }
       } catch (e) {
-        if (conf.debugMode) console.log(e);
+        console.log(e);
         return def.reject({message: 'エラーが発生しました', status: 'fail'});
       }
 
@@ -6419,7 +6450,7 @@
 
       var getPipe = function(result, url, page) {
         return function() {
-          if (conf.debugMode) console.log('load RSS', url, page);
+          console.log('load RSS', url, page);
           return $.ajax({
               url: url,
               data: {rss: '2.0', lang: 'ja-jp', page: page},
@@ -6592,7 +6623,7 @@
           var def = new $.Deferred();
           if (!hasPage) return def.resolve(hasPage);
           var url = baseUrl + '?page=' + page;
-          if (conf.debugMode) console.log('load page', url);
+          console.log('load page', url);
 
           $.ajax({url: url}).then(function(resp) {
             var hasNextPage = parseItems(resp, result);
@@ -6627,7 +6658,7 @@
           url = 'http://ch.nicovideo.jp/channel/ch'+ id + '/video';
           myId = WatchController.getMyUserId();
         } catch (e) {
-          if (conf.debugMode) console.log(e);
+          console.log(e);
           throw { message: 'エラーが発生しました', status: 'fail'};
         }
 
@@ -6728,6 +6759,7 @@
       video_id = '', watch_id = '',
       WatchApp = w.WatchApp, WatchJsApi = w.WatchJsApi,
       isTouchActive = false,
+      console = conf.debugMode ? window.console : {log: _.noop, trace: _.noop},
       watch = WatchApp.ns.init,
       watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
 
@@ -6950,10 +6982,10 @@
 
         if (isFirst && conf.commentVisibility !== 'visible') {
           if (conf.commentVisibility === 'hidden') {
-            if (conf.debugMode) console.log('comment off');
+            console.log('comment off');
             WatchController.commentVisibility(false);
           } else {
-            if (conf.debugMode) console.log('last state', conf.lastCommentVisibility);
+            console.log('last state', conf.lastCommentVisibility);
             WatchController.commentVisibility(conf.lastCommentVisibility === 'visible');
           }
         }
@@ -7197,15 +7229,6 @@
     } // end initRightPanel
 
     function initRightPanelHorizontalTab($, conf, w) {
-//      var playerTab = WatchApp.ns.init.PlayerInitializer.playerTab;
-//      // 終了時にニコメンドが勝手に開かなくするやつ
-//      // 連続再生中はニコメンドパネルが開かない事を利用する
-//      playerTab.playlist_org = playerTab.playlist;
-//      playerTab.playlist = {
-//        isContinuous: function() {
-//          return true;
-//        }
-//      };
     } //
 
     function initRightPanelVerticalTab($sidePanel) {
@@ -7408,11 +7431,11 @@
     /**
      * 説明文中の動画リンク類を加工
      */
-    function decorateVideoDescriptionLink($videoDescription) {
+    function decorateVideoDescriptionLink($description) {
       var watchLinks = [], watchIds = [];
       var videoReg = /\/watch\/((sm|nm|so|)\d+)$/;
       var seigaReg = /seiga\/im(\d+)/;
-      $videoDescription.find('a').each(function() {
+      $description.find('a').each(function() {
         var url = this.href, text, $this = $(this);
         if (videoReg.test(url)) {
           var watchId = RegExp.$1;
@@ -7423,8 +7446,7 @@
 
           watchLinks.push({id: watchId, $target: $nextButton});
           watchIds.push(watchId);
-        }
-        else if (seigaReg.test(url)) {
+        } else if (seigaReg.test(url)) {
           var illustId = RegExp.$1;
           var $thumbnail = $([
             '<div class="descriptionThumbnail illust">',
@@ -7438,6 +7460,9 @@
       });
 
       if (conf.enableDescriptionThumbnail && watchIds.length > 0) {
+        var ac = function(s) {
+          return '<span class="count">' + WatchApp.ns.util.StringUtil.addComma(s) + '</span>';
+        };
         var onWatchIdInfoReady = function(result) {
           $(watchLinks).each(function(i, watchLink) {
             var id = watchLink.id, $target = watchLink.$target;
@@ -7448,9 +7473,15 @@
                 '<img src="', info.thumbnail_url, '" onclick="WatchItLater.WatchController.showLargeThumbnail(this.src);">',
                 '<span class="uploadAt">', info.first_retrieve ,' 投稿</span>',
                 '<p>', info.title, ' (', info.length,  ')</p>',
+                '<div class="counterContainer">',
+                  '<span class="view">再生: ',    ac(info.view_counter)  ,'</span> ',
+                  '<span class="comment">コメ: ', ac(info.num_res)       ,'</span> ',
+                  '<span class="mylist">マイ: ',  ac(info.mylist_counter),'</span>',
+                '</div>',
                 '</div>'].join(''));
               $target.after($thmb);
             }
+            $target = watchLink = null;
           });
           watchIds = watchLinks = null;
         };
@@ -7463,9 +7494,38 @@
       } else {
         watchIds = watchLinks = null;
       }
-      $videoDescription = null;
+      $description = null;
     }
 
+    /**
+     * 動画説明文のクリックイベント類を割り当てる
+     */
+    function bindDescriptionEvents($description) {
+      $description.on('click', function(e) {
+        if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) { return; }
+
+        var elm = e.target;
+        if (elm.tagName !== 'A') { return; }
+        if (elm.className === 'otherSite') return;
+
+        var $elm = $(elm);
+
+        if (elm.textContent.indexOf('mylist/') === 0) {
+          e.preventDefault(); e.stopPropagation();
+          var mylistId = elm.textContent.split('/').reverse()[0];
+
+          WatchController.showMylist(mylistId);
+        } else
+        if (elm.className === 'seekTime') {
+          e.preventDefault(); e.stopPropagation();
+          var data = $elm.attr('data-seekTime').split(":"),
+              vpos = (data[0] * 60 + parseInt(data[1], 10)) * 1000;
+          WatchController.vpos(vpos);
+        }
+      });
+      $description.find('.watch').unbind('click');
+      $description = null;
+    }
 
     function create$videoDescription(html) {
       var linkmatch = /<a.*?<\/a>/, links = [], n;
@@ -7483,37 +7543,15 @@
       }
       html = html.split(' <br /> ').join('<br />');
       var $description = $('<p class="videoDescription description">' + html + '</p>');
-      $description.find('a:not(.otherSite)').each(function(i, elm) {
-        if (elm.tagName === 'A') {
-          if (elm.className === 'otherSite') return;
-          var $elm = $(elm);
 
-          if (elm.textContent.indexOf('mylist/') === 0) {
-            var mylistId = elm.textContent.split('/').reverse()[0];
-
-            $elm.addClass('mylist').attr('target', null).on(
-              'click.sideInfo', Util.Closure.openMylist(mylistId));
-          } else
-          if (elm.className === 'seekTime') {
-            var data = $elm.attr('data-seekTime').split(":"),
-                vpos = (data[0] * 60 + parseInt(data[1], 10)) * 1000;
-
-            $elm.attr('href', location.href + '?from=' + $elm.text().substr(1)).on(
-              'click.leftInfo', Util.Closure.seekVideo(vpos));
-          }
-        }
-      });
-
-      $description.find('.watch').unbind('click');
+      bindDescriptionEvents($description);
       decorateVideoDescriptionLink($description);
       return $description;
     } //
 
     function resetSideIchibaPanel($ichibaPanel, force) {
 
-      $ichibaPanel.scrollTop(0);
-      $ichibaPanel.find('*').unbind();
-      $ichibaPanel.empty();
+      $ichibaPanel.scrollTop(0).find('*').unbind().empty();
       var $inner  = $('<div class="ichibaPanelInner" />');
       var $header = $('<div class="ichibaPanelHeader"><p class="logo">ニコニコ市場出張所</p></div>');
       $inner.append($header);
@@ -7581,105 +7619,161 @@
       EventDispatcher.addEventListener('onVideoInitialized', resetHidariue);
     } //
 
-    var $favMylistToggle = null, $favMylistPopup = null, loadFavMylistTimer = null;
-    function loadFavMylists() {
-      if ($favMylistToggle) {
-        $('.videoExplorerMenu').find('ul:first li:first').after($favMylistPopup).after($favMylistToggle);
-        return;
-      }
-      if (loadFavMylistTimer) { return; }
-      loadFavMylistTimer =  setTimeout(function() {
-        var $toggle = $('<li style="display:none;"></li>'),
-            $a = $('<a>お気に入りマイリスト</a>'),
-            $popup = $('<li><ul></ul></li>').addClass('slideMenu'), $ul = $popup.find('ul'),
-            $reload = $('<li><button class="reload">リロード</button></li>'),
-            $reloadButton = $reload.find('button');
-        $toggle.attr('id','favoriteMylistsMenu').addClass('watchItLaterMenu');
-        $a.attr('href', '/my/fav/mylist').click(function(e) {
-          if (e.button !== 0 || e.metaKey) return;
-          e.preventDefault();
-          var isVisible = $popup.hasClass('open');
-          $toggle.addClass('opening');
-          $popup.toggleClass('open', !isVisible);
-          setTimeout(function() {
-            $toggle.toggleClass('open', !isVisible);
-            $toggle.removeClass('opening');
-          }, 500);
+
+    var VideoExplorerToggleMenu = function(title, titleLink) {
+      this.initializeBaseDom(title, titleLink);
+    };
+    WatchApp.mixin(VideoExplorerToggleMenu.prototype, {
+      initializeBaseDom: function(title, titleLink) {
+
+        this._$toggle = $('<li style="display:none;" class="toggleVideoExplorerMenu watchItLaterMenu"></li>');
+        this._$menu   = $('<li class="slideMenu"><ul></ul></li>');
+        this._$list   = this._$menu.find('ul');
+
+        var $a = $('<a/>').text(title).attr('href', titleLink);
+        this._$toggle.append($a);
+
+        this._initializeToggleEvent();
+        this._initializeItemEvent();
+      },
+      _initializeToggleEvent: function() {
+        this._$toggle.on('click', $.proxy(function(e) {
+          if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) { return; }
+          e.preventDefault(); e.stopPropagation();
+
+          var isVisible = this._$menu.hasClass('open');
+          this._$toggle.addClass('opening');
+          this._$menu.toggleClass('open', !isVisible);
+
+          window.setTimeout($.proxy(function() {
+            this._$toggle.toggleClass('open', !isVisible);
+            this._$toggle.removeClass('opening');
+          }, this), 500);
+        }, this));
+      },
+      _initializeItemEvent: function() {
+        this._$menu.on('click', function(e) {
+          if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) { return; }
+
+          var elm = e.target;
+          if (elm.tagName !== 'A') { return; }
+          var $elm = $(elm);
+          var type = $elm.attr('data-menu-type');
+
+          if (type === 'mylist') {
+            e.preventDefault(); e.stopPropagation();
+            var mylistId = $elm.attr('data-mylist-id');
+            WatchController.showMylist(mylistId);
+          } else
+          if (type === 'deflist') {
+            e.preventDefault(); e.stopPropagation();
+            WatchController.showDeflist();
+          } else
+          if (type === 'tag') {
+            e.preventDefault(); e.stopPropagation();
+            var tag = $elm.attr('data-search-tag');
+            WatchController.nicoSearch(tag, 'tag');
+          }
         });
-        $favMylistToggle = $toggle;
-        $favMylistPopup  = $popup;
-        $toggle.append($a);//.append($popup)
-        $('.videoExplorerMenu').find('ul:first li:first').after($popup).after($toggle);
-
-
-        function reload() {
-          $reloadButton.unbind('click');
-          $ul.hide(300, function() { $ul.empty().show(); });
-          setTimeout(function() {
-            load();
-          }, 500);
-        }
-
-        function load() {
-          FavMylists.load(function(mylists) {
-            if (mylists.length < 1) {
-              $ul.append($reload);
-              return;
-            }
-            $reloadButton.click(reload);
-            for (var i = 0, len = mylists.length; i < len; i++) {
-              var mylist = mylists[i], lastVideo = mylist.lastVideo, $li = $('<li/>'),
-                title = [
-                  '/mylist/', mylist.id, '\n',
-                  mylist.description, '\n',
-                  '最新動画: ', lastVideo.title, '\n',
-                  '投稿日時: ', lastVideo.postedAt, '\n',
-                ''].join(''),
-                $a = $('<a/>')
-                .attr({href: '/mylist/' + mylist.id, title: title})
-                .text(mylist.name)
-                .addClass('favoriteMylist')
-                .click(Util.Closure.openMylist(mylist.id));
-              $ul.append($li.addClass(mylist.iconType).append($a));
-            }
-            $ul.append($reload);
-            $toggle.fadeIn(500);
-          });
-        }
-        load();
-
-      }, 100);
-    } //
-
-
-    var $favTagToggle = null, $favTagPopup = null, loadFavTagsTimer = null;
-    function loadFavTags() {
-      if ($favTagToggle) {
-        $('.videoExplorerMenu').find('ul:first li:first').after($favTagPopup).after($favTagToggle);
-        return;
+      },
+      attach: function() {
+        $('.videoExplorerMenu').find('ul:first li:first').after(this._$menu).after(this._$toggle);
+      },
+      detach: function() {
+        this._$toggle.detach();
+        this._$menu.detach();
+      },
+      add$listItem: function($item) {
+        this._$list.append($item);
+      },
+      addItem: function(name, title, attr) {
+        var
+          $a = $('<a/>')
+           .attr(attr)
+           .text(title),
+          $li = $('<li/>').addClass(iconType);
+        $li.append($a);
+        this._$list.append($li);
+        return $a;
+      },
+      addMylistItem: function(name, mylistId, title, iconType) {
+        var
+          $a = $('<a/>')
+           .text(name)
+           .attr({
+              href: '/mylist/' + mylistId,
+              title: title,
+              'data-menu-type': 'mylist',
+              'data-mylist-id': mylistId,
+            }),
+          $li = $('<li/>').addClass(iconType);
+        $li.append($a);
+        this._$list.append($li);
+        return $a;
+      },
+      show: function() {
+        this._$toggle.fadeIn(500);
       }
-      if (loadFavTagsTimer) { return; }
-      loadFavTagsTimer =  setTimeout(function() {
-        var $toggle = $('<li style="display:none;"></li>'),
-            $a = $('<a>お気に入りタグ</a>'),
-            $popup = $('<li><ul></ul></li>').addClass('slideMenu'), $ul = $popup.find('ul');
-        $toggle.attr('id', 'favoriteTagsMenu').addClass('watchItLaterMenu');
-        $a.attr('href', '/my/fav/tag').click(function(e) {
-          if (e.button !== 0 || e.metaKey) return;
-          e.preventDefault();
-          var isVisible = $popup.hasClass('open');
-          $popup.toggleClass('open', !isVisible);
-          setTimeout(function() {
-            $toggle.toggleClass('open', !isVisible);
-            $toggle.removeClass('opening');
-          }, 500);
-        });
-        $favTagToggle = $toggle;
-        $favTagPopup  = $popup;
-        $toggle.append($a);
-        $('.videoExplorerMenu').find('ul:first li:first').after($popup).after($toggle);
+    });
 
-        FavTags.load(function(tags) {
+    WatchItLater.videoExplorerMenu = {};
+    WatchItLater.videoExplorerMenu.favMylists = (function() {
+      var toggleMenu;
+
+      var initialize = function() {
+        initialize = window._.noop;
+        console.log('%cinitialize WatchItLater.videoExplorerMenu.favMylists', 'background: lightgreen;');
+
+        toggleMenu = new VideoExplorerToggleMenu('お気に入りマイリスト', '/my/fav/mylist');
+
+        window.WatchItLater.loader.favMylists.load(function(mylists) {
+          if (mylists.length < 1) {
+            return;
+          }
+          for (var i = 0, len = mylists.length; i < len; i++) {
+            var mylist = mylists[i], lastVideo = mylist.lastVideo, $li = $('<li/>'),
+              title = [
+                '/mylist/', mylist.id, '\n',
+                mylist.description, '\n',
+                '最新動画: ', lastVideo.title, '\n',
+                '投稿日時: ', lastVideo.postedAt, '\n',
+              ''].join('');
+              toggleMenu.addMylistItem(
+                mylist.name,
+                mylist.id,
+                title,
+                mylist.iconType
+              );
+          }
+          toggleMenu.show();
+        });
+      };
+
+      return {
+        attach: function() {
+          initialize();
+          toggleMenu.attach();
+        },
+        detach: function() {
+          if (!toggleMenu) {
+            return;
+          }
+          console.log(toggleMenu);
+          toggleMenu.detach();
+        }
+      };
+    })();
+
+    WatchItLater.videoExplorerMenu.favTags = (function() {
+      var toggleMenu;
+
+      var initialize = function() {
+        initialize = window._.noop;
+        console.log('%cinitialize WatchItLater.videoExplorerMenu.favTags', 'background: lightgreen;');
+
+        toggleMenu = new VideoExplorerToggleMenu('お気に入りタグ', '/my/fav/tag');
+
+        window.WatchItLater.loader.favTags.load(function(tags) {
           if (tags.length < 1) {
             $toggle.remove();
             return;
@@ -7688,182 +7782,186 @@
           for (var i = 0, len = tags.length; i < len; i++) {
             var tag = tags[i], $li = $('<li/>'),
               $a = $('<a/>')
-              .attr({href: '/tag/' + encodeURIComponent(tag.name + ' ' + conf.defaultSearchOption) + sortOrder})
-              .text(tag.name)
-              .addClass('favoriteTag')
-              .click(Util.Closure.openNicoSearch(tag.name));
-            $ul.append($li.append($a));
+              .attr({
+                href: '/tag/' + encodeURIComponent(tag.name + ' ' + conf.defaultSearchOption) + sortOrder,
+                'data-menu-type': 'tag',
+                'data-search-tag': tag.name
+              })
+              .text(tag.name);
+            toggleMenu.add$listItem($li.append($a));
           }
-          $toggle.fadeIn(500);
+          toggleMenu.show();
         });
-      }, 100);
-    } //
-
-
-    var $mylistListToggle = null, $mylistListPopup = null, loadMylistListTimer = null;
-    function loadMylistList() {
-      if ($mylistListToggle) {
-        $('.videoExplorerMenu').find('ul:first li:first').after($mylistListPopup).after($mylistListToggle);
-        return;
-      }
-      if (loadMylistListTimer) { return; }
-      loadMylistListTimer = setTimeout(function() {
-        var $toggle = $('<li style="display:none;"></li>'),
-            $a = $('<a>マイショートカット</a>'),
-            $popup = $('<li><ul></ul></li>').addClass('slideMenu'), $ul = $popup.find('ul');
-        $toggle.attr('id', 'mylistListMenu').addClass('watchItLaterMenu');
-        $a.attr('href', '/my/mylist').click(function(e) {
-          if (e.button !== 0 || e.metaKey) return;
-          e.preventDefault();
-          var isVisible = $popup.hasClass('open');
-          $toggle.addClass('opening');
-          $popup.toggleClass('open', !isVisible);
-          setTimeout(function() {
-            $toggle.toggleClass('open', !isVisible);
-            $toggle.removeClass('opening');
-          }, 500);
-        });
-        $toggle.append($a);
-        $('.videoExplorerMenu').find('ul:first li:first').after($popup).after($toggle);
-        $mylistListToggle = $toggle;
-        $mylistListPopup = $popup;
-
-        Mylist.loadMylistList(function(mylistList) {
-          $ul.append(
-            $('<li/>').append(
-              $('<a/>')
-                .attr({href: '/my/mylist'})
-                .text('とりあえずマイリスト')
-                .addClass('mylistList')
-                .addClass('defMylist')
-                .click(Util.Closure.openDefMylist())
-            )
-          );
-          var items = [
-            {id:  -1, href: '/my/history',      title: '視聴履歴'},
-            {id:  -2, href: '/recommendations', title: 'あなたにオススメの動画'},
-            {id: NicorepoVideo.REPO_ALL,    href: '/my/top/all',    title: '【ニコレポ】すべての動画'},
-            {id: NicorepoVideo.REPO_USER,   href: '/my/top/user',   title: '【ニコレポ】お気に入りユーザー'},
-            {id: NicorepoVideo.REPO_CHCOM,  href: '/my/top/chcom',  title: '【ニコレポ】チャンネル&コミュニティ'},
-            {id: NicorepoVideo.REPO_MYLIST, href: '/my/top/mylist', title: '【ニコレポ】お気に入りマイリスト'}
-          ];
-          function createItemDom(item) {
-            return  $('<li/>').append(
-              $('<a/>')
-                .attr({href: item.href})
-                .text(item.title)
-                .addClass('mylistList')
-                .addClass('defMylist')
-                .click(Util.Closure.openMylist(item.id))
-            );
-          }
-          for (var v in items) {
-            $ul.append(createItemDom(items[v]));
-          }
-          for (var i = 0, len = mylistList.length; i < len; i++) {
-            var mylist = mylistList[i], $li = $('<li/>'),
-              $a = $('<a/>')
-              .attr({href: '/my/mylist/#/' + mylist.id})
-              .text(mylist.name)
-              .addClass('mylistList')
-              .click(Util.Closure.openMylist(mylist.id));
-            $ul.append($li.append($a));
-          }
-          $toggle.fadeIn(500);
-        });
-      }, 100);
-    } //
-
-    var loadVideoRanking = (function() {
-      var $videoRankingToggle = null, $videoRankingPopup = null, loadVideoRankingTimer = null;
-      var attach = function() {
-        $('.videoExplorerMenu').find('ul:first li:first').after($videoRankingPopup).after($videoRankingToggle);
       };
-      var getToggleMenuClosure = function($popup, $toggle) {
-        return function(e) {
-          if (e.button !== 0 || e.metaKey) return;
-          e.preventDefault();
-          var isVisible = $popup.hasClass('open');
-          $toggle.addClass('opening');
-          $popup.toggleClass('open', !isVisible);
-          setTimeout(function() {
-            $toggle.toggleClass('open', !isVisible);
-            $toggle.removeClass('opening');
-          }, 500);
-        };
-      };
-      return function() {
-        if ($videoRankingToggle) {
-          return attach();
+
+      return {
+        attach: function() {
+          initialize();
+          toggleMenu.attach();
+        },
+        detach: function() {
+          if (!toggleMenu) {
+            return;
+          }
+          toggleMenu.detach();
         }
-        if (loadVideoRankingTimer) { return; }
-        loadVideoRankingTimer = setTimeout(function() {
-          var $toggle = $('<li style="display:none;"></li>'),
-              $a = $('<a>動画ランキング</a>'),
-              $popup = $('<li><ul></ul></li>').addClass('videoRankingList').addClass('slideMenu'), $ul = $popup.find('ul');
-          function createMenu($, genre, id, name, category, term) {
-            var $a =
-              $('<a/>')
-                .attr({href: '/ranking/fav/' + term + '/' + genre})
-                .text(name)
-                .addClass('videoRankingListItem')
-                .addClass(genre)
-                .click(Util.Closure.openMylist(id));
-            var $li = $('<li/>');
-            if (genre === category) {
-              $li.addClass('isCategory'); // nameと同じならカテゴリランキング、違うならジャンルランキング
-              if (genre !== 'all' && genre !== 'g_politics' && genre !== 'r18') {
-                var $button = $([
-                  '<button class="rankingCategoryToggle">',
-                    '<span class="open" title="サブカテゴリを開く">▼</span>',
-                    '<span class="close" title="サブカテゴリを閉じる">▲</span>',
-                  '</button>'
-                  ].join(''));
-                $button.attr('data-category', category);
-                $li.append($button);
-              }
-            }
-            var isClose = conf.getValue('rankingCategory_' + category + '_Close');
-            $li.toggleClass('categoryClose', isClose);
-            return $li
-              .attr({'data-genre': genre, 'data-category': category})
-              .addClass(category).addClass(genre)
-              .append($a);
-          }
-
-          $toggle.attr('id', 'videoRankingMenu').addClass('watchItLaterMenu');
-          $a.attr('href', '/ranking').click(getToggleMenuClosure($popup, $toggle));
-          $toggle.append($a);
-          $videoRankingToggle = $toggle;
-          $videoRankingPopup = $popup;
-          var genreId = VideoRanking.getGenreId();
-
-          // TODO: マジックナンバーを
-          $ul.append(createMenu($, 'all',  -100, 'カテゴリ合算(毎時)',   'all', 'hourly'));
-          $ul.append(createMenu($, 'all', -1100, 'カテゴリ合算(24時間)', 'all', 'daily'));
-//          $ul.append(createMenu($, 'all', -4100, 'カテゴリ合算(合計)',   'all', 'total'));
-
-          for (var genre in genreId) {
-            if (genre === 'all') { continue; }
-            var
-              id = genreId[genre], name = VideoRanking.getGenreName(genre), category = VideoRanking.getCategory(id);
-              $ul.append(createMenu($, genre, id, name, category, 'hourly'));
-          }
-
-          $popup.on('click', '.rankingCategoryToggle', function(e) {
-            e.preventDefault(); e.stopPropagation();
-            var $target = $(e.currentTarget), category = $target.attr('data-category');
-            var $popup = $target.closest('.slideMenu');
-            var isClose = $popup.find('li.' + category).toggleClass('categoryClose').hasClass('categoryClose');
-            conf.setValue('rankingCategory_' + category + '_Close', isClose);
-          });
-
-          attach();
-          $toggle.show();
-          $a = $ul = $popup = $toggle = null;
-        }, 100);
       };
     })();
+
+
+    WatchItLater.videoExplorerMenu.myShortcuts = (function() {
+      var toggleMenu;
+
+      var initialize = function() {
+        initialize = window._.noop;
+        console.log('%cinitialize WatchItLater.videoExplorerMenu.myShortcuts', 'background: lightgreen;');
+
+        toggleMenu = new VideoExplorerToggleMenu('マイショートカット', '/my/mylist');
+        toggleMenu.attach();
+
+        window.WatchItLater.Mylist.loadMylistList(function(mylistList) {
+          toggleMenu.add$listItem(
+            $('<li/>').append(
+              $('<a/>')
+                .addClass('defMylist')
+                .attr({href: '/my/mylist', 'data-menu-type': 'deflist'})
+                .text('とりあえずマイリスト')
+            ));
+          var items = [
+            {id:  -1, href: '/my/history',      name: '視聴履歴'},
+            {id:  -2, href: '/recommendations', name: 'あなたにオススメの動画'},
+            {id: NicorepoVideo.REPO_ALL,    href: '/my/top/all',    name: '【ニコレポ】すべての動画'},
+            {id: NicorepoVideo.REPO_USER,   href: '/my/top/user',   name: '【ニコレポ】お気に入りユーザー'},
+            {id: NicorepoVideo.REPO_CHCOM,  href: '/my/top/chcom',  name: '【ニコレポ】チャンネル&コミュニティ'},
+            {id: NicorepoVideo.REPO_MYLIST, href: '/my/top/mylist', name: '【ニコレポ】お気に入りマイリスト'}
+          ];
+          for (var v in items) {
+            var item = items[v];
+            toggleMenu
+              .addMylistItem(item.name, item.id)
+              .addClass('defMylist')
+              .attr({
+                href: item.href
+              });
+          }
+          for (var i = 0, len = mylistList.length; i < len; i++) {
+            var mylist = mylistList[i];
+            toggleMenu.addMylistItem(mylist.name, mylist.id);
+          }
+
+          toggleMenu.show();
+        });
+      };
+
+      return {
+        attach: function() {
+          initialize();
+          toggleMenu.attach();
+        },
+        detach: function() {
+          if (!toggleMenu) {
+            return;
+          }
+          toggleMenu.detach();
+        }
+      };
+    })();
+
+    WatchItLater.videoExplorerMenu.videoRanking = (function() {
+      var toggleMenu;
+
+      var VideoRankingToggleMenu = function(title, titleLink) {
+        WatchApp.extend(this, VideoRankingToggleMenu, VideoExplorerToggleMenu, [title, titleLink]);
+
+        this._$menu.addClass('videoRankingList');
+        this.initializeCategoryToggleEvents();
+      };
+      WatchApp.mixin(VideoRankingToggleMenu.prototype, {
+        initializeCategoryToggleEvents: function() {
+          this._$menu.on('click', '.rankingCategoryToggle', function(e) {
+            e.preventDefault(); e.stopPropagation();
+
+            var $target = $(e.currentTarget), category = $target.attr('data-category');
+            var $popup  = $target.closest('.slideMenu');
+            var isClose = $popup.find('li.' + category).toggleClass('categoryClose').hasClass('categoryClose');
+
+            conf.setValue('rankingCategory_' + category + '_Close', isClose);
+          });
+        },
+        addRankingItem: function($, genre, id, name, category, term) {
+          var $a =
+            $('<a/>')
+              .attr({
+                href: '/ranking/fav/' + term + '/' + genre,
+                'data-menu-type': 'mylist',
+                'data-mylist-id': id
+              })
+              .text(name)
+              .addClass(genre);
+          var $li = $('<li/>');
+
+          if (genre === category) {
+            $li.addClass('isCategory'); // nameと同じならカテゴリランキング、違うならジャンルランキング
+            if (genre !== 'all' && genre !== 'g_politics' && genre !== 'r18') {
+              var $button = $([
+                '<button class="rankingCategoryToggle">',
+                  '<span class="open" title="サブカテゴリを開く">▼</span>',
+                  '<span class="close" title="サブカテゴリを閉じる">▲</span>',
+                '</button>'
+                ].join(''));
+              $button.attr('data-category', category);
+              $li.append($button);
+            }
+          }
+          var isClose = conf.getValue('rankingCategory_' + category + '_Close');
+          $li
+            .toggleClass('categoryClose', isClose)
+            .attr({'data-genre': genre, 'data-category': category})
+            .addClass(category).addClass(genre)
+            .append($a);
+
+          this._$list.append($li);
+            return $a;
+          }
+        });
+
+
+      var initialize = function() {
+        initialize = window._.noop;
+        console.log('%cinitialize WatchItLater.videoExplorerMenu.videoRanking', 'background: lightgreen;');
+
+        toggleMenu = new VideoRankingToggleMenu('動画ランキング', '/ranking');
+        toggleMenu.attach();
+
+        // TODO: マジックナンバーを
+        toggleMenu.addRankingItem($, 'all',  -100, 'カテゴリ合算(毎時)',   'all', 'hourly');
+        toggleMenu.addRankingItem($, 'all', -1100, 'カテゴリ合算(24時間)', 'all', 'daily');
+//      toggleMenu.addRankingItem($, 'all', -4100, 'カテゴリ合算(合計)',   'all', 'total');
+
+        var genreId = VideoRanking.getGenreId();
+        for (var genre in genreId) {
+          if (genre === 'all') { continue; }
+          var id = genreId[genre], name = VideoRanking.getGenreName(genre), category = VideoRanking.getCategory(id);
+          toggleMenu.addRankingItem($, genre, id, name, category, 'hourly');
+        }
+
+        window.setTimeout(function() { toggleMenu.show(); }, 100);
+      };
+
+      return {
+        attach: function() {
+          initialize();
+          toggleMenu.attach();
+        },
+        detach: function() {
+          if (!toggleMenu) {
+            return;
+          }
+          toggleMenu.detach();
+        }
+      };
+    })();
+
 
     var WatchingVideoView = function() { this.initialize.apply(this, arguments); };
     WatchingVideoView.prototype = {
@@ -8045,7 +8143,7 @@
         this._content.changeState(params);
         this._content.refresh({page: 1});
       },
-        _getFilter: function() {
+      _getFilter: function() {
         var to_h = function(str) {
           return str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(s) {
              return String.fromCharCode(s.charCodeAt(0) - 65248);
@@ -8121,8 +8219,6 @@
       content._isOwnerNicorepo = false;
       content._isRanking       = false;
       content.getIsMine          = $.proxy(function() {
-        // getUserId()はstringだけどwatchInfoModelから取ってるmyUserIdはnumber HAHAHA
-        // ・・・と思ったら両方stringになったぽい？ 2013/09/05
         return parseInt(this.getUserId(), 10) === parseInt(myUserId, 10) && parseInt(this.getMylistId(), 10) > 0;
       }, content);
       content.getIsDummy         = $.proxy(function() {
@@ -8209,24 +8305,33 @@
           callback(err, result);
         };
         if (id < 0) {
-          var onload  = function(result) {
+          var timeoutTimer = null;
+          var onload = function(result) {
+            window.clearTimeout(timeoutTimer);
             // 投稿者ニコレポが0件で、投稿動画一覧を公開していたらそっちを開くタイマーをセット
             if (result.list.length < 1 &&
               parseInt(id, 10) === NicorepoVideo.REPO_OWNER &&
               WatchController.isVideoPublic()) {
-              setTimeout(function() {
+              window.setTimeout(function() {
                 WatchController.openVideoOwnersVideo();
               }, 500);
             }
             applyFilter(null, result);
           };
-          var onerror = function(result) { callback('error', result); };
+          var onerror = function(result) {
+            window.clearTimeout(timeoutTimer);
+            callback('error', result);
+          };
+          timeoutTimer = window.setTimeout(function() {
+            onload = onerror = window._.noop;
+            onerror({message: '通信がタイムアウトしました:' + id, status: 'fail'});
+          }, 30 * 1000);
+
            // マイリストIDに負の数字(通常ないはず)が来たら乗っ取るサイン
            // そもそもマイリストIDはstringのようなので数字にこだわる必要なかったかも
-
+           //
           try {
             if (typeof VideoRanking.getGenreName(id) === 'string') {
-              //if (conf.debugMode)console.log('load VideoRanking: ', VideoRanking.getGenreName(id));
               isRanking = true;
               VideoRanking.load(null, {id: id}).then(onload, onerror);
               return;
@@ -8447,7 +8552,7 @@
 
       content.changeState_org = content.changeState;
       content.changeState = $.proxy(function(params, callback) {
-        if (conf.debugMode) console.log('deflist refresh! ', params, callback);
+        console.log('deflist refresh! ', params, callback);
         if (!this.isActive()) {
           WatchController.clearDeflistCache();
         }
@@ -9114,7 +9219,7 @@
             return;
           }
           if (result.candidates) {
-            if (conf.debugMode) console.log(result.candidates);
+            console.log(result.candidates);
             var candidates = result.candidates;
             var options = [];
             for (var i = candidates.length - 1; i >= 0; i--) {
@@ -9211,19 +9316,23 @@
       // メニュー拡張
       var
         detachMenuItems = function() {
-          $('.watchItLaterMenu, .slideMenu').detach();
+          WatchItLater.videoExplorerMenu.myShortcuts .detach();
+          WatchItLater.videoExplorerMenu.videoRanking.detach();
+          WatchItLater.videoExplorerMenu.favTags     .detach();
+          WatchItLater.videoExplorerMenu.favMylists  .detach();
+
           $inputForm.detach();
           $closeExplorer.detach();
         },
         attachMenuItems = function() {
-          if (conf.enableFavTags   ) { loadFavTags();    }
-          if (conf.enableFavMylists) { loadFavMylists(); }
-          loadVideoRanking();
-          loadMylistList();
+          if (conf.enableFavTags   ) { WatchItLater.videoExplorerMenu.favTags.attach(); }
+          if (conf.enableFavMylists) { WatchItLater.videoExplorerMenu.favMylists.attach(); }
+          WatchItLater.videoExplorerMenu.videoRanking.attach();
+          WatchItLater.videoExplorerMenu.myShortcuts.attach();
 
 
           $('.videoExplorerMenu')
-            .find('.itemList>li:first')/*.css('position', 'relative')*/.append($inputForm)
+            .find('.itemList>li:first').append($inputForm)
             .end().find('.errorMessage').after($closeExplorer);
         };
       controller._refreshMenu_org = controller._refreshMenu;
@@ -9422,12 +9531,12 @@
             '</div>', $menu = $(menu);
 
           var $template = $('<div/>').html(watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html());
-            $template.find('.column1 .thumbnailContainer').append($menu);
-            $template.find('.column4 .balloon').before($menu.clone());
-            $template.find('.column4 .balloon').remove();
-            $template.find('.column1')
-              .find('.descriptionShort').after($('<p class="itemMylistComment mylistComment"/>'))
-              .end().find('.createdTime').after($('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>'));
+          $template.find('.column1 .thumbnailContainer').append($menu).end()
+            .find('.column4 .balloon').before($menu.clone()).end()
+            .find('.column4 .balloon').remove().end()
+            .find('.descriptionShort')
+              .after($('<p class="itemMylistComment mylistComment"/>')).end()
+              .find('.createdTime').after($('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>'));
             watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html($template.html());
             $template = $menu = null;
 
@@ -9624,12 +9733,6 @@
         }
       });
 
-      EventDispatcher.addEventListener('onVideoEnded', function() {
-        // 原宿までと同じように、動画終了時にフルスクリーンを解除したい (ただし、連続再生中はやらない)
-        if (conf.autoNotFull && $('body').hasClass('full_with_browser') && !WatchController.isPlaylistActive()) {
-          WatchController.changeScreenMode('notFull');
-        }
-      });
 
       var lastPlayerConfig = null, lastScreenMode = '';
 
@@ -9758,7 +9861,7 @@
 
       if (conf.lastControlPanelPosition === 'bottom' || conf.lastControlPanelPosition === 'over') {
         EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
-          if (conf.debugMode) console.log('restore oldTypeControlPanel ? ', conf.lastControlPanelPosition === 'bottom');
+          console.log('restore oldTypeControlPanel ? ', conf.lastControlPanelPosition === 'bottom');
           watch.PlayerInitializer.nicoPlayerConnector.playerConfig.set(
             {oldTypeControlPanel: conf.lastControlPanelPosition === 'bottom'}
           );
@@ -9929,7 +10032,6 @@
           }
           // 復元するリストの中に現在の動画がなかった
           if (currentIndex === -1) {
-            //console.log(list.c, list.i.length, newItems.length);
             if (typeof list.c === 'number') {
               if (list.c < newItems.length) {
                 currentIndex = list.c + 1;
@@ -10122,7 +10224,7 @@
       var hashlist = LocationHashParser.getValue('playlist');
       if (hashlist && hashlist.i && hashlist.i.length > 0) {
         try {
-          if (conf.debugMode) console.log('restore playlist!!');
+          console.log('restore playlist!!');
           importPlaylist(hashlist);
           if (conf.hashPlaylistMode < 1) {
             LocationHashParser.removeHash();
@@ -10135,7 +10237,7 @@
       } else
       if ((conf.storagePlaylistMode === 'sessionStorage' || conf.storagePlaylistMode === 'localStorage') && w[conf.storagePlaylistMode] && !playlist.isContinuous()) {
         try {
-          if (conf.debugMode) console.log('restore playlist:' + conf.storagePlaylistMode);
+          console.log('restore playlist:' + conf.storagePlaylistMode);
           var list = JSON.parse(w[conf.storagePlaylistMode].getItem('watchItLater_playlist'));
           if (list !== null) { importPlaylist(list); }
           setTimeout(function() { resetView(); } , 3000);
@@ -10203,7 +10305,7 @@
       });
 
       playlist.addEventListener('changePlaybackMode', function(mode) {
-        if (conf.debugMode) console.log('changePlaybackMode', mode, conf.hashPlaylistMode);
+        console.log('changePlaybackMode', mode, conf.hashPlaylistMode);
         if (mode === 'normal' && conf.hashPlaylistMode < 2) {
           LocationHashParser.removeHash();
         } else {
@@ -10317,7 +10419,7 @@
 
       WatchApp.ns.model.player.NicoPlayerConnector.onTagDataReceived_org = WatchApp.ns.model.player.NicoPlayerConnector.onTagDataReceived;
       WatchApp.ns.model.player.NicoPlayerConnector.onTagDataReceived = function(a) {
-        if (conf.debugMode) console.log('onTagDataReceived', a);
+        console.log('onTagDataReceived', a);
         if (conf.disableTagReload) {
           return;
         }
@@ -10958,7 +11060,7 @@
 
 
           this._newSearchWrapper.load(params, function(err, result) {
-            if (conf.debugMode)console.log('%cNewNicoSearchWrapper result', 'color: green;', result);
+            console.log('%cNewNicoSearchWrapper result', 'color: green;', result);
             callback(err, result);
           });
         }
@@ -11012,9 +11114,9 @@
             if (typeof word === 'string' && word.length > 0) {
               this._$header.append(relatedTagView.getView());
               relatedTag.load(word, function(err, result) {
-                if (conf.debugMode) { console.log('SearchContentView._updateRelatedTag', err, result); }
+                console.log('SearchContentView._updateRelatedTag', err, result);
                 if (err) {
-                  if (conf.debugMode) { console.log('load suggest fail', err, result); }
+                  console.log('load suggest fail', err, result);
                 } else {
                   relatedTagView.update(result.values);
                 }
@@ -11166,7 +11268,7 @@
           $('#mylist_add_frame').find('.mylistAdd').click();
         }},
         {name: 'shortcutOpenDefMylist',      exec: function(e) {
-          WatchController.showDefMylist();
+          WatchController.showDeflist();
           WatchController.scrollToVideoPlayer(true);
         }},
         {name: 'shortcutOpenSearch',         exec: function(e) {
@@ -11546,10 +11648,6 @@
         }
 
         var result = generateCss();
-        if (result.css === '') {
-         // clearStyle();
-         // return;
-        }
         var css = result.css, profile = result.profile, name = profile.name;
 
         if (lastCssName === name) {
@@ -11569,7 +11667,7 @@
         } else {
           $('body').toggleClass('w_size_custom');
         }
-      }
+      };
       var clearStyle = function() {
         if (customStyleElement) {
           customStyleElement.innerHTML = '';
@@ -11702,7 +11800,7 @@
       }, showMylist = function(n) {
          var num = parseInt(n, 36);
          if (num === 0) {
-           WatchController.showDefMylist();
+           WatchController.showDeflist();
          } else
          if (mylistList[num]) {
            WatchController.showMylist(mylistList[num].id);
@@ -11913,7 +12011,6 @@
 
         var list = watch.PlayerInitializer.commentPanelViewController.commentLists;
         for (var i = 0; i < list.length; i++) {
-          //if (conf.debugMode) console.log(list[i].listName, list[i].comments.length);
           if (list[i].listName === 'commentlist:main' && list[i].comments.length > 0) {
             comments = list[i].comments;
             break;
@@ -12275,12 +12372,8 @@
     }
 
 
-    function hideAds() {
-      $('#content').removeClass('panel_ads_shown');
-      $('playerBottomAd').hide();
-    }
-
     function initTest(test) {
+      var console = window.console;
       var expect = test.expect;
       WatchApp.mixin(WatchItLater.test.spec, {
         testChannelVideo: function(def) {
@@ -12386,7 +12479,7 @@
           var Mylist = WatchItLater.Mylist;
           var randomMessage = 'RND: ' + Math.random();
 
-          var d = new $.Deferred;
+          var d = new $.Deferred();
           d.promise()
             .then(function() {
               var d = new $.Deferred();
@@ -12649,7 +12742,6 @@
         }),
         origin);
     } catch (e) {
-      alert(e);
       console.log('err', e);
     }
   });
