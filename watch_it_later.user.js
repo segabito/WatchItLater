@@ -1103,6 +1103,10 @@
       #outline.under960 .bottomAccessContainer{
         right: 60px;
       }
+      .watchItLaterSettingMenu {
+        font-weight: bolder;
+        white-space: nowrap;
+      }
       #outline .sidebar {
         -webkit-transition: margin-top 0.3s ease-out;
         transition:         margin-top 0.3s ease-out;
@@ -10673,8 +10677,10 @@
       var $div = $('<div class="bottomAccessContainer"/>').append(createPlaylistToggle()).append(createOpenExplorer());
 
 
-      $('#outline .outer').before($div);
+      var $headerMenu = $('<li class="watchItLaterSettingMenu"><a href="javascript:;" title="WatchItLaterの設定">WatchItLater設定</a></li>');
+      $('#siteHeaderRightMenuFix').after($headerMenu);
 
+      $('#outline .outer').before($div);
       var $container = $('<div class="bottomConfButtonContainer" />'), $conf = $('<button title="WatchItLaterの設定">設定</button>');
       var $explorerConf = $('<button><span class="open">｀・ω・´</span><span class="close">´・ω・`</span></button>');
       var toggleConf = function(e) {
@@ -10686,6 +10692,8 @@
       $conf.addClass('openConfButton');
       $conf.on('click', toggleConf);//.attr('accesskey', 'p');
       $('#outline .outer').before($container);
+      $headerMenu.find('a').on('click', toggleConf);//.attr('accesskey', 'p');
+
 
       $('.videoExplorerBody').append($explorerConf);
       $explorerConf
