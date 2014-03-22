@@ -237,15 +237,6 @@
     var w;
     try { w = unsafeWindow || window; } catch (e) { w = window;}
     var document = w.document;
-    function addlink(e, video_id) {
-//      var eco    = document.createElement('a');
-//      eco.innerHTML = '&nbsp;eco';
-//      eco.title = 'エコノミーで視聴';
-//      eco.href   = e.href.replace(/\?.+$/, '') + '?eco=1';
-//      eco.className = 'itemEcoLink';
-//      panel.addExtElement(eco);
-    }
-
 
     var conf = {
       autoBrowserFull: false, // 再生開始時に自動全画面化
@@ -850,13 +841,14 @@
       .sideVideoInfo .userName, .sideVideoInfo .channelName{
         display: block;
         font-size: 120%;
+        cursor: pointer;
       }
       .sideVideoInfo .userIconContainer, .sideVideoInfo .channelIconContainer {
         background: #ddd; width: 100%; text-align: center; float: none;
       }
       .sidePanel .userIcon, .sidePanel .channelIcon{
         min-width: 128px; max-width: 150px; width: auto; height: auto; border: 0;
-        box-shadow: 0 0 4px #666;
+        box-shadow: 0 0 4px #666; cursor: pointer;
       }
       .sideVideoInfo .descriptionThumbnail {
         text-align: left; font-size: 90%; padding: 4px; background: #ddd;
@@ -2982,7 +2974,7 @@
         return function(e) {
           if (e.button !== 0 || e.metaKey) return;
           if (w.WatchApp) {
-            WatchController.nicoSearch(text);
+            WatchController.nicoSearch(text, 'tag');
             e.preventDefault();
             appendTagHistory(this, text, dic);
           }
@@ -3052,7 +3044,7 @@
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
     var token = '';//
 
-    function Mylist(){
+    function Mylist() {
       this.initialize();
     }
 
@@ -3636,13 +3628,7 @@
       body.name = 'nicomylistaddDummy';
       body.className = 'mylistPopupPanel';
       body.setAttribute('style', 'width: 130px; height: 24px; z-index: 10000; border: 1px solid silver; padding: 0; margin: 0; overflow: hidden');
-//      body.style.width = '130px';
-//      body.style.height = '24px';
-//      body.style.zIndex = 10000;
-//      body.style.border = '1px solid silver';
-//      body.style.padding = 0;
-//      body.style.margin  = 0;
-//      body.style.overflow = 'hidden';
+
       body.watchId = function(w) {
         if (w) {
           _watchId = w;
@@ -3861,6 +3847,7 @@
       var api = 'http://' + host + '/api/favtag/list?t=' + now;
       $.ajax({
         url: api,
+        timeout: 30000,
         complete: function(result) {
           if (result.status !== 200) {
             return;
@@ -4103,7 +4090,7 @@
           } else {
             showPanel(watchId, mx + 8, my + 8);
           }
-          addlink(mylistPanel, self, watchId);
+          EventDispatcher.dispatch('mylistPanelOpen', mylistPanel, self, watchId);
         }, hoverMenuDelay);
 
         if (!this.w_eventInit) {
@@ -4300,7 +4287,7 @@
   //===================================================
   //===================================================
 
-  WatchItLater.VideoArrayAPILoader = (function() {
+  window.WatchItLater.loader.videoArrayAPILoader = (function() {
     var sessionId = 0;
     var deferredList = {};
     var cacheData = {};
@@ -4308,7 +4295,7 @@
     var loaderFrame, loaderWindow;
     var BASE_URL = 'http://i.nicovideo.jp/v3/video.array?v=';
 
-    //WatchItLater.VideoArrayAPILoader.load('sm9').then(function(info) { console.log(info); });
+    //WatchItLater.loader.videoArrayAPILoader.load('sm9').then(function(info) { console.log(info); });
 
     var load = function(watchId) {
       var ids = [], result = {}, def = new $.Deferred(), timeoutTimer = null;
@@ -5011,7 +4998,7 @@
       }
     };
   })(w); // end WatchController
-  WatchItLater.WatchController = window.WatchController;
+  window.WatchItLater.WatchController = window.WatchController;
 
   var Util = (function(WatchItLater, WatchController) {
     var Cache = {
@@ -5170,7 +5157,7 @@
     };
     return self;
   })(WatchItLater, WatchController);
-  WatchItLater.Util = Util;
+  window.WatchItLater.util = Util;
 
   var NicoNews = (function() {
     var WatchApp = null, watch = null, $ = null, WatchJsApi = null, initialized = false;
@@ -5511,6 +5498,7 @@
         url: url,
         type: 'POST',
         data: JSON.stringify(data),
+        timeout: 30000,
         complete: function(result) {
           console.log('result', result);
           if (result.status !== 200) {
@@ -5535,6 +5523,13 @@
             return;
           }
           callback(null, data);
+        },
+        error: function(req, status, thrown) {
+          if (status === 'parsererror') {
+            return;
+          }
+          console.log('%c ajax error: ' + status, 'background: red', arguments);
+          callback('fail', status);
         }
       });
     }
@@ -5721,6 +5716,7 @@
         url: url,
         type: 'POST',
         data: word,
+        timeout: 30000,
         complete: function(result) {
           if (result.status !== 200) {
             callback('fail', 'HTTP status:' + result.status);
@@ -5735,6 +5731,12 @@
           }
           Util.Cache.set(cache_key, data, cache_time);
           callback(null, data);
+        },
+        error: function(req, status, thrown) {
+          if (status === 'parsererror') {
+            return;
+          }
+          callback('fail', status);
         }
       });
     }
@@ -5760,6 +5762,7 @@
         url: url,
         type: 'POST',
         data: JSON.stringify(query),
+        timeout: 30000,
         complete: function(result) {
           if (result.status !== 200) {
             callback('fail', 'HTTP status:' + result.status);
@@ -5776,6 +5779,12 @@
           }
           Util.Cache.set(cache_key, data, cache_time);
           callback(null, data);
+        },
+        error: function(req, status, thrown) {
+          if (status === 'parsererror') {
+            return;
+          }
+          callback('fail', status);
         }
       });
     }
@@ -6109,7 +6118,7 @@
         _info: {
           first_retrieve: postedAt,
           nicorepo_className: src.className,
-          nicorepo_log: [_.escape(description_short)],
+          nicorepo_log: [window._.escape(description_short)],
           nicorepo_owner: {
             id: ownerId,
             icon: ownerIcon,
@@ -6123,7 +6132,7 @@
     };
 
     var loadPage = function(baseUrl, result, nextLink, type) {
-      var def = new $.Deferred;
+      var def = new $.Deferred();
       if (nextLink === null) {
         return def.resolve(baseUrl, result, null, null);
       }
@@ -6137,6 +6146,7 @@
 
       $.ajax({
         url: url,
+        timeout: 30000
       }).then(
         function(resp) {
           var $dom = $(resp),
@@ -6167,7 +6177,7 @@
     };
 
     var pipeRequest = function(baseUrl, result, maxPages, callback) {
-      var def = new $.Deferred, p = def.promise();
+      var def = new $.Deferred(), p = def.promise();
 
       for (var i = maxPages; i >= 0; i--) {
         p = p.then(loadPage);
@@ -6446,13 +6456,14 @@
     };
 
     var pipeRequest = function(baseUrl, result, page, maxPage) {
-      var def = new $.Deferred, p = def.promise();
+      var def = new $.Deferred(), p = def.promise();
 
       var getPipe = function(result, url, page) {
         return function() {
           console.log('load RSS', url, page);
           return $.ajax({
               url: url,
+              timeout: 30000,
               data: {rss: '2.0', lang: 'ja-jp', page: page},
               beforeSend: function(xhr) {
                 xhr.setRequestHeader('X-Requested-With', {toString: function(){ return ''; }});
@@ -6478,7 +6489,7 @@
 
     var CACHE_TIME = 1000 * 60 * 30;
     var request = function(baseUrl, page, maxPage) {
-      var def = new $.Deferred;
+      var def = new $.Deferred();
       var cacheData = Util.Cache.get(baseUrl);
       if (cacheData) {
         return def.resolve(cacheData);
@@ -6625,7 +6636,7 @@
           var url = baseUrl + '?page=' + page;
           console.log('load page', url);
 
-          $.ajax({url: url}).then(function(resp) {
+          $.ajax({url: url, timeout: 30000}).then(function(resp) {
             var hasNextPage = parseItems(resp, result);
             def.resolve(hasNextPage);
           }, function(err) {
@@ -7461,6 +7472,8 @@
 
       if (conf.enableDescriptionThumbnail && watchIds.length > 0) {
         var ac = function(s) {
+          s = parseInt(s, 10);
+          s = s < 1 ? '-' : s;
           return '<span class="count">' + WatchApp.ns.util.StringUtil.addComma(s) + '</span>';
         };
         var onWatchIdInfoReady = function(result) {
@@ -7489,7 +7502,7 @@
           watchIds = watchLinks = null;
         };
         window.setTimeout(function() {
-          window.WatchItLater.VideoArrayAPILoader.load(watchIds).then(onWatchIdInfoReady, onWatchIdInfoFail);
+          window.WatchItLater.loader.videoArrayAPILoader.load(watchIds).then(onWatchIdInfoReady, onWatchIdInfoFail);
         }, 1000);
       } else {
         watchIds = watchLinks = null;
@@ -9415,6 +9428,7 @@
             return;
           }
         }
+        window.WatchApp.ns.util.WindowUtil.scrollFit('#videoExplorer');
       });
       EventDispatcher.addEventListener('onVideoExplorerOpening', function(content) {
         $('body').addClass('videoExplorerOpening');
@@ -12587,12 +12601,12 @@
           });
         },
         testVideoArray: function(def) {
-          window.WatchItLater.VideoArrayAPILoader.load(['sm9', 'sm13']).then(function(result) {
+          window.WatchItLater.loader.videoArrayAPILoader.load(['sm9', 'sm13']).then(function(result) {
             console.log('VideoArrayAPILoader', result);
             expect(result['sm9']).toBeTruthy('動画情報');
             expect(result['sm13'].title).toBeTruthy('タイトルがある');
             expect(result['sm13'].title.length >= 0).toBeTrue('タイトル長がある');
-            window.WatchItLater.VideoArrayAPILoader.load(['sm13', '1394785382']).then(function(result) {
+            window.WatchItLater.loader.videoArrayAPILoader.load(['sm13', '1394785382']).then(function(result) {
               console.log('VideoArrayAPILoader', result);
               expect(result['1394785382']).toBeTruthy('スレッドIDでも引ける');
               expect(result['1394785382'].title).toEqual('鬼灯の冷徹　第10話「十王の晩餐」「ダイエットは地獄みたいなもの」', '動画タイトル一致');
