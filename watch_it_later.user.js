@@ -2824,7 +2824,7 @@
       console.log('%cwatchCounter: %c%d', 'color: orange;', 'font-weight: bolder;', v);
       return v;
     }
-    var self ={
+    var self = {
       get: get,
       add: add
     };
@@ -4216,6 +4216,7 @@
     }
     return self;
   })(w, conf, EventDispatcher);
+  window.WatchItLater.popup = AnchorHoverPopup;
 
 
   //===================================================
