@@ -19,7 +19,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140321
+// @version        1.140325
 // ==/UserScript==
 
 /**
@@ -431,6 +431,7 @@
         width: 17px;
         height: 15px;
       }
+      
     {* マイリスト登録パネル *}
       .mylistPopupPanel {
         height: 24px;
@@ -2909,7 +2910,6 @@
         popup.appendChild(items);
         return popup;
       }
-
 
       function createPopupDOM() {
         var popup = document.createElement('div');
@@ -8987,36 +8987,32 @@
 
         #content.w_adjusted #playerContainerWrapper, #content.w_adjusted #playlist { box-shadow: none; }
         #content.w_adjusted #videoExplorerExpand .arrow { display: none; }
-        #videoExplorer.w_adjusted {
-          {*background: #333333;*}
-        }
+
         body.videoExplorer #footer.w_adjusted {
           display: none;
         }
-        #videoExplorer.w_adjusted .uadTagRelatedContainer .uadTagRelated .default .itemList .item .videoTitleContainer {
+        .w_adjusted .uadTagRelated .default .itemList .item .videoTitleContainer {
           width: 130px;
+          text-align: center;
         }
-        #videoExplorer.w_adjusted .uadTagRelatedContainer .uadTagRelated {
+        .w_adjusted .uadTagRelated .uadTagRelated {
           margin-bottom: 30px;
         }
-        #videoExplorer.w_adjusted .uadTagRelatedContainer .itemList>li,
-        #videoExplorer.w_adjusted .uadTagRelated .default .landing {
-          //width: 124px; margin: 0;
-          width: 130px; margin: 0 8px;
-                 {*        transform: scale(0.8985, 1.111111);         transform-origin: 0 0 0;
-          -webkit-transform: scale(0.8985, 1.111111); -webkit-transform-origin: 0 0 0;*}
+        .w_adjusted .uadTagRelated .itemList .item,
+        .w_adjusted .uadTagRelated .default .landing {
+          width: 130px; margin: 0 10px 0 8px;
         }
-        #videoExplorer.w_adjusted .uadTagRelated .default .itemList .item .imageContainer .itemImageWrapper .itemImage {
+        .w_adjusted .uadTagRelated .default .itemList .item .imageContainer .itemImageWrapper .itemImage {
           width: 130px; height: auto; top: 0; left: 0;
         }
-        #videoExplorer.w_adjusted .uadTagRelated .default .itemList .item .imageContainer .itemImageWrapper {
+        .w_adjusted .uadTagRelated .default .itemList .item .imageContainer .itemImageWrapper {
           width: 130px; height: 100px;
         }
         .w_adjusted .uadTagRelated .emptyItem .emptyMessageContainer {
           width: 130px; height: 100px;
         }
-        #videoExplorer.w_adjusted .videoExplorerContent .itemList.column1 .videoInformationOuter .link,
-        #videoExplorer.w_adjusted .videoExplorerContent .itemList.column1 .videoInformationOuter .link .title {
+        .w_adjusted .videoExplorerContent .itemList.column1 .videoInformationOuter .link,
+        .w_adjusted .videoExplorerContent .itemList.column1 .videoInformationOuter .link .title {
           display: inline;
         }
 
@@ -9026,11 +9022,13 @@
         #videoExplorer.w_adjusted .videoExplorerContent .itemList.column4 .commentBlank {
           width: 24%;
         }
-        #videoExplorer.w_adjusted .videoExplorerBody #searchResultContainer {
-          {*background: #fff;*}
+        .videoExplorerBody .videoExplorerContent.column4 .contentItemList .item .createdTime .submit
+        {
+          display: none !important;
         }
-
-
+        .nicorepoResult .column4 .videoInformation {
+          display: none;
+        }
 
         #videoExplorer .pager { margin-right: 20px; }
         #videoExplorer .contentItemList { clear: both; }
@@ -9089,7 +9087,7 @@
         }
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .contentItemList .folder .container,
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .suggestVideo .folder .container {
-          background-position: -15px -60px; width: 130px; height: 100px;
+          background-position: -15px -270px; width: 130px; height: 100px;
         }
 
         body.size_small.no_setting_panel.videoExplorer #content #videoExplorerExpand { {*「閉じる」ボタン *}
@@ -10437,7 +10435,7 @@
 
       WatchApp.ns.model.player.NicoPlayerConnector.onTagDataReceived_org = WatchApp.ns.model.player.NicoPlayerConnector.onTagDataReceived;
       WatchApp.ns.model.player.NicoPlayerConnector.onTagDataReceived = function(a) {
-        console.log('onTagDataReceived', a);
+        //console.log('onTagDataReceived', a);
         if (conf.disableTagReload) {
           return;
         }
@@ -10629,7 +10627,6 @@
         pac.addEventListener('onVideoChangeStatusUpdated', onVideoChangeStatusUpdated);
       });
 
-      var messageCallback = {};
       window.addEventListener('message', function(event) {
         if (event.origin.indexOf('nicovideo.jp') < 0) return;
         try {
@@ -12383,6 +12380,7 @@
         });
         console.log(JSON.parse($('#watchAPIDataContainer').text()));
 
+        WatchApp.ns.util.WindowUtil.shake = function() { console.log('%cshake', 'background: lightgreen;');};
         //NicoPlayerConnector.getCommentNicoruCount_org = NicoPlayerConnector.getCommentNicoruCount;
       }
     }
