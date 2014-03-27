@@ -19,7 +19,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140325
+// @version        1.140326
 // ==/UserScript==
 
 /**
@@ -405,20 +405,22 @@
       .tagItemsPopup {
         background: #eef;
       }
-      .tagItemsPopup, .playlistMenuPopup {
+      .popupMenu {
         position: absolute;
         min-width: 200px;
         font-Size: 12pt;
         z-index: 2000000;
         box-shadow: 2px 2px 2px #888;
       }
-      .tagItemsPopup ul,.tagItemsPopup ul li, .playlistMenuPopup ul, .playlistMenuPopup ul li  {
+      .popupMenu ul,   .popupMenu ul li {
         position: relative;
         list-style-type: none;
         margin: 0; padding: 0;
         white-space: nowrap;
       }
-      .tagItemsPopup li a{
+      .tagItemsPopup .icon{
+        width: 17px;
+        height: 15px;
       }
       .tagItemsPopup .nicodic, .tagItemsPopup .newsearch {
         margin: 1px 4px 1px 1px;
@@ -427,11 +429,82 @@
         margin: 0px 3px 0px 0px;
         border: 1px outset;
       }
-      .tagItemsPopup .icon{
-        width: 17px;
-        height: 15px;
+
+      .mylistListPopup {
+        position:absolute;
+        background: #fff;
+        overflow:visible;
+        padding: 8px;
+        border: 1px outset #333;
+        transition: opacity 0.3s ease;
       }
-      
+      .mylistListPopup.popupMenu ul li {
+        margin: 4px 8px;
+      }
+      .mylistListPopup:not(.show) {
+        left: -9999px;
+        top: -9999px;
+        opacity: 0;
+      }
+      .mylistListPopup.show {
+        opacity: 1;
+      }
+      .mylistListPopup .listInner {
+        -webkit-column-width: auto; -moz-column-width: auto;
+      }
+      .mylistListPopup .icon {
+        background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;
+        display: inline-block;
+        width: 18px;
+        height: 14px;
+        margin: -4px 4px 0 0;
+        vertical-align: middle;
+        margin-right: 15px;
+        transform: scale(1.5); -webkit-transform: scale(1.5);
+        transform-origin: 0 0 0; -webkit-transform-origin: 0 0 0;
+        transition: transform 0.1s ease, box-shadow 0.1s ease;
+        -webkit-transition: -webkit-transform 0.1s ease, box-shadow 0.1s ease;
+        cursor: pointer;
+      }
+      .mylistListPopup .icon:hover {
+        background-color: #ff9;
+        box-shadow: 2px 2px 4px #888;
+        transform: scale(2); -webkit-transform: scale(2);
+      }
+      .mylistListPopup .icon:hover:after {
+        content: '開く';
+        position: absolute;
+        bottom: 0px;
+        right: 12px;
+        padding: 2px;
+        background: #fff;
+        box-shadow: 2px 2px 2px #888;
+        transform: scale(0.5); -webkit-transform: scale(0.5);
+        z-index: 100;
+      }
+      .mylistListPopup .deflist .icon {
+        background-position: 0 -253px;
+      }
+      .mylistListPopup .name {
+        display: inline-block;
+        vertical-align: middle;
+        font-size: 110%;
+        color: #666;
+        text-derocation: none !important;
+      }
+      .mylistListPopup .name:hover {
+        color: #000;
+        background-color: #ff9;
+      }
+      .mylistListPopup .name:after {
+        content: ' に登録';
+        font-size: 75%;
+        color: #fff;
+      }
+      .mylistListPopup .name:hover:after {
+        color: #666;
+      }
+
     {* マイリスト登録パネル *}
       .mylistPopupPanel {
         height: 24px;
@@ -723,9 +796,9 @@
       }
       {* 右に表示する動画情報 *}
       .sidePanel .sideVideoInfo, .sidePanel .sideIchibaPanel, .sidePanel .sideReviewPanel  {
-        padding: 0px 0px 0 0px; width: 196px; height: 100%; z-index: 10060;
+        padding: 0px 0px 0 0px; width: 196px; height: 100%; z-index: 10019;
         position:absolute; top:0; right:0; border: 1px solid #000;
-        display:none; overflow-x: visible; overflow-y: auto;
+        overflow-x: visible; overflow-y: auto;
       }
       {* 右に表示する動画情報 *}
       #playerTabWrapper.sidePanel .sideVideoInfo, #playerTabWrapper.sidePanel .sideIchibaPanel, #playerTabWrapper.sidePanel .sideReviewPanel  {
@@ -739,7 +812,7 @@
       .videoExplorer #playerTabWrapper .sideVideoInfo,
       .videoExplorer #playerTabWrapper .sideIchibaPanel,
       .videoExplorer #playerTabWrapper .sideReviewPanel {
-        width: 418px; z-index: 10060;
+        width: 418px;
       }
       #playerTabWrapper.w_videoInfo #appliPanel, #playerTabWrapper.w_ichiba #appliPanel, #playerTabWrapper.w_review #appliPanel  {
         top: -9999px;
@@ -939,7 +1012,10 @@
       .sidePanel.w_videoInfo  .sideVideoInfo,
       .sidePanel.w_ichiba     .sideIchibaPanel,
       .sidePanel.w_review     .sideReviewPanel {
-        display: block;
+        display: block; z-index: 10060;
+      }
+      .sidePanel:not(.w_comment) .watchWatchContainer {
+        display: none;
       }
 
       #leftPanelTabContainer {
@@ -953,9 +1029,11 @@
         -webkit-transform: rotate(90deg); -webkit-transform-origin: 0 0 0;
         z-index: 1000;
       }
-      .full_with_browser #sidePanelTabContainer { background: #000; }
+      .full_with_browser #sidePanelTabContainer {
+        background: #000 !important;
+      }
       body:not(.videoExplorer):not(.full_with_browser) #sidePanelTabContainer.left {
-        background: #000 {* firefoxはこれがないと欠ける *}; right: auto; left: -375px; padding: 0; height: 27px;
+        background: #000; right: auto; left: -375px; padding: 0; height: 27px;
                 transform: rotate(-90deg);         transform-origin: 100% 0 0;
         -webkit-transform: rotate(-90deg); -webkit-transform-origin: 100% 0 0;
       }
@@ -1434,7 +1512,12 @@
       }
         .videoExplorerMenu .slideMenu ul li a:before{
           background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;
-          display: inline-block; height: 14px; margin: -4px 4px 0 0; vertical-align: middle; width: 18px; content: ""
+          display: inline-block;
+          height: 14px;
+          margin: -4px 4px 0 0;
+          vertical-align: middle;
+          width: 18px;
+          content: ""
         }
         .videoExplorerMenu .slideMenu ul li          a.defMylist:before{ background-position: 0 -253px;}
         .videoExplorerMenu .slideMenu ul li.folder0  a:before{ background-position: 0 0;}
@@ -2913,7 +2996,7 @@
 
       function createPopupDOM() {
         var popup = document.createElement('div');
-        popup.className        = 'tagItemsPopup';
+        popup.className        = 'tagItemsPopup popupMenu';
         popup.addEventListener('click', createPopupOnClick(), false);
         return popup;
       }
@@ -3129,9 +3212,9 @@
 
     pt.loadMylistList = function(callback) {
       if (initialized) {
-          setTimeout(function() { callback(mylistlist.concat()); }, 0);
+        setTimeout(function() { callback(mylistlist.concat()); }, 0);
       } else {
-          onInitialized.push(callback);
+        onInitialized.push(callback);
       }
     };
 
@@ -3393,6 +3476,7 @@
       var self = this;
       var _watchId = watchId, _videoId = videoId || watchId;
       var body = document.createElement('div');
+      var mylistListPopup = null;
       body.className = 'mylistPopupPanel deflistSelected';
       var nobr = document.createElement('nobr');
       body.appendChild(nobr);
@@ -3402,13 +3486,68 @@
 
       var isWatchPage = (window.WatchApp && window.WatchJsApi) ? true : false;
 
+      var addDeflist = function(watchId, description) {
+        self.addDefListItem(watchId, function(status, result, replaced) {
+          self.reloadDefList();
+          if (status !== 'ok') {
+            Popup.alert('とりあえずマイリストへの登録に失敗: ' + result.error.description);
+          } else {
+            var torimai = '<a href="/my/mylist">とりあえずマイリスト</a>';
+            Popup.show(
+              torimai +
+              (replaced ? 'の先頭に移動しました' : 'に登録しました')
+            );
+          }
+        }, description);
+      };
+      var addMylist = function(watchId, mylistId, mylistName, description) {
+        self.addMylistItem(watchId, mylistId, function(status, result) {
+          self.reloadDefList();
+          if (status === 'ok') {
+            Popup.show( '<a href="/my/mylist/#/' + mylistId + '">' + mylistName + '</a>に登録しました');
+          } else {
+            Popup.alert(mylistName + 'への登録に失敗: ' + result.error.description);
+          }
+        }, description);
+      };
+      var setButtonStyleUpdating = function(btn) {
+        btn.style.opacity = 0.5;
+        btn.style.cursor = 'pointer';
+        btn.disabled = true;
+
+        window.setTimeout(function() {
+          btn.disabled = false;
+          btn.style.opacity = 1;
+          btn.style.cursor = 'pointer';
+          btn = null;
+        }, 1000);
+      };
+      var onMylistListClick = function(mylistId, mylistName, type) {
+        if (type === 'icon') {
+          if (window.WatchApp) {
+            if (mylistId === 'default') {
+              WatchController.showDeflist();
+            } else {
+              WatchController.showMylist(mylistId);
+            }
+          } else {
+            location.href = 'http://' + host +  '/my/mylist/#/' + mylistId.replace('default','home');
+          }
+          return;
+        }
+        if (mylistId === 'default') {
+          addDeflist(_watchId);
+        } else {
+          addMylist(_watchId, mylistId, mylistName);
+        }
+      };
+
       body.watchId = function(w, v) {
         if (w) {
           _watchId = w;
           _videoId = v || w;
           var isThreadId = (/^[0-9]+$/.test(w));
 
-          this.clearExtElement();
           deleteDef.disabled = false;
           if (self.findDefMylistByWatchId(w)) {
             deleteDef.style.display = '';
@@ -3423,22 +3562,25 @@
           if (newTabLink) {
             newTabLink.href = 'http://nico.ms/' + _watchId; // QWatchに乗っ取られないようにnico.msをかます(せこい)
           }
+          if (mylistListPopup) {
+            mylistListPopup.hide();
+          }
           return body;
         }
         return _watchId;
       };
 
-      body.addExtElement = function(elm) {
-        extArea.appendChild(elm);
-      };
-      body.clearExtElement = function() {
-        extArea.innerHTML = '';
-      };
       body.show = function() {
         body.style.display = '';
+        if (mylistListPopup) {
+          mylistListPopup.hide();
+        }
       };
       body.hide = function() {
         body.style.display = 'none';
+        if (mylistListPopup) {
+          mylistListPopup.hide();
+        }
       };
 
       function createSelector() {
@@ -3487,7 +3629,7 @@
 
         appendO(sel, '0:とりマイ', 'default');
         sel.selectedIndex = 0;
-        setTimeout(createOptions, initialized ? 0 : 3000);
+        window.setTimeout(createOptions, initialized ? 0 : 3000);
 
         sel.addEventListener('change', onSelect, false);
         sel.addEventListener('contextmenu', onContextMenu, false);
@@ -3502,39 +3644,35 @@
         btn.appendChild(document.createTextNode('my'));
         btn.className = 'mylistAdd';
         btn.title = 'マイリストに追加';
+
+        var callMylistListPopup = function() {
+          if (!mylistListPopup) {
+            mylistListPopup = new MylistListPopup(mylistlist, onMylistListClick);
+          }
+          mylistListPopup.toggle(btn);
+        };
+
+        btn.addEventListener('contextmenu', function(e) {
+          if (window.jQuery) {
+            e.preventDefault();
+            e.stopPropagation();
+            callMylistListPopup();
+          }
+        });
+
         btn.addEventListener('click', function(e) {
           var description = null;
           if (e.shiftKey) {
             description = prompt('マイリストコメントの入力');
             if (!description) return;
           }
-          btn.disabled = true;
-          btn.style.opacity = 0.5;
-          btn.style.cursor = 'wait';
-          setTimeout(function() { btn.disabled = false; btn.style.opacity = 1; btn.style.cursor = 'pointer';}, 1000);
-          var groupId = sel.value, name = sel.options[sel.selectedIndex].textContent;
-          if (groupId === 'default') {
-            self.addDefListItem(_watchId, function(status, result, replaced) {
-              self.reloadDefList();
-              if (status !== "ok") {
-                Popup.alert('とりあえずマイリストへの登録に失敗: ' + result.error.description);
-              } else {
-                var torimai = '<a href="/my/mylist">とりあえずマイリスト</a>';
-                Popup.show(
-                  torimai +
-                  (replaced ? 'の先頭に移動しました' : 'に登録しました')
-                );
-              }
-            }, description);
+          setButtonStyleUpdating(btn);
+
+          var mylistId = sel.value, name = sel.options[sel.selectedIndex].textContent;
+          if (mylistId === 'default') {
+            addDeflist(_watchId, description);
           } else {
-            self.addMylistItem(_watchId, groupId, function(status, result) {
-              self.reloadDefList();
-              if (status === 'ok') {
-                Popup.show( '<a href="/my/mylist/#/' + groupId + '">' + name + '</a>に登録しました');
-              } else {
-                Popup.alert(name + 'への登録に失敗: ' + result.error.description);
-              }
-            }, description);
+            addMylist(_watchId, mylistId, name, description);
           }
         } ,false);
         return btn;
@@ -3545,9 +3683,11 @@
         btn.appendChild(document.createTextNode('×'));
         btn.className = 'deflistRemove';
         btn.title = 'とりあえずマイリストから外す';
+
         btn.addEventListener('click', function() {
-          btn.disabled = true;
-          setTimeout(function() {btn.disabled = false;}, 1000);
+
+          setButtonStyleUpdating(btn);
+
           self.deleteDefListItem(_watchId, function(status, result) {
             self.reloadDefList();
             btn.style.display = 'none';
@@ -3568,9 +3708,9 @@
         btn.title = 'タグ取得';
         btn.addEventListener('click', function(e) {
           btn.disabled = true;
-          btn.style.opacity = 0.5;
-          btn.style.cursor = 'wait';
-          setTimeout(function() {btn.disabled = false; btn.style.opacity = 1; btn.style.cursor = 'pointer'; }, 1000);
+
+          setButtonStyleUpdating(btn);
+
           if (w.jQuery) {
             var $btn = w.jQuery(btn), o = $btn.offset();
             VideoTags.popupItems(_videoId, o.left, o.top + $btn.outerHeight());
@@ -3646,11 +3786,6 @@
       }
 
       // ダミーメソッド
-      body.addExtElement = function() {
-        //var insertAfter = function(parent, node, referenceNode) { parent.insertBefore(node, referenceNode.nextSibling);}
-      };
-      body.clearExtElement = function() {};
-
       body.show = function() {
         body.style.display = '';
       };
@@ -3664,6 +3799,143 @@
 
     return new Mylist();
   })();
+
+  var MylistListPopup = function() { this.initialize.apply(this, arguments); };
+  MylistListPopup.prototype = {
+    initialize: function(mylistList, onItemClick) {
+      this._mylistList = mylistList.concat();
+      this.initializeView(mylistList);
+      this._onItemClick = onItemClick;
+    },
+    initializeView: function() {
+      var $ = window.jQuery;
+      this._$view = $([
+        '<div class="mylistListPopup popupMenu">',
+          '<div class="listInner">',
+          '<ul></ul>',
+          '</div>',
+        '</div>',
+        ''].join(''));
+      this._$list = this._$view.find('ul');
+      this._$inner = this._$view.find('.listInner');
+
+
+      $('body').append(this._$view);
+
+      this.refresh();
+
+      this.initializeEvent(this._$view);
+    },
+    initializeEvent: function($view) {
+      $view.on('click', window.jQuery.proxy(function(e) {
+        if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) { return; }
+        var target = e.target, $target = window.jQuery(target);
+        this.hide();
+        e.preventDefault();
+
+        var mylistId = $target.attr('data-mylist-id');
+        var mylistName = $target.attr('data-mylist-name');
+        if (!mylistId) { return; }
+        var type = target.className;
+
+        if (typeof this._onItemClick === 'function') {
+          this._onItemClick(mylistId, mylistName, type);
+        }
+      }, this));
+      var self = this, closeTimer = null;
+      $view.hover(
+        function() {
+          if (closeTimer) { window.clearTimeout(closeTimer); }
+        },
+        function() {
+          closeTimer = window.setTimeout(function() { self.hide(); }, 400);
+        });
+
+      $view = null;
+    },
+    adjustColumnCount: function() {
+      var height = this._$view.outerHeight(),
+          clientHeight = window.jQuery(window).innerHeight(),
+          threshold = clientHeight * 0.4;
+      if (threshold < height) {
+        var columns = parseInt( height / threshold, 10) + 1;
+        this._$inner.css({'column-count': columns});
+      }
+    },
+    updateList: function(mylistList) {
+      this._mylistList = mylistList.concat();
+      this.refresh();
+    },
+    refresh: function() {
+      var mylistList = this._mylistList;
+      this._$list.empty();
+      for (var i = 0, len = mylistList.length; i < len; i++) {
+        var mylist = mylistList[i];
+        this.appendItem(mylist.id, mylist.name);
+      }
+      this.appendItem('default', 'とりあえずマイリスト');
+
+      this.adjustColumnCount();
+    },
+    appendItem: function(id, name) {
+      var $mylist = window.jQuery([
+          '<li>',
+            '<span class="icon"></span>',
+            '<a href="my/mylist/#/', id.replace('default', 'home'), '" class="name">',
+              name,
+            '</a>',
+          '</li>',
+        ''].join(''));
+      $mylist.find('.icon, .name').attr({
+        'data-mylist-id': id,
+        'data-mylist-name': name
+      });
+      if (id === 'default') {
+        $mylist.addClass('deflist');
+      } else
+      if (id.indexOf('ext') === 0) {
+        $mylist.addClass('ext');
+      }
+      this._$list.append($mylist);
+    },
+    show: function(elm) {
+      this._$view.addClass('show active');
+
+      if (!elm) { return; }
+      var
+        $ = window.jQuery,
+        $elm = $(elm),
+        o = $elm.offset(),
+        $view = this._$view,
+        $window = $(window),
+        scrollLeft = $window.scrollLeft(),
+        scrollTop  = $window.scrollTop();
+
+      $view.css({
+        top:  Math.max(o.top - $view.outerHeight(), 0, scrollTop),
+        left: o.left
+      });
+      if ($view.offset().left + $view.outerWidth() > $window.innerWidth() + scrollLeft) {
+        $view.css({
+          left: $window.innerWidth() + scrollLeft - $view.outerWidth()
+        });
+      }
+    },
+    hide: function() {
+      var $view = this._$view
+        .removeClass('show');
+      window.setTimeout(function() {
+        $view.css({top: '', left: '', right: ''}).removeClass('active');
+      }, 500);
+    },
+    toggle: function(elm) {
+      if (this._$view.hasClass('avtive')) {
+        this.hide();
+      } else {
+        this.show(elm);
+      }
+    }
+  };
 
   var LocationHashParser = (function(conf, w) {
     var self, dat = {};
@@ -4261,12 +4533,13 @@
       $('select')[0].selectedIndex = $('select')[0].options.length - 1;
       $('#select_group option:last')[0].innerHTML = 'とりマイ';
 
-      var submit = document.createElement("input");
-      submit.className = 'mylistAdd';
-      submit.type  = "submit";
-      submit.value = "マ";
-      $(submit).css({position: 'absolute', top: 0, left: '64px'});
-      $('select')[0].parentNode.appendChild(submit);
+//      var submit = document.createElement("input");
+//      submit.className = 'mylistAdd';
+//      submit.type  = "submit";
+//      submit.value = "マ";
+//      $(submit).css({position: 'absolute', top: 0, left: '64px'});
+//      $('select')[0].parentNode.appendChild(submit);
+
 
       $('#edit_description').hide();
 
@@ -10148,7 +10421,9 @@
               playlist.enableContinuous();
             },
             createDom = function() {
-              $popup = $('<div/>').addClass('playlistMenuPopup').toggleClass('w_touch', isTouchActive);
+              $popup = $('<div class="playlistMenuPopup popupMenu"/>')
+                .addClass('pop')
+                .toggleClass('w_touch', isTouchActive);
               var $ul = $('<ul/>');
               $popup.click(function() {
                 self.hide();
@@ -11521,7 +11796,6 @@
         body.videoExplorer.content-fix #playerTabWrapper,
         body.videoExplorer.content-fix .videoExplorerMenu,
         body.videoExplorer.content-fix #playlist,
-        body.videoExplorer.content-fix #leftPanel,
         {*#playerTabWrapper  .playerCommentPanel*}
         body:not(.full_with_browser) .mylistPopupPanel.fixed
         {
@@ -11530,6 +11804,7 @@
           transform: translateZ(0);
         }
         {* Firefoxだと問題がある要素はこちら *}
+        body.videoExplorer.content-fix #leftPanel,
         body.videoExplorer.content-fix #content,
         #popupMarquee
         {
