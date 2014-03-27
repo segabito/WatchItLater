@@ -1007,6 +1007,7 @@
       .sidePanel.videoInfo  #leftPanelContent, .sidePanel.ichiba  #leftPanelContent {
         display: none;
       }
+      .sidePanel.w_comment    #playerTabContainer,
       .sidePanel.videoInfo    .sideVideoInfo,
       .sidePanel.ichiba       .sideIchibaPanel,
       .sidePanel.w_videoInfo  .sideVideoInfo,
@@ -3643,7 +3644,7 @@
         var btn = document.createElement('button');
         btn.appendChild(document.createTextNode('my'));
         btn.className = 'mylistAdd';
-        btn.title = 'マイリストに追加';
+        btn.title = 'マイリストに追加\n(ボタンを右クリックで詳細メニュー)';
 
         var callMylistListPopup = function() {
           if (!mylistListPopup) {
