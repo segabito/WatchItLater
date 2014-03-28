@@ -3918,7 +3918,7 @@
       });
       if ($view.offset().left + $view.outerWidth() > $window.innerWidth() + scrollLeft) {
         $view.css({
-          left: $window.innerWidth() + scrollLeft - $view.outerWidth()
+          left: Math.max(0, $window.innerWidth() + scrollLeft - $view.outerWidth())
         });
       }
     },
