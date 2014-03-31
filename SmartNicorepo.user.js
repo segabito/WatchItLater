@@ -87,6 +87,10 @@
         clear: both;
         margin-bottom: 24px;
       }
+      #favUser .uploadVideoList, #favUser .seigaUserPage {
+        font-size: 80%;
+        margin-left: 16px;
+      }
 
       #favUser .nicorepo.fail {
         color: #800;
@@ -107,13 +111,43 @@
         display: inline-block;
         vertical-align: middle;
       }
-      .nicorepo .log-target-thumbnail img {
-        width: 72px;
+      .nicorepo .log-target-thumbnail .imageContainer {
+        width: 64px;
+        height: 48px;
+        background-color: #fff;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
         transition: 0.2s width ease 0.4s, 0.2s height ease 0.4s;
       }
-      .nicorepo .log-target-thumbnail img:hover {
-        width: 130px;
+      .nicorepo .log-target-thumbnail .imageContainer:hover {
+        width: 128px;
+        height: 96px;
       }
+      .nicorepo .log-target-info .time {
+        display: block;
+        font-size: 80%;
+        color: black;
+      }
+      .nicorepo .log-target-info .logComment {
+        display: block;
+        font-size: 80%;
+        color: black;
+      }
+      .nicorepo .log-target-info .logComment:before {
+        content: '「';
+      }
+      .nicorepo .log-target-info .logComment:after {
+        content: '」';
+      }
+      .nicorepo .log-target-info a {
+        display: inline-block;
+        min-width: 100px;
+      }
+      .nicorepo .log-target-info a:hover {
+        background: #ccf;
+      }
+
 
       .nicorepo .log.log-user-video-round-number-of-view-counter {
         display: none;
@@ -132,42 +166,36 @@
         font-size: 80%;
         color: black;
       }
-      .nicorepo .log-comment {
-        position: absolute;
-        bottom: 0;
-        left: 138px;
-        text-align: center;
-        width: calc(100% - 150px);
+
+      .nicorepo .log .time:after {
+        background: #888;
+        color: #fff;
+        border-radius: 4px;
+        display: inline-block;
+        padding: 2px 4px;
       }
-      .nicorepo .log-comment:before {
-        content: '「';
-      }
-      .nicorepo .log-comment:after {
-        content: '」';
+      .nicorepo .log.log-user-register-chblog    .time:after,
+      .nicorepo .log.log-user-video-upload       .time:after,
+      .nicorepo .log.log-user-seiga-image-upload .time:after {
+        content: '投稿';
+        background: #866;
       }
 
-
-      .nicorepo .log.log-user-register-chblog    .log-footer-date:after,
-      .nicorepo .log.log-user-video-upload       .log-footer-date:after,
-      .nicorepo .log.log-user-seiga-image-upload .log-footer-date:after {
-        content: ' 投稿';
-        color: #008;
+      .nicorepo .log.log-user-mylist-add-blomaga .time:after,
+      .nicorepo .log.log-user-mylist-add         .time:after  {
+        content: 'マイリスト';
       }
-      .nicorepo .log.log-user-mylist-add         .log-footer-date:after  {
-        content: ' マイリスト';
-        color: #008;
+      .nicorepo .log.log-user-live-broadcast     .time:after  {
+        content: '放送';
       }
-      .nicorepo .log.log-user-live-broadcast     .log-footer-date:after  {
-        content: ' 放送';
-        color: #008;
+      .nicorepo .log.log-user-seiga-image-clip   .time:after  {
+        content: 'クリップ';
       }
-      .nicorepo .log.log-user-seiga-image-clip   .log-footer-date:after  {
-        content: ' クリップ';
-        color: #008;
+      .nicorepo .log.log-user-video-review       .time:after  {
+        content: 'レビュー';
       }
-      .nicorepo .log.log-user-video-review       .log-footer-date:after  {
-        content: ' レビュー';
-        color: #008;
+      .nicorepo .log.log-user-uad-advertise      .time:after  {
+        content: '広告';
       }
 
       .nicorepo .log.log-user-video-upload {
@@ -185,7 +213,8 @@
       .nicorepo .log-author,
       .nicorepo .log-body,
       .nicorepo .log-res,
-      .nicorepo .log-footer-inner>*:not(.log-footer-date) {
+      .nicorepo .log-comment,
+      .nicorepo .log-footer {
         display: none !important;
       }
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
@@ -232,6 +261,18 @@
             $elm.before($lnk);
           });
 
+          $('.outer .section a').each(function(i, elm) {
+            var $elm = $(elm), href = $elm.attr('href');
+            if (href.match(/\/(\d+)$/)) {
+              var userId = RegExp.$1;
+              var $video = $('<a class="uploadVideoList">動画一覧</a>')
+                .attr('href', '/user/' + userId + '/video');
+              var $seiga = $('<a class="seigaUserPage">静画一覧</a>')
+                .attr('href', 'http://seiga.nicovideo.jp/user/illust/' + userId);
+              $elm.after($seiga).after($video);
+            }
+          });
+
           var getClearBusy = function($elm) {
             return function() {
               $elm.removeClass('updating').addClass('done');
@@ -262,29 +303,64 @@
          var url = 'http://www.nicovideo.jp/user/' + userId + '/top?innerPage=1';
 
          var fail = function(msg) {
-           $container.append('<div class="nicorepo fail">' + msg + '</div>');
+           var $fail = $('<div class="nicorepo fail">' + msg + '</div>');
+           $container.append($fail);
+           autoScrollIfNeed($fail);
+         };
+
+         // ニコレポが画面の一番下よりはみ出していたら見える位置までスクロール
+         var autoScrollIfNeed = function($target) {
+            var
+              scrollTop = $('html').scrollTop(),
+              targetOffset = $target.offset(),
+              clientHeight = $(window).innerHeight(),
+              clientBottom = scrollTop + clientHeight,
+              targetBottom = targetOffset.top + $target.outerHeight();
+
+            if (targetBottom > clientBottom) {
+              $('html').animate({
+                scrollTop: scrollTop + $target.outerHeight()
+              }, 500);
+            }
          };
 
          var success = function($dom, $logBody) {
             var $result = $('<div class="nicorepo success" />');
-            var $img = $logBody.find('img');
+            var $img = $logBody.find('img'), $log = $logBody.find('.log');
             $img.each(function() {
-              var $this = $(this);
+              var $this = $(this), $parent = $this.parent();
               var lazyImg = $this.attr('data-src');
               if (lazyImg) {
-                $this.attr('src', lazyImg);
+                var $imageContainer = $('<div class="imageContainer"/>');
+                $imageContainer.css('background-image', 'url(' + lazyImg + ')');
+                $this.before($imageContainer);
+                $this.remove();
+              }
+              if (window.WatchItLater) {
+                var href = $parent.attr('href');
+                if (href) {
+                  $parent.attr('href', href.replace('http://www.nicovideo.jp/watch/', 'http://nico.ms/'));
+                }
               }
             });
-            if (window.WatchItLater) {
-              var $lnk = $img.parent(), href = $lnk.attr('href');
-              $lnk.attr('href', href.replace('http://www.nicovideo.jp/watch/', 'http://nico.ms/'));
-            }
+            $logBody.each(function() {
+              var $this = $(this), time = $this.find('time:first').text(), logComment = $this.find('.log-comment').text();
+
+              $this.find('.log-target-info>*:first')
+                .before($('<span class="time">' + time + '</span>'));
+              if (logComment) {
+                $this.find('.log-target-info')
+                  .append($('<span class="logComment">' + logComment + '</span>'));
+              }
+            });
 
             $result.append($logBody);
-            $container.scrollTop(0);
             $container.append($result);
+            $result.scrollTop(0);
+
+            autoScrollIfNeed($result);
          };
-//<img data-src="http://tn-skr.smilevideo.jp/smile?i=19595175" class="nicorepo-lazyimage video" alt="" src="http://uni.res.nimg.jp/img/x.gif">
+
          return $.ajax({
            url: url,
            timeout: 30000
@@ -292,7 +368,8 @@
           function(resp) {
             var
               $dom = $(resp),
-              // 欲しいのはそのユーザーの「行動」なのでxx再生みたいなのはいらない
+              // 欲しいのはそのユーザーの「行動」なので、
+              // xx再生やスタンプみたいなのはいらない
               $logBody = $dom.find('.log:not(.log-user-video-round-number-of-view-counter):not(.log-user-action-stamp):not(.log-user-live-video-introduced)');
             if ($logBody.length < 1) {
               fail('ニコレポが存在しないか、取得に失敗しました');
