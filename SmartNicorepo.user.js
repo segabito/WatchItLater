@@ -257,7 +257,9 @@
 //           }, this));
           $('.posRight .arrow').each(function(i, elm) {
             var $elm = $(elm), $lnk = $elm.clone();
-            $lnk.html('<span></span> ニコレポを表示&nbsp;').addClass('showNicorepo');
+            $lnk
+              .html('<span></span> ニコレポを表示&nbsp;')
+              .addClass('showNicorepo');
             $elm.before($lnk);
           });
 
@@ -280,6 +282,9 @@
           };
 
           $('#favUser .showNicorepo').on('click', $.proxy(function(e) {
+            if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) {
+              return;
+            }
             e.preventDefault();
             e.stopPropagation();
             var $elm = $(e.target);

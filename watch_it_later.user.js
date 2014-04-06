@@ -19,7 +19,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140326
+// @version        1.140403
 // ==/UserScript==
 
 /**
@@ -305,6 +305,8 @@
       mylistPanelPosition: '',
       enableDescriptionThumbnail: false, // 説明文の動画リンクにサムネイルとタイトル表示
 
+      enableLocalMylistCache: false,
+
       rankingCategory_g_ent2_Close:     true,
       rankingCategory_g_life2_Close:    true,
       rankingCategory_g_tech_Close:     true,
@@ -433,13 +435,15 @@
       .mylistListPopup {
         position:absolute;
         background: #fff;
-        overflow:visible;
+        overflow: visible;
         padding: 8px;
         border: 1px outset #333;
         transition: opacity 0.3s ease;
       }
       .mylistListPopup.popupMenu ul li {
-        margin: 4px 8px;
+        position: relative;
+        margin: 2px 8px;
+        overflow-y: visible;
       }
       .mylistListPopup:not(.show) {
         left: -9999px;
@@ -451,15 +455,16 @@
       }
       .mylistListPopup .listInner {
         -webkit-column-width: auto; -moz-column-width: auto;
+        -webkit-column-count: 1 !important; {* Chromeだけバグるので *}
       }
       .mylistListPopup .icon {
-        background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;
         display: inline-block;
         width: 18px;
         height: 14px;
         margin: -4px 4px 0 0;
         vertical-align: middle;
         margin-right: 15px;
+        background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;
         transform: scale(1.5); -webkit-transform: scale(1.5);
         transform-origin: 0 0 0; -webkit-transform-origin: 0 0 0;
         transition: transform 0.1s ease, box-shadow 0.1s ease;
@@ -468,19 +473,23 @@
       }
       .mylistListPopup .icon:hover {
         background-color: #ff9;
-        box-shadow: 2px 2px 4px #888;
         transform: scale(2); -webkit-transform: scale(2);
       }
-      .mylistListPopup .icon:hover:after {
+      .mylistListPopup .icon:after {
         content: '開く';
         position: absolute;
         bottom: 0px;
         right: 12px;
         padding: 2px;
-        background: #fff;
-        box-shadow: 2px 2px 2px #888;
+        opacity: 0;
         transform: scale(0.5); -webkit-transform: scale(0.5);
+        z-index: -1;
+      }
+      .mylistListPopup .icon:hover:after {
+                {*box-shadow: 2px 2px 2px #888;*}
+        background: #fff;
         z-index: 100;
+        opacity: 1;
       }
       .mylistListPopup .deflist .icon {
         background-position: 0 -253px;
@@ -500,6 +509,10 @@
         content: ' に登録';
         font-size: 75%;
         color: #fff;
+      }
+      .mylistListPopup .name.exist:after {
+        content: ' に登録済';
+        color: #933;
       }
       .mylistListPopup .name:hover:after {
         color: #666;
@@ -2543,8 +2556,12 @@
         values: {'する': true, 'しない': false}},
 
       {title: '実験中の設定', debugOnly: true, className: 'forDebug'},
-      {title: 'プレイリスト消えないモード(※実験中)',       varName: 'hashPlaylistMode', debugOnly: true, reload: true,
-        values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}},
+//      {title: 'プレイリスト消えないモード(※実験中)',       varName: 'hashPlaylistMode', debugOnly: true, reload: true,
+//        values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}},
+      {title: 'マイリストのローカルキャッシュ', varName: 'enableLocalMylistCache', debugOnly: true, reload: true,
+        values: {'有効': true, '無効': false}},
+
+
 
 
     ];
@@ -3125,7 +3142,7 @@
    *
    *  …と思っていたのだが、(9)からQになった今でもポップアップウィンドウは廃止されないようだ。
    */
-  var Mylist = window.WatchItLater.Mylist = (function(){
+  var Mylist = window.WatchItLater.mylist = (function(){
     var mylistlist = [];
     var initialized = false;
     var defListItems = [], mylistItems = {};
@@ -3138,8 +3155,27 @@
 
     function getToken() {
       if (!isNativeGM && host !== location.host) return null; //
-      var _token = (w.NicoAPI) ? w.NicoAPI.token : (w.WatchApp ? w.WatchApp.ns.init.CommonModelInitializer.watchInfoModel.csrfToken : '');
-      if (_token === null && w.FavMylist && w.FavMylist.csrf_token) _token = w.FavMylist.csrf_token;
+
+      var _token = (w.NicoAPI) ? w.NicoAPI.token : '';
+      if (w.NicoAPI) {
+        return w.NicoAPI.token;
+      } else
+      if (w.WatchApp && w.WatchJsApi) {
+        var watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
+        watchInfoModel.addEventListener('reset', function(watchInfoModel) {
+          token = watchInfoModel.csrfToken;
+        });
+        if (watchInfoModel.initialized) {
+          return watchInfoModel.csrfToken;
+        } else {
+          var dc = JSON.parse($("#watchAPIDataContainer").text());
+          return dc.flashvars.csrfToken;
+        }
+      } else
+      if (_token === null && w.FavMylist && w.FavMylist.csrf_token) {
+        _token = w.FavMylist.csrf_token;
+      }
+
       if (_token !== '') {
         return _token;
       }
@@ -3220,7 +3256,7 @@
     };
 
     pt.isMine = function(id) {
-      if (!initialized) { return false;}
+      if (!initialized) { return false; }
       for (var i = 0, len = mylistlist.length; i < len; i++) {
         if (mylistlist[i].id == id) { return true; }
       }
@@ -3276,7 +3312,7 @@
     };
 
 
-    pt.findDefMylistByWatchId = function(watchId) {
+    pt.findDeflistByWatchId = function(watchId) {
 //      if (/^[0-9]+$/.test(watchId)) return watchId; // スレッドIDが来た
 
       for (var i = 0, len = defListItems.length; i < len; i++) {
@@ -3302,7 +3338,7 @@
     // http://d.hatena.ne.jp/lolloo-htn/20110115/1295105845
     // http://d.hatena.ne.jp/aTaGo/20100811/1281552243
     pt.deleteDefListItem = function(watchId, callback) {
-      var item = this.findDefMylistByWatchId(watchId);
+      var item = this.findDeflistByWatchId(watchId);
       if (!item) return false;
       var item_id = item.item_id;
       var url = 'http://' + host + '/api/deflist/delete';
@@ -3315,6 +3351,11 @@
         onload: function(resp) {
           var result = JSON.parse(resp.responseText);
           if (typeof callback === "function") callback(result.status, result);
+          if (window.jQuery) {
+            defListItems = window.jQuery.grep(defListItems, function(item) {
+              return item.item_data.watch_id !== watchId;
+            });
+          }
           dispatchEvent('defMylistUpdate');
         }
       };
@@ -3377,6 +3418,7 @@
             var result = JSON.parse(resp.responseText);
             if (typeof callback === "function") callback(result.status, result);
             dispatchEvent('mylistUpdate', {action: 'add', groupId: groupId, watchId: watchId});
+            EventDispatcher.dispatch('onMylistItemAdded', groupId, watchId);
             self.clearMylistCache(groupId);
           },
           error: function() {
@@ -3415,6 +3457,7 @@
               var result = JSON.parse(resp.responseText);
               if (typeof callback === "function") callback(result.status, result);
               dispatchEvent('mylistUpdate', {action: 'update', groupId: groupId, watchId: watchId});
+              EventDispatcher.dispatch('onMylistItemUpdated', groupId, watchId);
             },
             error: function() {
               Popup.alert('ネットワークエラー');
@@ -3451,6 +3494,7 @@
               var result = JSON.parse(resp.responseText);
               if (typeof callback === "function") callback(result.status, result);
               dispatchEvent('mylistUpdate', {action: 'delete', groupId: groupId, watchId: watchId});
+              EventDispatcher.dispatch('onMylistItemDeleted', groupId, watchId);
             },
             error: function() {
               Popup.alert('ネットワークエラー');
@@ -3550,7 +3594,7 @@
           var isThreadId = (/^[0-9]+$/.test(w));
 
           deleteDef.disabled = false;
-          if (self.findDefMylistByWatchId(w)) {
+          if (self.findDeflistByWatchId(w)) {
             deleteDef.style.display = '';
           } else {
             deleteDef.style.display = 'none';
@@ -3650,7 +3694,7 @@
           if (!mylistListPopup) {
             mylistListPopup = new MylistListPopup(mylistlist, onMylistListClick);
           }
-          mylistListPopup.toggle(btn);
+          mylistListPopup.toggle(btn, _watchId);
         };
 
         btn.addEventListener('contextmenu', function(e) {
@@ -3849,18 +3893,25 @@
           if (closeTimer) { window.clearTimeout(closeTimer); }
         },
         function() {
-          closeTimer = window.setTimeout(function() { self.hide(); }, 400);
+          closeTimer = window.setTimeout(function() { self.hide(); }, 1000);
         });
 
       $view = null;
     },
     adjustColumnCount: function() {
+      this._$inner.css({
+        'column-count': '',
+        'max-height': ''
+      });
       var height = this._$view.outerHeight(),
           clientHeight = window.jQuery(window).innerHeight(),
           threshold = clientHeight * 0.4;
       if (threshold < height) {
         var columns = parseInt( height / threshold, 10) + 1;
-        this._$inner.css({'column-count': columns});
+        this._$inner.css({
+          'column-count': columns,
+          'max-height': clientHeight * 0.8
+        });
       }
     },
     updateList: function(mylistList) {
@@ -3891,6 +3942,7 @@
         'data-mylist-id': id,
         'data-mylist-name': name
       });
+
       if (id === 'default') {
         $mylist.addClass('deflist');
       } else
@@ -3899,7 +3951,23 @@
       }
       this._$list.append($mylist);
     },
-    show: function(elm) {
+    updateExist: function(watchId) {
+      if (!watchId) {
+        return;
+      }
+      this._$view.find('.exist').removeClass('exist');
+      this._$view.find('.name').each(function() {
+        var $this = window.jQuery(this), mylistId = $this.attr('data-mylist-id');
+        if (mylistId === 'default') { return; }
+        $this
+          .toggleClass('exist', window.WatchItLater.mylist.cache.hasItem(mylistId, watchId));
+      });
+
+      this._$view.find('.deflist .name')
+        .toggleClass('exist',   window.WatchItLater.mylist.findDeflistByWatchId(watchId) !== null);
+    },
+    show: function(elm, watchId) {
+      this.adjustColumnCount();
       this._$view.addClass('show active');
 
       if (!elm) { return; }
@@ -3921,6 +3989,9 @@
           left: Math.max(0, $window.innerWidth() + scrollLeft - $view.outerWidth())
         });
       }
+
+      this.updateExist(watchId);
+      window.jQuery('body').on('click', $.proxy(this._onBodyClick, this));
     },
     hide: function() {
       var $view = this._$view
@@ -3928,15 +3999,221 @@
       window.setTimeout(function() {
         $view.css({top: '', left: '', right: ''}).removeClass('active');
       }, 500);
+      window.jQuery('body').off('click', this._onBodyClick);
     },
-    toggle: function(elm) {
+    toggle: function(elm, watchId) {
       if (this._$view.hasClass('avtive')) {
         this.hide();
       } else {
-        this.show(elm);
+        this.show(elm, watchId);
       }
+    },
+    _onBodyClick: function() {
+      this.hide();
     }
   };
+
+  window.WatchItLater.mylist.cache = (function() {
+    var CacheList = function() { this.initialize.apply(this, arguments); };
+    CacheList.prototype = {
+      initialize: function() {
+        this.reset();
+      },
+      reset: function() {
+        this._cacheList = {};
+      },
+      setCache: function(mylistId, items) {
+        if (!this.hasCache(mylistId)) {
+          this._cacheList[mylistId] = new MylistCache();
+        }
+        this._cacheList[mylistId].update(items);
+      },
+      hasCache: function(mylistId) {
+        if (this._cacheList[mylistId]) {
+          return true;
+        }
+        return false;
+      },
+      hasItem: function(mylistId, watchId) {
+        if (!this.hasCache(mylistId)) {
+          return false;
+        }
+        return this._cacheList[mylistId].hasItem(watchId);
+      },
+      addItem: function(mylistId, watchId) {
+        if (!this.hasCache(mylistId)) {
+          return false;
+        }
+        this._cacheList[mylistId].addItem(watchId);
+      },
+      removeItem: function(mylistId, watchId) {
+        if (!this.hasCache(mylistId)) {
+          return false;
+        }
+        this._cacheList[mylistId].removeItem(watchId);
+      },
+      count: function(mylistId) {
+        if (!this.hasCache(mylistId)) {
+          return NaN;
+        }
+        this._cacheList[mylistId].count();
+      },
+      toJSON: function() {
+        var cacheList = this._cacheList;
+        return this._cacheList;
+      },
+      parse: function(jsonString) {
+        var data;
+        try {
+          data = JSON.parse(jsonString);
+        } catch (e) {
+          data = {};
+        }
+        this.reset();
+        for (var mylistId in data) {
+          var mylistCache = data[mylistId];
+          this._cacheList[mylistId] = new MylistCache(mylistCache);
+        }
+      }
+    };
+
+    var MylistCache = function() { this.initialize.apply(this, arguments); };
+    MylistCache.prototype = {
+      initialize: function(mylistData) {
+        this._name = '';
+        if (mylistData) {
+          this.update(mylistData);
+        }
+      },
+      update: function(mylistData) {
+        this._cache = [];
+        this._hash = {};
+        var items = mylistData.items ? mylistData.items : mylistData;
+        for (var i = 0, len = items.length; i < len; i++) {
+          var
+            item = items[i],
+            watchId = typeof item.getId === 'function' ? item.getId() : item.id;
+          this._cache.push({id: watchId});
+          this._hash[watchId] = true;
+        }
+        if (mylistData.name) {
+          this._name = mylistData.name;
+        }
+      },
+      hasItem: function(watchId) {
+        return this._hash[watchId] === true;
+      },
+      addItem: function(watchId) {
+        if (this.hasItem(watchId)) {
+          return;
+        }
+        this._hash[watchId] = true;
+        this._cache.push({id: watchId});
+      },
+      removeItem: function(watchId) {
+        if (!this.hasItem(watchId)) {
+          return;
+        }
+        delete this._hash[watchId];
+        this._cache = $.grep(this._cache, function(item) {
+          return item.id !== watchId;
+        });
+      },
+      count: function() {
+        return this._cache.length;
+      },
+      toJSON: function() {
+        return {
+          name:  this._name,
+          items: this._cache
+        };
+      },
+      parse: function(jsonString) {
+        var items;
+        try {
+          items = JSON.parse(jsonString);
+        } catch (e) {
+          items = [];
+        }
+        this.update(items);
+      }
+    };
+
+    var cacheList, noop = function() {};
+    var initialize = function() {
+      initialize = noop;
+      console.log('%cinitialize mylistCache', 'background: lightgreen;');
+      cacheList = new CacheList();
+
+      if (conf.enableLocalMylistCache) {
+        if (window.PlayerApp) {
+          $(window).on('beforeunload.watchItLater', function(e) {
+            window.localStorage.setItem('watchItLater_mylistCache', serialize());
+          });
+        }
+        var cacheData = window.localStorage.getItem('watchItLater_mylistCache');
+        if (cacheData) {
+          cacheList.parse(cacheData);
+        }
+      }
+    };
+    var hasCache = function(mylistId, watchId) {
+      initialize();
+      return cacheList.hasItem(mylistId, watchId);
+    };
+    var hasItem = function(mylistId, watchId) {
+      initialize();
+      return cacheList.hasItem(mylistId, watchId);
+    };
+    var addItem = function(mylistId, watchId) {
+      initialize();
+      cacheList.addItem(mylistId, watchId);
+    };
+    var removeItem = function(mylistId, watchId) {
+      initialize();
+      cacheList.removeItem(mylistId, watchId);
+    };
+    var setCache = function(mylistId, items) {
+      initialize();
+      cacheList.setCache(mylistId, items);
+    };
+    var serialize = function() {
+      initialize();
+      return JSON.stringify(cacheList);
+    };
+    var unserialize = function(json) {
+      initialize();
+      cacheList.parse(json);
+    };
+    var clearCache = function() {
+      window.localStorage.removeItem('watchItLater_mylistCache');
+    };
+
+
+    EventDispatcher.addEventListener('onMyMylistLoad', function(mylistId, list) {
+      setCache(mylistId, list || []);
+    });
+    EventDispatcher.addEventListener('onMylistItemAdded',  function(mylistId, watchId) {
+      initialize();
+      cacheList.addItem(mylistId, watchId);
+    });
+    EventDispatcher.addEventListener('onMylistItemDeleted',  function(mylistId, watchId) {
+      initialize();
+      cacheList.removeItem(mylistId, watchId);
+    });
+
+
+    return {
+      initialize: initialize,
+      hasItem: hasItem,
+      addItem: addItem,
+      setCache: setCache,
+      serialize: serialize,
+      unserialize: unserialize,
+      clearCache: clearCache
+    };
+  })();
+
 
   var LocationHashParser = (function(conf, w) {
     var self, dat = {};
@@ -4740,7 +5017,7 @@
     };
     var
       watch          = (WatchApp && WatchApp.ns.init) || {},
-      watchInfoModel = (watch.CommonModelInitializer && watch.CommonModelInitializer.watchInfoModel) || {},
+      watchInfoModel = (watch.CommonModelInitializer && WatchApp.ns.model.WatchInfoModel.getInstance()) || {},
       nicoPlayer     = (watch.PlayerInitializer && watch.PlayerInitializer.nicoPlayerConnector) || {},
       videoExplorerController = watch.VideoExplorerInitializer.videoExplorerController,
       videoExplorer           = videoExplorerController.getVideoExplorer(),
@@ -7040,14 +7317,10 @@
    *  watch.jsを解析すればわかる
    *
    */
-  (function(w) { // Zero Watch
-    if (!w.WatchApp || !w.WatchJsApi) return;
-
-//    $.fx.interval = conf.fxInterval;
-
+  var ZeroFunc = function(w) { // Zero Watch
     var
       video_id = '', watch_id = '',
-      WatchApp = w.WatchApp, WatchJsApi = w.WatchJsApi,
+//      WatchApp = w.WatchApp, WatchJsApi = w.WatchJsApi,
       isTouchActive = false,
       console = conf.debugMode ? window.console : {log: _.noop, trace: _.noop},
       watch = WatchApp.ns.init,
@@ -8111,7 +8384,7 @@
         toggleMenu = new VideoExplorerToggleMenu('マイショートカット', '/my/mylist');
         toggleMenu.attach();
 
-        window.WatchItLater.Mylist.loadMylistList(function(mylistList) {
+        window.WatchItLater.mylist.loadMylistList(function(mylistList) {
           toggleMenu.add$listItem(
             $('<li/>').append(
               $('<a/>')
@@ -8571,6 +8844,12 @@
 
         this._rawList = result.rawList || [];
         this.onLoad_org(err, result);
+        if (this.getIsMine()) {
+          EventDispatcher.dispatch('onMyMylistLoad', this.getMylistId(), {
+            name: this.getName(),
+            items: result.rawList
+          });
+        }
       }, content);
 
       content.containsWatchId = $.proxy(function(watchId) {
@@ -12773,7 +13052,7 @@
         },
         testUpdateMylistComment: function(def) {
           // 一個以上マイリストがあって先頭のマイリストになにか登録されている必要がある
-          var Mylist = WatchItLater.Mylist;
+          var Mylist = WatchItLater.mylist;
           var randomMessage = 'RND: ' + Math.random();
 
           var d = new $.Deferred();
@@ -12946,7 +13225,24 @@
     if (conf.debugMode) {
       initTest(WatchItLater.test);
     }
-  })(w);
+  };
+
+  if (window.WatchApp && window.WatchJsApi) {
+    (function() {
+      var watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
+      if (watchInfoModel.initialized) {
+        ZeroFunc(window);
+      } else {
+        var onReset = function() {
+          watchInfoModel.removeEventListener('reset', onReset);
+          window.setTimeout(function() {
+            ZeroFunc(window);
+          }, 0);
+        };
+        watchInfoModel.addEventListener('reset', onReset);
+      }
+    })();
+  }
 
 
   /**
