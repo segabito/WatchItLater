@@ -19,7 +19,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140403
+// @version        1.140407
 // ==/UserScript==
 
 /**
@@ -9553,6 +9553,7 @@
           margin-bottom: 30px;
         }
         .w_adjusted .uadTagRelated .itemList .item,
+        .w_adjusted .uadTagRelated .emptyItem,
         .w_adjusted .uadTagRelated .default .landing {
           width: 130px; margin: 0 10px 0 8px;
         }
@@ -10049,7 +10050,7 @@
       });
 
       var toggleVideoExplorerHack = function(v) {
-        $('#videoExplorer, #content, #footer').toggleClass('w_adjusted', v);
+        $('#videoExplorer, #content, #footer, #bottomContentTabContainer').toggleClass('w_adjusted', v);
         if (v) {
           $('#content').append($('.videoExplorerMenu'));
           if (WatchController.isSearchMode()) {
