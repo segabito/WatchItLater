@@ -2398,7 +2398,7 @@
         description: 'QWatch側の設定パネルの自動再生はオフにしてください。\n■こんな人におすすめ\n・自動再生ONにしたいけど別タブで開く時は自動再生したくない\n・複数タブ開いたままブラウザ再起動したら全部のタブで再生が始まって「うるせー！」という経験のある人',
         values: {'する': 'yes', 'しない': 'no'}},
       {title: '動画が切り替わる時、ポップアップでタイトルと再生数を表示', varName: 'popupViewCounter',
-        description: '全画面状態だと再生数がわからなくて不便、という時に',
+        description: '全画面状態で連続再生している時などに便利です',
         values: {'する': 'always', '全画面時のみ': 'full', 'しない': 'none'}},
 
       {title: 'プレイヤーの設定', className: 'playerSetting'},
@@ -2525,8 +2525,12 @@
         values: {'使う': true, '使わない': false}},
       {title: 'マイリストメニューの位置', varName: 'mylistPanelPosition',
         values: {'左下': 'left', '右下': ''}},
-      {title: '2本目以降の動画だけ自動再生', varName: 'autoPlay2ndVideo', reload: true,
+      {title: '2本目以降の動画だけ自動再生 (※プレミアム用)', varName: 'autoPlay2ndVideo', reload: true,
         values: {'する': true, 'しない': false}},
+      {title: 'マイリストのローカルキャッシュ', varName: 'enableLocalMylistCache', reload: true,
+        description: '動画がどのマイリストに登録されてるかの情報をキャッシュします。\n「my」ボタンの右クリックを活用する人はおすすめ。',
+        values: {'有効': true, '無効': false}},
+
 
       {title: 'マウスとキーボードの設定', description: '※Chromeはコメント入力中も反応してしまいます', className: 'shortcut'},
       {title: '背景ダブルクリックで動画の位置にスクロール', varName: 'doubleClickScroll',
@@ -2558,9 +2562,6 @@
       {title: '実験中の設定', debugOnly: true, className: 'forDebug'},
 //      {title: 'プレイリスト消えないモード(※実験中)',       varName: 'hashPlaylistMode', debugOnly: true, reload: true,
 //        values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}},
-      {title: 'マイリストのローカルキャッシュ', varName: 'enableLocalMylistCache', debugOnly: true, reload: true,
-        values: {'有効': true, '無効': false}},
-
 
 
 
