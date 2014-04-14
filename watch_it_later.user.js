@@ -19,7 +19,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140407
+// @version        1.140414
 // ==/UserScript==
 
 /**
@@ -3418,9 +3418,11 @@
           onload: function(resp) {
             var result = JSON.parse(resp.responseText);
             if (typeof callback === "function") callback(result.status, result);
-            dispatchEvent('mylistUpdate', {action: 'add', groupId: groupId, watchId: watchId});
-            EventDispatcher.dispatch('onMylistItemAdded', groupId, watchId);
-            self.clearMylistCache(groupId);
+            if (result.status === 'ok') {
+              dispatchEvent('mylistUpdate', {action: 'add', groupId: groupId, watchId: watchId});
+              EventDispatcher.dispatch('onMylistItemAdded', groupId, watchId);
+              self.clearMylistCache(groupId);
+            }
           },
           error: function() {
             Popup.alert('ネットワークエラー');
@@ -3456,9 +3458,11 @@
             url: url,
             onload: function(resp) {
               var result = JSON.parse(resp.responseText);
-              if (typeof callback === "function") callback(result.status, result);
-              dispatchEvent('mylistUpdate', {action: 'update', groupId: groupId, watchId: watchId});
-              EventDispatcher.dispatch('onMylistItemUpdated', groupId, watchId);
+              if (result.status === 'ok') {
+                if (typeof callback === "function") callback(result.status, result);
+                dispatchEvent('mylistUpdate', {action: 'update', groupId: groupId, watchId: watchId});
+                EventDispatcher.dispatch('onMylistItemUpdated', groupId, watchId);
+              }
             },
             error: function() {
               Popup.alert('ネットワークエラー');
@@ -3493,9 +3497,11 @@
             url: url,
             onload: function(resp) {
               var result = JSON.parse(resp.responseText);
-              if (typeof callback === "function") callback(result.status, result);
-              dispatchEvent('mylistUpdate', {action: 'delete', groupId: groupId, watchId: watchId});
-              EventDispatcher.dispatch('onMylistItemDeleted', groupId, watchId);
+              if (result.status === 'ok') {
+                if (typeof callback === "function") callback(result.status, result);
+                dispatchEvent('mylistUpdate', {action: 'delete', groupId: groupId, watchId: watchId});
+                EventDispatcher.dispatch('onMylistItemDeleted', groupId, watchId);
+              }
             },
             error: function() {
               Popup.alert('ネットワークエラー');
@@ -3530,7 +3536,7 @@
       var extArea = document.createElement('span');
 
 
-      var isWatchPage = (window.WatchApp && window.WatchJsApi) ? true : false;
+      var isWatchPage = (window.PlayerApp) ? true : false;
 
       var addDeflist = function(watchId, description) {
         self.addDefListItem(watchId, function(status, result, replaced) {
@@ -5007,15 +5013,8 @@
   //===================================================
   //===================================================
 
-  window.WatchController = (function(w) {
+  var _watchController = function(w) {
     var WatchApp = w.WatchApp, _false = function() { return false; };
-    if (!w.WatchApp) return {
-      isZeroWatch:  _false,
-      isQWatch:     _false,
-      isFullScreen: _false,
-      isSearchMode: _false,
-      getTid2Vid: function(threadId, callback) { return callback(threadId);}
-    };
     var
       watch          = (WatchApp && WatchApp.ns.init) || {},
       watchInfoModel = (watch.CommonModelInitializer && WatchApp.ns.model.WatchInfoModel.getInstance()) || {},
@@ -5026,10 +5025,7 @@
       $ = w.$, WatchJsApi = w.WatchJsApi;
     return {
       isZeroWatch: function() {
-        return (WatchApp && WatchJsApi) ? true : false;
-      },
-      isQwatch: function() {
-        return this.isZeroWatch();
+        return (window.PlayerApp) ? true : false;
       },
       getWatchInfoModel: function() {
         return watchInfoModel;
@@ -5554,10 +5550,21 @@
           });
       }
     };
-  })(w); // end WatchController
-  window.WatchItLater.WatchController = window.WatchController;
+  }; // end _watchController
 
-  var Util = (function(WatchItLater, WatchController) {
+  (function() {
+    window.WatchItLater.WatchController =
+    window.WatchController = {
+      isZeroWatch:  function() { return window.PlayerApp ? true : false; },
+      isFullScreen: function() { return false; },
+      isSearchMode: function() { return false; },
+      getTid2Vid: function(threadId, callback) { return callback(threadId);}
+    };
+  })();
+
+
+
+  var Util = (function() {
     var Cache = {
       storage: {},
       get: function(key) {
@@ -5713,7 +5720,7 @@
       }
     };
     return self;
-  })(WatchItLater, WatchController);
+  })();
   window.WatchItLater.util = Util;
 
   var NicoNews = (function() {
@@ -6599,7 +6606,7 @@
 
 
   var NicorepoVideo = (function(w, Util) {
-    if (!WatchController.isZeroWatch()) return {};
+    if (!window.PlayerApp) return {};
 
     var CACHE_TIME = 1000 * 60 * 10;
     var WatchApp = w.WatchApp;
@@ -6860,7 +6867,7 @@
    *  ランキングのRSSをマイリストAPIと互換のある形式に変換することで、ダミーマイリストとして表示してしまう作戦
    */
   var VideoRanking = (function(w, Util) {
-    if (!WatchController.isZeroWatch()) return {};
+    if (!window.PlayerApp) return {};
     var $ = w.jQuery;
 
     var
@@ -7183,7 +7190,7 @@
    *  チャンネル動画一覧をマイリストAPIと互換のある形式で返すことで、ダミーマイリストとして表示してしまう作戦
    */
   var ChannelVideoList = (function(w, Util){
-    if (!WatchController.isZeroWatch()) return {};
+    if (!window.PlayerApp) return {};
     var
       CACHE_TIME = 1000 * 60 * 1, MAX_PAGE = 3,
       getPipe = function(baseUrl, result, page) {
@@ -7442,7 +7449,7 @@
       search();
       w.ichiba.showConsole();
     }
-    WatchController.openIchibaSearch = ichibaSearch;
+    WatchController.ichibaSearch = ichibaSearch;
 
     function initVideoCounter() {
       var
@@ -13229,15 +13236,22 @@
     }
   };
 
-  if (window.WatchApp && window.WatchJsApi) {
+  if (window.PlayerApp) {
     (function() {
       var watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
       if (watchInfoModel.initialized) {
+        window.WatchItLater.WatchController =
+        window.WatchController =
+          _watchController(window);
         ZeroFunc(window);
       } else {
         var onReset = function() {
           watchInfoModel.removeEventListener('reset', onReset);
           window.setTimeout(function() {
+            window.WatchItLater.WatchController =
+            window.WatchController =
+              _watchController(window);
+
             ZeroFunc(window);
           }, 0);
         };
