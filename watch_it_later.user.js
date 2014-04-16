@@ -19,7 +19,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140414
+// @version        1.140417
 // ==/UserScript==
 
 /**
@@ -491,9 +491,18 @@
         z-index: 100;
         opacity: 1;
       }
-      .mylistListPopup .deflist .icon {
-        background-position: 0 -253px;
-      }
+      .mylistListPopup .deflist .icon { background-position: 0 -253px; }
+      .mylistListPopup .folder1 .icon { background-position: 0 -23px;}
+      .mylistListPopup .folder2 .icon { background-position: 0 -46px;}
+      .mylistListPopup .folder3 .icon { background-position: 0 -69px;}
+      .mylistListPopup .folder4 .icon { background-position: 0 -92px;}
+      .mylistListPopup .folder5 .icon { background-position: 0 -115px;}
+      .mylistListPopup .folder6 .icon { background-position: 0 -138px;}
+      .mylistListPopup .folder7 .icon { background-position: 0 -161px;}
+      .mylistListPopup .folder8 .icon { background-position: 0 -184px;}
+      .mylistListPopup .folder9 .icon { background-position: 0 -207px;}
+
+
       .mylistListPopup .name {
         display: inline-block;
         vertical-align: middle;
@@ -3231,13 +3240,14 @@
         return;
       }
       token = getToken();
-      var url = 'http://' + host + '/api/watch/uservideo?user_id=' + uid;
+      //var url = 'http://' + host + '/api/watch/uservideo?user_id=' + uid;
+      var url = 'http://' + host + '/api/mylistgroup/list';
       GM_xmlhttpRequest({
         url: url,
         onload: function(resp) {
           var result = JSON.parse(resp.responseText);
-          if (result.status === "ok" && result.list) {
-            mylistlist = result.list;
+          if (result.status === "ok" && result.mylistgroup) {
+            mylistlist = result.mylistgroup;
             initialized = true;
             for (var i = 0; i < onInitialized.length; i++) {
               onInitialized[i](mylistlist.concat());
@@ -3930,15 +3940,15 @@
       this._$list.empty();
       for (var i = 0, len = mylistList.length; i < len; i++) {
         var mylist = mylistList[i];
-        this.appendItem(mylist.id, mylist.name);
+        this.appendItem(mylist.id, mylist.name, mylist.icon_id);
       }
       this.appendItem('default', 'とりあえずマイリスト');
 
       this.adjustColumnCount();
     },
-    appendItem: function(id, name) {
+    appendItem: function(id, name, icon_id) {
       var $mylist = window.jQuery([
-          '<li>',
+          '<li class="folder', icon_id, '">',
             '<span class="icon"></span>',
             '<a href="my/mylist/#/', id.replace('default', 'home'), '" class="name">',
               name,
@@ -8279,7 +8289,7 @@
               'data-menu-type': 'mylist',
               'data-mylist-id': mylistId,
             }),
-          $li = $('<li/>').addClass(iconType);
+          $li = $('<li/>').addClass(iconType || '');
         $li.append($a);
         this._$list.append($li);
         return $a;
@@ -8419,7 +8429,7 @@
           }
           for (var i = 0, len = mylistList.length; i < len; i++) {
             var mylist = mylistList[i];
-            toggleMenu.addMylistItem(mylist.name, mylist.id);
+            toggleMenu.addMylistItem(mylist.name, mylist.id, '', 'folder' + mylist.icon_id);
           }
 
           toggleMenu.show();
