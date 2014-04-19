@@ -10183,7 +10183,7 @@
         }
 
         this._$item.find('.thumbnailContainer')
-          .css('background-image', 'url(' + item.getThumbnailUrl() + ')');
+          .css('background-image', 'url(' + this._$thumbnail.attr('src') + ')');
 
         if (item._seed && item._seed._info) {
           var info = item._seed._info;
