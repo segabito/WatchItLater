@@ -19,7 +19,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140417
+// @version        1.140421
 // ==/UserScript==
 
 /**
@@ -8652,19 +8652,24 @@
         this._$form      = this._$view.find('form');
         this._$input     = this._$view.find('.grepInput').attr('list', params.listName);
         this._$community = this._$view.find('.community');
+        this._$alive     = this._$view.find('.alive');
+        this._$invert    = this._$view.find('.invert');
+        this._$checkboxes = this._$view.find('input[type=checkbox]');
+
+        this._not = false;
 
         this._$view.toggleClass('debug', !!conf.debugMode);
 
         this._$list = $('<datalist />').attr('id', params.listName);
         $('body').append(this._$list);
 
-        this._$form .on('submit',    $.proxy(this._onFormSubmit,          this));
-        this._$community.on('click', $.proxy(this._onCommunityCheckClick, this));
+        this._$form.on('submit', $.proxy(this._onFormSubmit, this));
+        this._$checkboxes.on('click', $.proxy(this._onCheckClick, this));
 
         this._$input.on('click', $.proxy(function(e) {
           e.stopPropagation();
         }, this))   .on('focus', $.proxy(function(e) {
-          WatchApp.ns.util.WindowUtil.scrollFitMinimum('#playlist', 600);
+          WatchController.scrollToVideoPlayer(true);
         }, this));
 
         this._$view .on('click', $.proxy(function(e) {
@@ -8679,7 +8684,8 @@
       },
       clear: function() {
         this._$input.val('');
-        this._$community.prop('checked', false);
+        this._$checkboxes.prop('checked', false);
+        this._$view.removeClass('active');
       },
       update: function() {
         var list = this._content.getRawList();
@@ -8695,10 +8701,15 @@
           setTimeout($.proxy(function() { this._$input.focus(); }, this), 100);
         }
       },
-      _getWord: function() {
-        return this._$input.val();
+      _isActive: function() {
+        return (this._$input.val().length > 0 ||
+          !!this._$community.prop('checked') ||
+          !!this._$alive    .prop('checked'));
       },
-      _onCommunityCheckClick: function(e) {
+      _getWord: function() {
+        return $.trim(this._$input.val());
+      },
+      _onCheckClick: function(e) {
         e.stopPropagation();
         this._submit();
       },
@@ -8708,16 +8719,15 @@
         this._submit();
       },
       _submit: function() {
-        var word = this._getWord();
-        var communityFilter = !!this._$community.prop('checked');
+        var isActive = this._isActive();
+        this._$view.toggleClass('active', isActive);
 
-        if (word.length > 0 || communityFilter) {
+        if (isActive) {
           this._content.setFilter(this._getFilter());
         } else {
           this._content.setFilter(null);
         }
 
-        //this._content.changeState({page: 1});
         this.contentRefresh();
       },
       contentRefresh: function() {
@@ -8732,23 +8742,50 @@
              return String.fromCharCode(s.charCodeAt(0) - 65248);
           }).toLowerCase();
         };
-        var isCommunity = function(str) {
-          return /^so|^\d+$/.test(str);
-        };
         var word = to_h(this._getWord());
+        var communityReg = /^so|^\d+$/;
+        var wordFilter      = word.length > 0;
         var communityFilter = !!this._$community.prop('checked');
+        var aliveFilter     = !!this._$alive.prop('checked');
+        var isInvert        = !!this._$invert.prop('checked');
 
-        return function(item) {
-          if (communityFilter && word.length <= 0) {
-            return isCommunity(item.id);
-          }
-          var title = to_h(item.title);
+
+        var isCommunity = function(item) {
+          return communityReg.test(item.id);
+        };
+        var isMatch = function(item) {
+          var title = item.title;
           var desc  = item.description_full || item.description_short || '';
           var mc    = item.mylist_comment   || '';
-          var result = title.indexOf(word) >= 0 || to_h(desc).indexOf(word) >= 0 || to_h(mc).indexOf(word) >= 0;
-          result = communityFilter ? (result && isCommunity(item.id)) : result;
-          return result;
+          var text  = to_h([title, desc, mc].join('\n'));
+
+          return text.indexOf(word) >= 0;
         };
+        var isAlive = function(item) {
+          var thumbnail = item.thumbnail_url || '';
+          if (thumbnail.indexOf('http://res.nimg.jp/img/common/video_deleted') < 0) {
+            return true;
+          }
+          return false;
+        };
+
+        var grepFilter = function(item) {
+          var result = true, i = func.length, f;
+          while (--i >= 0 && (result || isInvert)) {
+            f = func[i];
+            result &= f(item);
+          }
+          return isInvert ? !result : result;
+        };
+
+        var func = [], f;
+        if (wordFilter)      { func.push(isMatch); }
+        if (communityFilter) { func.push(isCommunity); }
+        if (aliveFilter)     { func.push(isAlive); }
+
+        if (func.length < 1) { return null; }
+
+        return grepFilter;
       }
     }; // end GrepOptionView.prototype
 
@@ -8787,7 +8824,9 @@
           '<div class="grepOption">',
             '<form>',
               '<input type="search" class="grepInput" autocomplete="on" placeholder="タイトル・説明文で絞り込む(G)" accesskey="g">',
-              '<label class="communityFilter"><input type="checkbox" class="community">チャンネル・コミュニティ・マイメモリーのみ</label>',
+              '<label class="communityFilter filter"><input type="checkbox" class="community">チャンネル・コミュニティ・マイメモリーのみ</label>',
+              '<label class="aliveFilter filter"><input type="checkbox" class="alive">生存動画のみ</label>',
+              '<label class="invertFilter filter"><input type="checkbox" class="invert">絞り込みの反転</label>',
             '</form>',
           '</div>',
         ].join(''))
@@ -9029,12 +9068,21 @@
           font-size: 120%;
           width: 100%;
         }
-        .grepOption .communityFilter {
-          display: none;
-        }
-        .grepOption .communityFilter {
+
+        .grepOption .filter {
           display: block; margin: 8px;
         }
+        .grepOption .filter:hover {
+          background: #ccc;
+        }
+        .grepOption .filter.invertFilter {
+          display: none;
+        }
+        .grepOption.active .filter.invertFilter {
+          display: block; text-align: right;
+        }
+
+
       */});
       addStyle(__css__, 'mylistContentCss');
 
@@ -9125,7 +9173,9 @@
           '<div class="grepOption">',
             '<form>',
               '<input type="search" class="grepInput" autocomplete="on" placeholder="とりマイをタイトル・説明文で絞り込む(G)" accesskey="g">',
-              '<label class="communityFilter"><input type="checkbox" class="community">チャンネル・コミュニティ・マイメモリーのみ</label>',
+              '<label class="communityFilter filter"><input type="checkbox" class="community">チャンネル・コミュニティ・マイメモリーのみ</label>',
+              '<label class="aliveFilter filter"><input type="checkbox" class="alive">生存動画のみ</label>',
+              '<label class="invertFilter filter"><input type="checkbox" class="invert">絞り込みの反転</label>',
             '</form>',
           '</div>',
         ].join(''))
