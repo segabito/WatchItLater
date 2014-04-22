@@ -19,7 +19,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140421
+// @version        1.140423
 // ==/UserScript==
 
 /**
@@ -366,15 +366,17 @@
 
     function addStyle(styles, id) {
       var elm = document.createElement('style');
-      elm.type = 'text/css';
-      if (id) { elm.id = id; }
+      window.setTimeout(function() {
+        elm.type = 'text/css';
+        if (id) { elm.id = id; }
 
-      var text = styles.toString();
-      text = document.createTextNode(text);
-      elm.appendChild(text);
-      var head = document.getElementsByTagName('head');
-      head = head[0];
-      head.appendChild(elm);
+        var text = styles.toString();
+        text = document.createTextNode(text);
+        elm.appendChild(text);
+        var head = document.getElementsByTagName('head');
+        head = head[0];
+        head.appendChild(elm);
+      }, 0);
       return elm;
     }
 
@@ -4989,9 +4991,8 @@
         if (type !== 'VideoArrayAPILoader') { return; }
         try {
           var session = data.session, xml = data.xml;
-          console.log('VideoArrayAPILoader.onMessage', data.session, data.xml);
+          //console.log('VideoArrayAPILoader.onMessage', data.session, data.xml);
           if (deferredList[session]) {
-            console.log('resolve!');
             deferredList[session].resolve(parseVideoArray(xml));
             delete deferredList[session];
             currentPromise = null;
@@ -7340,10 +7341,11 @@
       video_id = '', watch_id = '',
 //      WatchApp = w.WatchApp, WatchJsApi = w.WatchJsApi,
       isTouchActive = false,
-      console = conf.debugMode ? window.console : {log: _.noop, trace: _.noop},
+      console = conf.debugMode ? window.console : {log: _.noop, trace: _.noop, time: _.noop, timeEnd: _.noop},
       watch = WatchApp.ns.init,
       watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
 
+    console.log('%cGinza', 'background: lightgreen;');
 
     /**
      *  ゆっくり再生(スロー再生)メニュー
@@ -8669,7 +8671,7 @@
         this._$input.on('click', $.proxy(function(e) {
           e.stopPropagation();
         }, this))   .on('focus', $.proxy(function(e) {
-          WatchController.scrollToVideoPlayer(true);
+          window.WatchApp.ns.util.WindowUtil.scrollFit('#videoExplorer');
         }, this));
 
         this._$view .on('click', $.proxy(function(e) {
@@ -8698,7 +8700,7 @@
         this._$list.html(tmp.join(''));
 
         if (this._getWord().length > 0) {
-          setTimeout($.proxy(function() { this._$input.focus(); }, this), 100);
+          window.setTimeout($.proxy(function() { this._$input.focus(); }, this), 100);
         }
       },
       _isActive: function() {
@@ -9355,8 +9357,9 @@
     }
 
     function onVideoExplorerRefreshStart(params) {
-     var target = params.target, contentList = params.contentList, content = params.content;
-     var
+      window.console.time('videoExplorerRefresh');
+      var target = params.target, contentList = params.contentList, content = params.content;
+      var
         ContentType = WatchApp.ns.components.videoexplorer.model.ContentType,
         type = content.getType(),
         $ve = $('#videoExplorer')
@@ -9391,6 +9394,7 @@
       EventDispatcher.dispatch('onVideoExplorerRefreshStart', content);
     }
     function onVideoExplorerRefreshEnd(params) {
+      window.console.timeEnd('videoExplorerRefresh');
       var target = params.target, contentList = params.contentList, content = params.content;
       EventDispatcher.dispatch('onVideoExplorerRefreshEnd', content);
     }
@@ -10053,6 +10057,8 @@
             return;
           }
         }
+      });
+      EventDispatcher.addEventListener('onVideoExplorerRefreshStart', function(content) {
         window.WatchApp.ns.util.WindowUtil.scrollFit('#videoExplorer');
       });
       EventDispatcher.addEventListener('onVideoExplorerOpening', function(content) {
@@ -12982,7 +12988,7 @@
       };
 
       var playerConfig = watch.PlayerInitializer.nicoPlayerConnector.playerConfig;
-      if (conf.autoPlayIfWindowActivei === 'yes') {
+      if (conf.autoPlayIfWindowActive === 'yes') {
         playerConfig.set({autoPlay: false});
       }
       if (conf.autoPlay2ndVideo) {
@@ -13005,7 +13011,7 @@
         });
         console.log(JSON.parse($('#watchAPIDataContainer').text()));
 
-        WatchApp.ns.util.WindowUtil.shake = function() { console.log('%cshake', 'background: lightgreen;');};
+        //WatchApp.ns.util.WindowUtil.shake = function() { console.log('%cshake', 'background: lightgreen;');};
         //NicoPlayerConnector.getCommentNicoruCount_org = NicoPlayerConnector.getCommentNicoruCount;
       }
     }
@@ -13251,6 +13257,8 @@
 
     } // end initTest
 
+    window.console.time('init WatchItLater');
+//    window.console.profile('init WatchItLater');
     LocationHashParser.initialize();
     initNews();
     initShortcutKey();
@@ -13282,12 +13290,15 @@
     initInvisibleCommentInput($, conf, w);
     initOtherCss();
     initCustomPlayerSize($, conf, w);
+
     initStageVideo($, conf, w);
     initHeatMap($, conf, w);
     initPopupMarquee();
     initMylistPanel($, conf, w);
     initScroll($, conf, w);
     initOther();
+//    window.console.profileEnd('init WatchItLater');
+    window.console.timeEnd('init WatchItLater');
 
     onWindowResizeEnd();
 
