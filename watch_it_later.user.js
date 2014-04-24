@@ -12,6 +12,7 @@
 // @exclude        http://www.upload.nicovideo.jp/*
 // @exclude        http://upload.nicovideo.jp/*
 // @exclude        http://ch.nicovideo.jp/tool/*
+// @exclude        http://flapi.nicovideo.jp/*
 // @match          http://www.nicovideo.jp/*
 // @match          http://ch.nicovideo.jp/*
 // @match          http://i.nicovideo.jp/*
@@ -19,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140423
+// @version        1.140424
 // ==/UserScript==
 
 /**
@@ -10160,6 +10161,10 @@
           return this._prepareState_org(state);
         }
       }, watchPageRouter);
+      window.WatchApp.ns.model.state.WatchPageState.prototype.isVideoStateChange =
+        function(state) {
+          return this.getVideoId() !== state.getVideoId();
+        };
 
 
     } // end initVideoExplorer
@@ -13426,9 +13431,10 @@
     }
   });
 
-  // Chromeに対応させるための処理
-  // いったん<script>として追加してから実行する
   try {
+    if (location.host === 'flapi.nicovideo.jp') {
+      return;
+    } else
     if (location.host === 'i.nicovideo.jp') {
       spapi();
     } else
