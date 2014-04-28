@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140424
+// @version        1.140428
 // ==/UserScript==
 
 /**
@@ -40,6 +40,9 @@
  *
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
+//
+// * ver 1.140428
+// - 本家の仕様変更で使えなくなっていた、プレイリストのブックマーク保存機能を復活
 
 // * ver 1.140319
 // - 謎の技術によって、ニコメンドがなくても説明文の動画リンクにサムネイルを出せるように
@@ -4240,6 +4243,12 @@
 
     function initialize() {
       var hash = w.location.hash.toString();
+      var redirectedHash = window.sessionStorage.getItem('watchItLater_redirectedHash');
+      if (redirectedHash) {
+        console.log('%cNiconicodo redirect', 'background: lightgreen;');
+        hash = redirectedHash;
+        window.sessionStorage.removeItem('watchItLater_redirectedHash');
+      }
       try {
         if (hash.indexOf('#json={') === 0) {
           dat = JSON.parse(hash.substr(6));
@@ -7328,6 +7337,25 @@
 
 
 
+  var niconicodoRedirect = function() {
+    // www.nicovideo.jp/stampを watchにパラメータを中継するためのクッションページとして使う。
+    // watchと同じドメインならどこでもいいけど、ここはDBアクセスもなさそうな静的ページため採用
+    var hash = location.hash.toString();
+    if (hash.indexOf('#json={') !== 0) {
+      return;
+    }
+    console.log('%cNiconicodo redirect', 'background: lightgreen;');
+
+    LocationHashParser.initialize();
+    var blankWatchId = 'sm20353707';
+    var redirectWatchId = LocationHashParser.getValue('redirectWatchId');
+    // 見た目が残念なので消す
+    document.body.innerHTML = '';
+
+    window.sessionStorage.setItem('watchItLater_redirectedHash', location.hash);
+    var redirectTo = '/watch/' + (redirectWatchId ? redirectWatchId : blankWatchId);
+    location.replace(redirectTo);
+  };
 
 
   /**
@@ -9326,6 +9354,7 @@
 
     var videoExplorerOpenCount = 0;
     function onVideoExplorerOpened(params) {
+      window.console.timeEnd('onVideoExplorerOpen');
       var target = params.target, contentList = params.contentList, content = params.content;
       if (videoExplorerOpenCount++ === 0) {
         EventDispatcher.dispatch('onFirstVideoExplorerOpened', content);
@@ -9336,6 +9365,7 @@
     }
 
     function onVideoExplorerOpening(params) {
+      window.console.time('onVideoExplorerOpen');
       var target = params.target, contentList = params.contentList, content = params.content;
       if (videoExplorerOpenCount === 0) {
         EventDispatcher.dispatch('onFirstVideoExplorerOpening', params);
@@ -10085,8 +10115,10 @@
       });
 
       EventDispatcher.addEventListener('onFirstVideoExplorerOpened', function() {
+        window.console.time('onFirstVideoExplorerOpen');
         EventDispatcher.addEventListener('onWindowResizeEnd',  adjustVideoExplorerSize);
         EventDispatcher.addEventListener('onVideoInitialized', adjustVideoExplorerSize);
+        window.console.timeEnd('onFirstVideoExplorerOpen');
       });
 
       var duration_match = /^([0-9]+):([0-9]+)/;
@@ -10527,6 +10559,7 @@
       var
         playlist = watch.PlaylistInitializer.playlist,
         blankVideoId = 'sm20353707', blankVideoUrl = 'http://www.nicovideo.jp/watch/' + blankVideoId + '?',
+        redirectPageUrl = 'http://www.nicovideo.jp/stamp',
         items = {},
         toCenter = function() { // 表示位置調整
           var
@@ -10721,8 +10754,14 @@
             playlist.o.name = $savelink.text();
             playlist.t = 'mylist';
             LocationHashParser.setValue('playlist', playlist);
+            if (!playlist.r) {
+              LocationHashParser.setValue('redirectWatchId', watchInfoModel.id);
+            } else {
+              LocationHashParser.deleteValue('redirectWatchId');
+            }
             $savelink
-              .attr('href', blankVideoUrl + LocationHashParser.getHash().replace(/\?/g, ''))
+              //.attr('href', blankVideoUrl + LocationHashParser.getHash().replace(/\?/g, ''))
+              .attr('href', redirectPageUrl + LocationHashParser.getHash().replace(/\?/g, ''))
               .unbind();
           }
           function closeDialog() {
@@ -11199,8 +11238,14 @@
       });
 
       watchInfoModel.addEventListener('reset', onWatchInfoReset);
-      watchInfoModel.addEventListener('beforeReset', function() { EventDispatcher.dispatch('onWatchInfoBeforeReset'); });
-      watchInfoModel.addEventListener('afterReset',  function() { EventDispatcher.dispatch('onWatchInfoAfterReset'); });
+      watchInfoModel.addEventListener('beforeReset', function() {
+        window.console.time('watchInfoModelReset');
+        EventDispatcher.dispatch('onWatchInfoBeforeReset');
+      });
+      watchInfoModel.addEventListener('afterReset',  function() {
+        window.console.timeEnd('watchInfoModelReset');
+        EventDispatcher.dispatch('onWatchInfoAfterReset');
+      });
       watch.PlayerInitializer.playerScreenMode.addEventListener('change', onScreenModeChange);
 
       var explorer = watch.VideoExplorerInitializer.videoExplorer;
@@ -12882,7 +12927,7 @@
         window.WatchApp.ns.util.WindowUtil.scrollFit('#playerContainerWrapper');
       }, vv);
 
-      $ = conf = w = videoExplorerModeViewController = null;
+      $ = conf = w = null;
     } //
 
     function initOther() {
@@ -13334,6 +13379,9 @@
         watchInfoModel.addEventListener('reset', onReset);
       }
     })();
+  } else
+  if (location.host === 'www.nicovideo.jp' && location.pathname ==='/stamp') {
+    niconicodoRedirect();
   }
 
 
