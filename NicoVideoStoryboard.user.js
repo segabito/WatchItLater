@@ -41,6 +41,7 @@
         background: #ccc;
         border: 2px outset #000;
         z-index: 9000;
+        overflow: visible;
 
         transition: bottom 0.5s ease;
       }
@@ -56,6 +57,9 @@
         overflow-x: scroll;
         white-space: nowrap;
         background: #222;
+        margin: 4px 12px;
+        border-style: inset;
+        border-width: 2px 4px;
       }
       .storyboardContainer.success .storyboardInner {
         display: block;
@@ -79,6 +83,22 @@
       .storyboardContainer.debug .boardList .board {
       }
 
+      .storyboardContainer .boardList .board > div {
+        white-space: nowrap;
+      }
+      .storyboardContainer .boardList .board .border {
+        box-sizing: border-box;
+        -moz-box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+        border-style: solid;
+        border-color: #006;
+        border-width: 0 2px 0 2px;
+        display: inline-block;
+      }
+      .storyboardContainer .boardList .board:hover .border {
+        display: none; {* クリックできなくなっちゃうので苦し紛れの対策 もうちょっとマシな方法を考える *}
+      }
+
       .storyboardContainer .storyboardHeader {
         position: relative;
         width: 100%;
@@ -89,18 +109,53 @@
         left: 50%;
         width: 32px;
         margin-left: -16px;
-        color: red;
+        color: #006;
         z-index: 9010;
         text-align: center;
       }
 
+      .storyboardContainer .cursorTime {
+        display: none;
+        position: absolute;
+        bottom: -20px;
+        font-size: 10pt;
+        border: 1px solid #000;
+        z-index: 9010;
+        background: #ffc;
+
+      }
+      .storyboardContainer:hover .cursorTime {
+        display: block;
+      }
+
+      .storyboardContainer .turnDisable {
+        position: absolute;
+        display: inline-block;
+        left: 150px;
+        bottom: -32px;
+        transition: bottom 0.3s ease-out;
+      }
+      .storyboardContainer:hover .turnDisable {
+        bottom: 0;
+      }
+      .storyboardContainer .turnDisable button {
+        background: none repeat scroll 0 0 #CCCCCC;
+        border-color: #333333;
+        border-radius: 18px 18px 0 0;
+        border-style: solid;
+        border-width: 2px 2px 0;
+        width: 137px;
+        cursor: pointer;
+      }
 
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
 
     var storyboardTemplate = [
             '<div id="storyboardContainer" class="storyboardContainer">',
               '<div class="storyboardHeader">',
+                '<div class="turnDisable"><button>閉じる</button></div>',
                 '<div class="pointer">▼</div>',
+                '<div class="cursorTime"></div>',
               '</div>',
               '<div class="storyboardInner">',
               '</div>',
@@ -571,6 +626,7 @@
 
           var $inner = this._$inner = $view.find('.storyboardInner');
           this._$failMessage = $view.find('.failMessage');
+          this._$cursorTime = $view.find('.cursorTime');
 
           $view
             .on('click', '.board', $.proxy(function(e) {
@@ -579,14 +635,28 @@
               var x = e.pageX - offset.left;
               var page = $board.attr('data-page');
               var vpos = this._storyboard.getPointVpos(x, y, page);
+              if (isNaN(vpos)) { return; }
 
               eventDispatcher.dispatchEvent('onStoryboardSelect', vpos);
+            }, this))
+            .on('mousemove', '.board', $.proxy(function(e) {
+              var $board = $(e.target), offset = $board.offset();
+              var y = $board.attr('data-top') * 1;
+              var x = e.pageX - offset.left;
+              var page = $board.attr('data-page');
+              var vpos = this._storyboard.getPointVpos(x, y, page);
+              if (isNaN(vpos)) { return; }
+              var sec = Math.floor(vpos / 1000);
+
+              var time = Math.floor(sec / 60) + ':' + ((sec % 60) + 100).toString().substr(1);
+              this._$cursorTime.text(time).css({left: e.pageX});
+
             }, this))
             .on('mousewheel', $.proxy(function(e, delta) {
               e.preventDefault();
               e.stopPropagation();
               var left = $inner.scrollLeft();
-              $inner.scrollLeft(left - delta * 90);
+              $inner.scrollLeft(left - delta * 180);
 
             }, this))
             .hover(
@@ -616,6 +686,8 @@
           var height = storyboard.getHeight();
           var rows  = storyboard.getRows();
 
+          var $borders =
+            this._createBorders(storyboard.getWidth(), storyboard.getHeight(), storyboard.getCols());
 
           var totalRows = storyboard.getTotalRows();
           var rowCnt = 0;
@@ -645,7 +717,8 @@
                     'data-top': height * j + height / 2,
                     'data-left': pageWidth * rowCnt,
                     'src': src
-                  });
+                  })
+                  .append($borders.clone());
               $list.append($img);
               rowCnt++;
               if (rowCnt >= totalRows) {
@@ -660,6 +733,17 @@
           this._$view.addClass('show success');
           this._$inner.scrollLeft(0);
           this.enableTimer();
+        },
+        _createBorders: function(width, height, count) {
+          var $border = $('<div class="border"/>').css({
+            width: width,
+            height: height
+          });
+          var $div = $('<div />');
+          for (var i = 0; i < count; i++) {
+            $div.append($border.clone());
+          }
+          return $div;
         },
         _updateFail: function() {
           this._$view.addClass('fail');
@@ -753,11 +837,11 @@
           evt.addEventListener('onDisableStoryboard',
             $.proxy(this._onDisableStoryboard, this));
 
-          //evt.addEventListener('onGetflvLoadStart',
-          //  $.proxy(this._onGetflvLoadStart, this));
+          evt.addEventListener('onGetflvLoadStart',
+            $.proxy(this._onGetflvLoadStart, this));
 
-          //evt.addEventListener('onThumbnailInfoLoadStart',
-          //  $.proxy(this._onThumbnailInfoLoadStart, this));
+          evt.addEventListener('onThumbnailInfoLoadStart',
+            $.proxy(this._onThumbnailInfoLoadStart, this));
         },
 
         load: function(videoId) {
@@ -827,6 +911,12 @@
             this.config.set('enabled', false);
             this.unload();
           }, this), 0);
+        },
+
+        _onGetflvLoadStart: function() {
+        },
+
+        _onThumbnailInfoLoadStart: function() {
         }
       });
 
