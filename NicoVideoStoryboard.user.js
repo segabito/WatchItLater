@@ -293,7 +293,10 @@
       var nicoPlayerConnector = root.init.PlayerInitializer.nicoPlayerConnector;
       var watchInfoModel      = root.model.WatchInfoModel.getInstance();
       var viewerInfoModel     = root.init.CommonModelInitializer.viewerInfoModel;
+      var playerAreaConnector = root.init.PlayerInitializer.playerAreaConnector;
       var externalNicoplayer;
+
+      var watchController = new EventDispatcher();
 
       var getVpos = function() {
         return nicoPlayerConnector.getVpos();
@@ -302,7 +305,11 @@
         nicoPlayerConnector.seekVideo(vpos);
       };
 
+      var _isPlaying = undefined;
       var isPlaying = function() {
+        if (_isPlaying !== undefined) {
+          return _isPlaying;
+        }
         if (!externalNicoplayer) {
           externalNicoplayer = $("#external_nicoplayer")[0];
         }
@@ -341,7 +348,35 @@
         }
       };
 
-      return {
+      playerAreaConnector.addEventListener('onVideoPlayed', function() {
+        console.log('onVideoPlayed');
+        _isPlaying = true;
+        watchController.dispatchEvent('onVideoPlayed');
+      });
+      playerAreaConnector.addEventListener('onVideoStopped', function() {
+        console.log('onVideoStopped');
+        _isPlaying = false;
+        watchController.dispatchEvent('onVideoStopped');
+      });
+
+      playerAreaConnector.addEventListener('onVideoStarted', function() {
+        console.log('onVideoStarted');
+        _isPlaying = true;
+        watchController.dispatchEvent('onVideoStarted');
+      });
+      playerAreaConnector.addEventListener('onVideoEnded', function() {
+        console.log('onVideoEnded');
+        _isPlaying = false;
+        watchController.dispatchEvent('onVideoEnded');
+      });
+
+      playerAreaConnector.addEventListener('onVideoSeeked', function() {
+        console.log('onVideoSeeked');
+        watchController.dispatchEvent('onVideoSeeked');
+      });
+
+
+      window.WatchApp.mixin(watchController, {
         getVpos: getVpos,
         setVpos: setVpos,
 
@@ -355,7 +390,9 @@
         getVideoId: getVideoId,
 
         popup: popup
-      };
+      });
+
+      return watchController;
     })();
 
 
@@ -825,6 +862,8 @@
           this._currentUrl = '';
           this._lazyImage = {};
           this._lastPage = -1;
+          this._lastVpos = 0;
+          this._lastGetVpos = 0;
           this._timerCount = 0;
 
           this._enableButtonView =
@@ -897,8 +936,16 @@
           $inner
             .on('scroll', _.throttle(function() {
               self._onScroll();
-              console.log('%conScroll', 'background: cyan;');
             }, 500));
+
+          this._watchController.addEventListener('onVideoSeeked', function() {
+            var vpos  = self._watchController.getVpos();
+            var index = self._storyboard.getIndex(vpos);
+            var page  = self._storyboard.getPageIndex(index);
+
+            self._lazyLoadImage(page);
+            self._onVposUpdate(vpos);
+          });
 
           this._$disableButton.on('click',
             $.proxy(this._onDisableButtonClick, this));
@@ -1007,32 +1054,17 @@
           if (pageNumber < 1 || this._lazyImage[className]) {
             return;
           }
+          this._lazyImage[className] = true;
 
           var src = this._storyboard.getPageUrl(pageNumber);
-          var img = new Image();
           var $target = this._$inner.find('.' + className);
 
-          // TODO: 外部クラス化
-          this._lazyImage[className] = img;
-          console.log('%c set lazyLoadImage', 'background: cyan;', src);
+          console.log('%c set lazyLoadImage', 'background: cyan;', 'page: ' + pageNumber, '  url: ' + src);
+          $target
+            .css('background-image', 'url(' + src + ')')
+            .removeClass('lazyImage ' + className);
+          $target = null;
 
-          img.onload = function() {
-            $target
-              .removeClass('lazyImage ' + className)
-              .css('background-image', 'url(' + src + ')');
-            console.log('%c lazyLoadImage success: ', 'background: cyan;', src);
-            $target = null;
-          };
-          img.onerror = function() {
-            $target
-              .removeClass('lazyImage ' + className)
-              .addClass('loadFail');
-            console.log('%c lazyLoadImage fail: ', 'background: cyan; color: red;', src);
-            $target = null;
-          };
-
-          img.src = src;
-          img = null;
         },
         _updateFail: function() {
           this._$view.removeClass('success').addClass('fail');
@@ -1061,13 +1093,26 @@
           if (this._isHover) { return; }
           if (!this._storyboard.isEnabled()) { return; }
 
+          var div = 2;
+          var mod = this._timerCount % div;
           this._timerCount++;
 
-          // TODO: getVpos 意外と重いので参照を減らす
-          var vpos = this._watchController.getVpos();
-          if (this._lastVpos === vpos) { return; }
+          var vpos;
 
-          this._lastVpos = vpos;
+          // TODO: getVposが意外に時間を取るので回数を減らす
+          // そもそもコメントパネルがgetVpos叩きまくってるのは・・・
+          if (this._watchController.isPlaying()) {
+            if (mod === 0) {
+              vpos = this._watchController.getVpos();
+           } else {
+              vpos = this._lastVpos + VPOS_INTERVAL / div;
+            }
+          } else {
+            return;
+          }
+
+//          if (this._lastVpos === vpos) { return; }
+
           this._onVposUpdate(vpos);
         },
         _onVposUpdate: function(vpos) {
@@ -1078,14 +1123,15 @@
           var boardWidth = storyboard.getCount() * width;
           var left = boardWidth * per + width / 2;
 
+          this._lastVpos = vpos;
           this._$inner.scrollLeft(left);
 
         },
         _onScroll: function(left) {
           var storyboard = this._storyboard;
           var scrollLeft = left !== undefined ? left : this._$inner.scrollLeft();
-          var page = Math.floor(scrollLeft / (storyboard.getPageWidth() * storyboard.getRows()));
-          this._lazyLoadImage(Math.min(storyboard.getPageCount() - 1, page + 1));
+          var page = Math.round(scrollLeft / (storyboard.getPageWidth() * storyboard.getRows()));
+          this._lazyLoadImage(Math.min(storyboard.getPageCount() - 1, page));
         },
         reset: function() {
           this._lastVpos = -1;
