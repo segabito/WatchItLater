@@ -651,8 +651,8 @@
          *  nページ目のURLを返す。 ゼロオリジン
          */
         getPageUrl: function(page) {
-          page = Math.max(0, Math.min(this.getPageCount(), page)) + 1;
-          return this.getUrl() + '&board=' + page;
+          page = Math.max(0, Math.min(this.getPageCount() - 1, page));
+          return this.getUrl() + '&board=' + (page + 1);
         },
 
         /**
@@ -976,7 +976,7 @@
             return this._scrollLeft;
           } else
           if (left === 0 || Math.abs(this._scrollLeft - left) > 1) {
-            this._$inner.scrollLeft(left);
+            this._$inner[0].scrollLeft = left;
             this._scrollLeft = left;
           }
         },
@@ -1069,17 +1069,20 @@
           if (pageNumber < 1 || this._lazyImage[className]) {
             return;
           }
-          this._lazyImage[className] = true;
 
           var src = this._storyboard.getPageUrl(pageNumber);
-          var $target = this._$inner.find('.' + className);
+          this._lazyImage[className] = src;
 
           //console.log('%c set lazyLoadImage', 'background: cyan;', 'page: ' + pageNumber, '  url: ' + src);
-          $target
-            .css('background-image', 'url(' + src + ')')
-            .removeClass('lazyImage ' + className);
-          $target = null;
 
+          var load = $.proxy(function() {
+            this._$inner.find('.' + className)
+              .css('background-image', 'url(' + src + ')')
+              .removeClass('lazyImage ' + className);
+          }, this);
+
+          window.setTimeout(load, 0);
+          //window.setTimeout(load, 1000);
         },
         _updateFail: function() {
           this._$view.removeClass('success').addClass('fail');
@@ -1148,13 +1151,14 @@
           var storyboard = this._storyboard;
           var scrollLeft = this.scrollLeft();
           var page = Math.round(scrollLeft / (storyboard.getPageWidth() * storyboard.getRows()));
-          this._lazyLoadImage(Math.min(storyboard.getPageCount() - 1, page));
+          this._lazyLoadImage(Math.min(page, storyboard.getPageCount() - 1));
         },
         reset: function() {
           this._lastVpos = -1;
           this._lastPage = -1;
           this._currentUrl = '';
           this._timerCount = 0;
+          this._scrollLeft = 0;
           this._lazyImage = {};
           if (this._$view) {
             this._$view.removeClass('show');
