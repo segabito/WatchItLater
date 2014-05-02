@@ -218,6 +218,16 @@
       '',
     ''].join('');
 
+ // マスコットキャラクターのサムネーヨちゃん
+    var noThumbnailAA = (function() {/*
+　∧ ∧　 　 　┌─────────────
+　( ´ー｀)　　 ＜　サムネーヨ
+ 　＼　< 　　　 └───/|────────
+　　　＼.＼＿＿＿＿__／/
+　　　　 ＼　　　　　　　／
+　　　　　　∪∪‾∪∪
+    */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
+
     var EventDispatcher = (function() {
 
       function AsyncEventDispatcher() {
@@ -719,6 +729,7 @@
           $('body').append(this._$view);
         },
         reset: function() {
+          this._$view.attr('title', '');
           if (this._storyboard.isEnabled()) {
             this._$view.removeClass('loadingVideo getflv thumbnailInfo fail success').addClass('loading');
             this._setText(TEXT.GETFLV);
@@ -757,13 +768,15 @@
             window.setTimeout($.proxy(function() {
               this._$view
               .removeClass('loading getflv thumbnailInfo')
-              .addClass('success');
+              .addClass('success')
+              .attr('title', '');
               this._setText(TEXT.DEFAULT);
             }, this), 3000);
           } else {
             this._$view
               .removeClass('loading')
-              .addClass('fail');
+              .addClass('fail')
+              .attr('title', DEBUG ? noThumbnailAA : '');
             this._setText(storyboard.getMessage());
           }
         },
