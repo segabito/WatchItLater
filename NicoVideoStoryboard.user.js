@@ -79,6 +79,15 @@
         cursor: pointer;
         background-color: #101010;
       }
+      .storyboardContainer .boardList .board.lazyImage {
+        background-color: #ccc;
+      }
+      .storyboardContainer .boardList .board.loadFail {
+        background-color: #c99;
+      }
+      .storyboardContainer .boardList .board.lazyImage {
+        cursor: wait;
+      }
 
       .storyboardContainer .boardList .board > div {
         white-space: nowrap;
@@ -814,6 +823,9 @@
 
           this._isHover = false;
           this._currentUrl = '';
+          this._lazyImage = {};
+          this._lastPage = -1;
+          this._timerCount = 0;
 
           this._enableButtonView =
             new window.NicovideoStoryboard.view.SetToEnableButtonView({
@@ -851,6 +863,8 @@
               $view.addClass('clicked');
               window.setTimeout(function() { $view.removeClass('clicked'); }, 100);
               this._eventDispatcher.dispatchEvent('onStoryboardSelect', vpos);
+
+              if ($board.hasClass('lazyImage')) { this._lazyLoadImage(page); }
             }, this))
             .on('mousemove', '.board', $.proxy(function(e) {
               var $board = $(e.target), offset = $board.offset();
@@ -863,6 +877,8 @@
 
               var time = Math.floor(sec / 60) + ':' + ((sec % 60) + 100).toString().substr(1);
               this._$cursorTime.text(time).css({left: e.pageX});
+
+              if ($board.hasClass('lazyImage')) { this._lazyLoadImage(page); }
             }, this))
             .on('mousewheel', $.proxy(function(e, delta) {
               e.preventDefault();
@@ -877,6 +893,12 @@
               function() {
                 self._isHover = false;
               });
+
+          $inner
+            .on('scroll', _.throttle(function() {
+              self._onScroll();
+              console.log('%conScroll', 'background: cyan;');
+            }, 500));
 
           this._$disableButton.on('click',
             $.proxy(this._onDisableButtonClick, this));
@@ -932,10 +954,8 @@
                   .css({
                     width: pageWidth,
                     height: height,
-                    background: 'url(' + src + ')',
                     backgroundPosition: '0 -' + height * j + 'px'
                   })
-                  .addClass('page-', i)
                   .attr({
                     'data-src': src,
                     'data-page': i,
@@ -944,6 +964,12 @@
                     'src': src
                   })
                   .append($borders.clone());
+
+              if (i === 0) { // 1ページ目だけ遅延ロードしない
+                $img.css('background-image', 'url(' + src + ')');
+              } else {
+                $img.addClass('lazyImage page-' + i);
+              }
               $list.append($img);
               rowCnt++;
               if (rowCnt >= totalRows) {
@@ -975,11 +1001,42 @@
           }
           return $div;
         },
-        _updateFail: function() {
+        _lazyLoadImage: function(pageNumber) {
+          var className = 'page-' + pageNumber;
 
+          if (pageNumber < 1 || this._lazyImage[className]) {
+            return;
+          }
+
+          var src = this._storyboard.getPageUrl(pageNumber);
+          var img = new Image();
+          var $target = this._$inner.find('.' + className);
+
+          // TODO: 外部クラス化
+          this._lazyImage[className] = img;
+          console.log('%c set lazyLoadImage', 'background: cyan;', src);
+
+          img.onload = function() {
+            $target
+              .removeClass('lazyImage ' + className)
+              .css('background-image', 'url(' + src + ')');
+            console.log('%c lazyLoadImage success: ', 'background: cyan;', src);
+            $target = null;
+          };
+          img.onerror = function() {
+            $target
+              .removeClass('lazyImage ' + className)
+              .addClass('loadFail');
+            console.log('%c lazyLoadImage fail: ', 'background: cyan; color: red;', src);
+            $target = null;
+          };
+
+          img.src = src;
+          img = null;
+        },
+        _updateFail: function() {
           this._$view.removeClass('success').addClass('fail');
           this.disableTimer();
-          //this._watchController.popup.alert(this._storyboard.getMessage());
         },
         clear: function() {
           if (this._$view) {
@@ -1002,7 +1059,11 @@
         },
         _onTimerInterval: function() {
           if (this._isHover) { return; }
+          if (!this._storyboard.isEnabled()) { return; }
 
+          this._timerCount++;
+
+          // TODO: getVpos 意外と重いので参照を減らす
           var vpos = this._watchController.getVpos();
           if (this._lastVpos === vpos) { return; }
 
@@ -1010,10 +1071,6 @@
           this._onVposUpdate(vpos);
         },
         _onVposUpdate: function(vpos) {
-          if (!this._$view.hasClass('show')) {
-            return;
-          }
-
           var storyboard = this._storyboard;
           var duration = Math.max(1, storyboard.getDuration());
           var per = vpos / (duration * 1000);
@@ -1022,11 +1079,20 @@
           var left = boardWidth * per + width / 2;
 
           this._$inner.scrollLeft(left);
+
+        },
+        _onScroll: function(left) {
+          var storyboard = this._storyboard;
+          var scrollLeft = left !== undefined ? left : this._$inner.scrollLeft();
+          var page = Math.floor(scrollLeft / (storyboard.getPageWidth() * storyboard.getRows()));
+          this._lazyLoadImage(Math.min(storyboard.getPageCount() - 1, page + 1));
         },
         reset: function() {
           this._lastVpos = -1;
           this._lastPage = -1;
           this._currentUrl = '';
+          this._timerCount = 0;
+          this._lazyImage = {};
           if (this._$view) {
             this._$view.removeClass('show');
             this._$inner.empty();
