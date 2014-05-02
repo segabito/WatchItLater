@@ -12,7 +12,7 @@
 
 (function() {
   var monkey = function() {
-    var DEBUG = true;
+    var DEBUG = !true;
     var $ = window.jQuery, _ = window._;
 
     var __css__ = (function() {/*
@@ -25,29 +25,32 @@
         border: 0;
       }
 
-      .xDomainLoaderFrame.debug {
-        position: static;
-        width: 512px;
-        height: 384px;
-        border: 2px inset ;
-      }
-
       .storyboardContainer {
         position: fixed;
         bottom: -300px;
         left: 0;
         right: 0;
         width: 100%;
-        background: #ccc;
+        box-sizing: border-box;
+        -moz-box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+        background: #999;
         border: 2px outset #000;
-        z-index: 9000;
+        z-index: 9005;
         overflow: visible;
+        border-radius: 10px 10px 0 0;
+        border-width: 2px 2px 0;
+        box-shadow: 0 -2px 2px #666;
 
-        transition: bottom 0.5s ease;
+        transition: bottom 0.5s ease-in-out;
       }
 
       .storyboardContainer.show {
         bottom: 0;
+      }
+
+      .storyboardContainer.clicked *{
+        cursor: wait;
       }
 
       .storyboardContainer .storyboardInner {
@@ -60,15 +63,10 @@
         margin: 4px 12px;
         border-style: inset;
         border-width: 2px 4px;
-      }
-      .storyboardContainer.success .storyboardInner {
-        display: block;
+        border-radius: 10px 10px 0 0;
       }
 
-      .storyboardContainer .failMessage {
-        display: none;
-      }
-      .storyboardContainer.fail .failMessage {
+      .storyboardContainer.success .storyboardInner {
         display: block;
       }
 
@@ -79,8 +77,7 @@
       .storyboardContainer .boardList .board {
         display: inline-block;
         cursor: pointer;
-      }
-      .storyboardContainer.debug .boardList .board {
+        background-color: #101010;
       }
 
       .storyboardContainer .boardList .board > div {
@@ -91,8 +88,8 @@
         -moz-box-sizing: border-box;
         -webkit-box-sizing: border-box;
         border-style: solid;
-        border-color: #006;
-        border-width: 0 2px 0 2px;
+        border-color: #000 #333 #000 #999;
+        border-width: 0     2px    0  2px;
         display: inline-block;
       }
       .storyboardContainer .boardList .board:hover .border {
@@ -105,11 +102,11 @@
       }
       .storyboardContainer .pointer {
         position: absolute;
-        bottom: -10px;
+        bottom: -15px;
         left: 50%;
         width: 32px;
         margin-left: -16px;
-        color: #006;
+        color: #333;
         z-index: 9010;
         text-align: center;
       }
@@ -117,70 +114,160 @@
       .storyboardContainer .cursorTime {
         display: none;
         position: absolute;
-        bottom: -20px;
+        bottom: -30px;
+        left: -999px;
         font-size: 10pt;
         border: 1px solid #000;
         z-index: 9010;
         background: #ffc;
-
       }
       .storyboardContainer:hover .cursorTime {
         display: block;
       }
 
-      .storyboardContainer .turnDisable {
+      .storyboardContainer .setToDisable {
         position: absolute;
         display: inline-block;
-        left: 150px;
+        left: 250px;
         bottom: -32px;
-        transition: bottom 0.3s ease-out;
+        transition: bottom 0.3s ease-in-out;
       }
-      .storyboardContainer:hover .turnDisable {
+      .storyboardContainer:hover .setToDisable {
         bottom: 0;
       }
-      .storyboardContainer .turnDisable button {
-        background: none repeat scroll 0 0 #CCCCCC;
-        border-color: #333333;
+
+      .storyboardContainer .setToDisable button,
+      .setToEnableButtonContainer button {
+        background: none repeat scroll 0 0 #999;
+        border-color: #666;
         border-radius: 18px 18px 0 0;
         border-style: solid;
         border-width: 2px 2px 0;
-        width: 137px;
+        width: 200px;
+        overflow: auto;
+        white-space: nowrap;
         cursor: pointer;
+        box-shadow: 0 -2px 2px #666;
+      }
+
+      .full_with_browser .setToEnableButtonContainer button {
+        box-shadow: none;
+        color: #888;
+        background: #000;
+      }
+
+      .full_with_browser .storyboardContainer .setToDisable,
+      .full_with_browser .setToEnableButtonContainer {
+        background: #000; {* Firefox対策 *}
+      }
+
+      .setToEnableButtonContainer button {
+        width: 200px;
+      }
+
+      .storyboardContainer .setToDisable button:hover,
+      .setToEnableButtonContainer:not(.loading):not(.fail) button:hover {
+        background: #ccc;
+        transition: none;
+      }
+
+      .storyboardContainer .setToDisable button.clicked,
+      .setToEnableButtonContainer.loading button,
+      .setToEnableButtonContainer.fail button,
+      .setToEnableButtonContainer button.clicked {
+        border-style: inset;
+        box-shadow: none;
+      }
+
+      .setToEnableButtonContainer {
+        position: fixed;
+        z-index: 9003;
+        left: 250px;
+        bottom: 0px;
+        transition: bottom 0.5s ease-in-out;
+      }
+      .setToEnableButtonContainer.loadingVideo {
+        bottom: -50px;
+      }
+
+      .setToEnableButtonContainer.loading *,
+      .setToEnableButtonContainer.loadingVideo *{
+        cursor: wait;
+        font-size: 80%;
+      }
+      .setToEnableButtonContainer.fail {
+        color: #999;
+        cursor: default;
+        font-size: 80%;
       }
 
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
 
     var storyboardTemplate = [
-            '<div id="storyboardContainer" class="storyboardContainer">',
-              '<div class="storyboardHeader">',
-                '<div class="turnDisable"><button>閉じる</button></div>',
-                '<div class="pointer">▼</div>',
-                '<div class="cursorTime"></div>',
-              '</div>',
-              '<div class="storyboardInner">',
-              '</div>',
-              '<div class="failMessage">',
-              '</div>',
-            '</div>',
-            '',
-          ''].join('');
+      '<div id="storyboardContainer" class="storyboardContainer">',
+        '<div class="storyboardHeader">',
+          '<div class="setToDisable"><button>▼　閉じる　</button></div>',
+          '<div class="pointer">▼</div>',
+          '<div class="cursorTime"></div>',
+        '</div>',
+
+        '<div class="storyboardInner"></div>',
+        '<div class="failMessage">',
+        '</div>',
+      '</div>',
+      '',
+    ''].join('');
 
     var EventDispatcher = (function() {
-      // TODO: extend
-      return window.WatchApp.ns.event.EventDispatcher;
+
+      function AsyncEventDispatcher() {
+        window.WatchApp.extend(
+          this,
+          AsyncEventDispatcher,
+          window.WatchApp.ns.event.EventDispatcher);
+      }
+
+      window.WatchApp.mixin(AsyncEventDispatcher.prototype, {
+//        addEventListener: function(name, func) {
+//          console.log('%caddEventListener: ', 'background: red; color: white;', name, func);
+//          if (!func) {
+//            console.trace();
+//          }
+//          AsyncEventDispatcher.__super__.addEventListener.call(this, name, func);
+//        },
+        dispatchAsync: function() {
+          var args = arguments;
+
+          window.setTimeout($.proxy(function() {
+            try {
+              this.dispatchEvent.apply(this, args);
+            } catch (e) {
+              console.log(e);
+            }
+          }, this), 0);
+        }
+      });
+      return AsyncEventDispatcher;
     })();
-    var eventDispatcher = new EventDispatcher();
 
     window.NicovideoStoryboard =
       (function() {
-        return {api: {}, model: {}, view: {}, controller: {}, external: {}};
+        return {
+          api: {},
+          model: {},
+          view: {},
+          controller: {},
+          external: {},
+          eventDispatcher: new EventDispatcher()
+        };
       })();
 
-    var console =
-      (function(debug) {
-        var n = window._.noop;
-        return debug ? window.console : {log: n, trace: n, time: n, timeEnd: n};
-      })(DEBUG);
+//    var console =
+//      (function(debug) {
+//        var n = window._.noop;
+//        return debug ? window.console : {log: n, trace: n, time: n, timeEnd: n};
+//      })(DEBUG);
+    var console = window.console;
 
     window.NicovideoStoryboard.external.watchController = (function() {
       var root = window.WatchApp.ns;
@@ -256,6 +343,8 @@
     window.NicovideoStoryboard.api.getflv = (function() {
       var BASE_URL = 'http://flapi.nicovideo.jp/api/getflv?v=';
       var loaderFrame, loaderWindow, cache = {};
+      var eventDispatcher = window.NicovideoStoryboard.eventDispatcher;
+      var getflv = new EventDispatcher();
 
       var parseInfo = function(q) {
         var info = {}, lines = q.split('&');
@@ -272,8 +361,8 @@
         var info = parseInfo(data.info), url = data.url;
 
         cache[url] = info;
-        console.log('getflv.onGetflvLoad', info);
-        eventDispatcher.dispatchEvent('onGetflvLoad', info);
+        //console.log('getflv.onGetflvLoad', info);
+        getflv.dispatchAsync('onGetflvLoad', info);
       };
 
       var initialize = function() {
@@ -283,7 +372,7 @@
 
         loaderFrame = document.createElement('iframe');
         loaderFrame.name      = 'getflvLoader';
-        loaderFrame.className = DEBUG ? 'xDomainloaderFrame debug' : 'xDomainloaderFrame';
+        loaderFrame.className = DEBUG ? 'xDomainLoaderFrame debug' : 'xDomainLoaderFrame';
         document.body.appendChild(loaderFrame);
 
         loaderWindow = loaderFrame.contentWindow;
@@ -291,55 +380,70 @@
         eventDispatcher.addEventListener('onMessage', onMessage);
       };
 
-      var load = function(videoId) {
+      var load = function(watchId) {
         initialize();
-        var url = BASE_URL + videoId;
-        console.log('getflv: ', url);
+        var url = BASE_URL + watchId;
+        //console.log('getflv: ', url);
 
-        eventDispatcher.dispatchEvent('onGetflvLoadStart', videoId);
+        getflv.dispatchEvent('onGetflvLoadStart', watchId);
         if (cache[url]) {
-          eventDispatcher.dispatchEvent('onGetflvLoad', cache[url]);
+          //console.log('%cgetflv cache exist', 'background: cyan', url);
+          getflv.dispatchAsync('onGetflvLoad', cache[url]);
         } else {
           loaderWindow.location.replace(url);
         }
       };
 
-      return {
+      window.WatchApp.mixin(getflv, {
         load: load
-      };
+      });
+
+      return getflv;
     })();
 
    window.NicovideoStoryboard.api.thumbnailInfo = (function() {
       var getflv = window.NicovideoStoryboard.api.getflv;
       var loaderFrame, loaderWindow, cache = {};
+      var eventDispatcher = window.NicovideoStoryboard.eventDispatcher;
+      var thumbnailInfo = new EventDispatcher();
 
       var onGetflvLoad = function(info) {
-        console.log('thumbnailInfo.onGetflvLoad', info);
+        //console.log('thumbnailInfo.onGetflvLoad', info);
         if (!info.url) {
-          eventDispatcher.dispatchEvent(
+          thumbnailInfo.dispatchAsync(
             'onThumbnailInfoLoad',
             {status: 'ng', message: 'サムネイル情報の取得に失敗しました'}
             );
           return;
-        }
-
-        eventDispatcher.dispatchEvent('onThumbnailInfoLoadStart', info.url);
-        if (cache[info.url]) {
-          eventDispatcher.dispatchEvent('onThumbnailInfoLoad', cache[info.url]);
+        } else
+        if (info.url.indexOf('http://') !== 0) { // rtmpe:～など
+          thumbnailInfo.dispatchAsync(
+            'onThumbnailInfoLoad',
+            {status: 'ng', message: 'この配信形式には対応していません'}
+            );
           return;
         }
-        loaderWindow.location.replace(info.url + '&sb=1');
+
+        var url = info.url + '&sb=1';
+
+        thumbnailInfo.dispatchEvent('onThumbnailInfoLoadStart');
+        if (cache[url]) {
+          //console.log('%cthumbnailInfo cache exist', 'background: cyan', url);
+          thumbnailInfo.dispatchAsync('onThumbnailInfoLoad', cache[url]);
+          return;
+        }
+        loaderWindow.location.replace(url);
       };
 
       var onMessage = function(data, type) {
         if (type !== 'storyboard') { return; }
-        console.log('thumbnailInfo.onMessage: ', data, type);
+        //console.log('thumbnailInfo.onMessage: ', data, type);
 
         var url = data.url;
         var xml = data.xml, $xml = $(xml), $storyboard = $xml.find('storyboard');
 
         if ($storyboard.length < 1) {
-          eventDispatcher.dispatchEvent(
+          eventDispatcher.dispatchAsync(
             'onThumbnailInfoLoad',
             {status: 'ng', message: 'この動画にはサムネイルがありません'}
             );
@@ -365,7 +469,7 @@
         };
 
         cache[url] = info;
-        eventDispatcher.dispatchEvent('onThumbnailInfoLoad', info);
+        thumbnailInfo.dispatchAsync('onThumbnailInfoLoad', info);
       };
 
       var initialize = function() {
@@ -375,31 +479,37 @@
 
         loaderFrame = document.createElement('iframe');
         loaderFrame.name      = 'StoryboardLoader';
-        loaderFrame.className = DEBUG ? 'xDomainloaderFrame debug' : 'xDomainloaderFrame';
+        loaderFrame.className = DEBUG ? 'xDomainLoaderFrame debug' : 'xDomainLoaderFrame';
         document.body.appendChild(loaderFrame);
 
         loaderWindow = loaderFrame.contentWindow;
 
-        eventDispatcher.addEventListener('onMessage',    onMessage);
-        eventDispatcher.addEventListener('onGetflvLoad', onGetflvLoad);
+        eventDispatcher.addEventListener('onMessage', onMessage);
+        getflv.addEventListener('onGetflvLoad', onGetflvLoad);
       };
 
-      var load = function(videoId) {
+      var load = function(watchId) {
         initialize();
-        getflv.load(videoId);
+        getflv.load(watchId);
       };
 
-      return {
+
+      window.WatchApp.mixin(thumbnailInfo, {
         load: load
-      };
+      });
+
+      return thumbnailInfo;
     })();
 
     window.NicovideoStoryboard.model.StoryboardModel = (function() {
 
       function StoryboardModel(params) {
-        this._watchController = params.watchController;
         this._eventDispatcher = params.eventDispatcher;
         this._thumbnailInfo   = params.thumbnailInfo;
+        this._watchController = params.watchController;
+        this._isEnabled       = params.isEnabled;
+
+        window.WatchApp.extend(this, StoryboardModel, EventDispatcher);
       }
 
       window.WatchApp.mixin(StoryboardModel.prototype, {
@@ -429,30 +539,31 @@
           }
           this._info = info;
 
-          if (!this._view) {
-            this._view = new window.NicovideoStoryboard.view.StoryboardView({
-              watchController: this._watchController,
-              eventDispatcher: this._eventDispatcher,
-              storyboard: this
-            });
-          }
-          this._view.update();
+          this.dispatchEvent('update');
         },
 
         reset: function() {
-          if (this._view) {
-            this._view.reset();
+          if (this.isEnabled()) {
+            window.setTimeout($.proxy(function() {
+              this.load();
+            }, this), 1000);
           }
+          this.dispatchEvent('reset');
         },
 
-        load: function(videoId) {
-          this._thumbnailInfo.load(videoId);
+        load: function(watchId) {
+          watchId = watchId || this._watchController.getWatchId();
+          this._isEnabled = true;
+          this._thumbnailInfo.load(watchId);
         },
 
         unload: function() {
-          if (this._view) {
-            this._view.reset();
-          }
+          this._isEnabled = false;
+          this.dispatchEvent('unload');
+        },
+
+        isEnabled: function() {
+          return this._isEnabled;
         },
 
         getStatus:   function() { return this._info.status; },
@@ -460,9 +571,15 @@
         getUrl:      function() { return this._info.url; },
         getDuration: function() { return parseInt(this._info.duration, 10); },
 
-        getWidth:  function() { return parseInt(this._info.thumbnail.width, 10); },
-        getHeight: function() { return parseInt(this._info.thumbnail.height, 10); },
-        getCount:  function() { return parseInt(this._info.thumbnail.number, 10); },
+        getWidth:    function() { return parseInt(this._info.thumbnail.width, 10); },
+        getHeight:   function() { return parseInt(this._info.thumbnail.height, 10); },
+        getInterval: function() { return parseInt(this._info.thumbnail.interval, 10); },
+        getCount:    function() {
+          return Math.max(
+            Math.ceil(this.getDuration() / Math.max(0.01, this.getInterval())),
+            parseInt(this._info.thumbnail.number, 10)
+          );
+        },
         getRows:   function() { return parseInt(this._info.board.rows, 10); },
         getCols:   function() { return parseInt(this._info.board.cols, 10); },
         getPageCount: function() { return parseInt(this._info.board.number, 10); },
@@ -533,7 +650,7 @@
           var height = Math.max(1, this.getHeight());
           var row = Math.floor(y / height);
           var col = Math.floor(x / width);
-          var mod = col % width;
+          var mod = x % width;
 
 
           // 何番目のサムネに相当するか？
@@ -556,49 +673,115 @@
       return StoryboardModel;
     })();
 
-    window.NicovideoStoryboard.view.TurnOnButton = (function() {
 
-      var DEFAULT_TEXT = 'サムネイルを表示する';
+    window.NicovideoStoryboard.view.SetToEnableButtonView = (function() {
 
-      function TurnOnButton(params) {
+      var TEXT = {
+        DEFAULT:   '▲ サムネイルを開く ',
+        LOADING:   '動画を読み込み中...',
+        GETFLV:    '動画情報を読み込み中...',
+        THUMBNAIL: 'サムネイル情報を読み込み中...'
+      };
+
+
+      function SetToEnableButtonView(params) {
+        this._storyboard      = params.storyboard;
         this._eventDispatcher = params.eventDispatcher;
+
         this.initialize();
       }
 
-      window.WatchApp.mixin(TurnOnButton.prototype, {
+      window.WatchApp.mixin(SetToEnableButtonView.prototype, {
         initialize: function() {
+          console.log('%cinitialize SetToEnableButtonView', 'background: lightgreen;');
           this._$view = $([
-              '<div class="turnEnableButtonContainer">',
-                '<button>', DEFAULT_TEXT, '</button>',
+              '<div class="setToEnableButtonContainer loadingVideo">',
+                '<button>', TEXT.DEFAULT, '</button>',
               '</div>',
               '',
               '',
             ''].join(''));
           this._$button = this._$view.find('button');
+          this._$button.on('click', $.proxy(this._onButtonClick, this));
 
-          this._$button.on('click', $.proxy(function(e) {
-            e.preventDefault();
-            e.stopPropagation();
+          var sb = this._storyboard;
+          sb.addEventListener('reset',  $.proxy(this._onStoryboardReset, this));
+          sb.addEventListener('update', $.proxy(this._onStoryboardUpdate, this));
 
-            this._$view.addClass('loading');
-            this._eventDispatcher.dispatchEvent('onEnableStoryboard');
-          }, this));
+          var evt = this._eventDispatcher;
+          evt.addEventListener('getFlvLoadStart',
+            $.proxy(this._onGetflvLoadStart, this));
+          evt.addEventListener('onThumbnailInfoLoadStart',
+            $.proxy(this._onThumbnailInfoLoadStart, this));
+          evt.addEventListener('onWatchInfoReset',
+            $.proxy(this._onWatchInfoReset, this));
 
           $('body').append(this._$view);
         },
-        disable: function() {
-          this._$view
-            .removeClass('loading')
-            .addClass('disable');
-          this._$button.text('この動画では表示できません');
-        },
         reset: function() {
-          this._$view.removeClass('loading disable');
-          this._$button.text(DEFAULT_TEXT);
+          if (this._storyboard.isEnabled()) {
+            this._$view.removeClass('loadingVideo getflv thumbnailInfo fail success').addClass('loading');
+            this._setText(TEXT.GETFLV);
+          } else {
+            this._$view.removeClass('loadingVideo getflv thumbnailInfo fail success loading');
+            this._setText(TEXT.DEFAULT);
+          }
+        },
+        _setText: function(text) {
+          this._$button.text(text);
+        },
+        _onButtonClick: function(e) {
+          if (
+            this._$view.hasClass('loading') ||
+            this._$view.hasClass('loadingVideo') ||
+            this._$view.hasClass('fail')) {
+            return;
+          }
+          e.preventDefault();
+          e.stopPropagation();
+
+          var $view = this._$view.addClass('loading clicked');
+          this._eventDispatcher.dispatchEvent('onEnableStoryboard');
+          window.setTimeout(function() {
+            $view.removeClass('clicked');
+            $view = null;
+          }, 1000);
+        },
+        _onStoryboardReset: function() {
+          this.reset();
+        },
+        _onStoryboardUpdate: function() {
+          var storyboard = this._storyboard;
+
+          if (storyboard.getStatus() === 'ok') {
+            window.setTimeout($.proxy(function() {
+              this._$view
+              .removeClass('loading getflv thumbnailInfo')
+              .addClass('success');
+              this._setText(TEXT.DEFAULT);
+            }, this), 3000);
+          } else {
+            this._$view
+              .removeClass('loading')
+              .addClass('fail');
+            this._setText(storyboard.getMessage());
+          }
+        },
+        _onGetflvLoadStart: function() {
+          this._$view.addClass('loading getflv');
+          this._setText(TEXT.GETFLV);
+        },
+        _onThumbnailInfoLoadStart: function() {
+          this._$view.addClass('loading thumbnailInfo');
+          this._setText(TEXT.THUMBNAIL);
+        },
+        _onWatchInfoReset: function() {
+          this._$view.addClass('loadingVideo');
+          this._setText(TEXT.LOADING);
         }
       });
 
-      return TurnOnButton;
+      return SetToEnableButtonView;
     })();
 
     window.NicovideoStoryboard.view.StoryboardView = (function() {
@@ -613,10 +796,23 @@
           console.log('%c initialize StoryboardView', 'background: lightgreen;');
 
           this._watchController = params.watchController;
-          this._storyboard      = params.storyboard;
-          this._eventDispatcher = params.eventDispatcher;
+          var evt = this._eventDispatcher = params.eventDispatcher;
+          var sb  = this._storyboard = params.storyboard;
 
           this._isHover = false;
+          this._currentUrl = '';
+
+          this._enableButtonView =
+            new window.NicovideoStoryboard.view.SetToEnableButtonView({
+              storyboard:      sb,
+              eventDispatcher: this._eventDispatcher
+            });
+
+          evt.addEventListener('onWatchInfoReset', $.proxy(this._onWatchInfoReset, this));
+
+          sb.addEventListener('update', $.proxy(this._onStoryboardUpdate, this));
+          sb.addEventListener('reset',  $.proxy(this._onStoryboardReset,  this));
+          sb.addEventListener('unload', $.proxy(this._onStoryboardUnload, this));
         },
         _initializeStoryboard: function() {
           this._initializeStoryboard = _.noop;
@@ -625,9 +821,11 @@
           var $view = this._$view = $(storyboardTemplate);
 
           var $inner = this._$inner = $view.find('.storyboardInner');
-          this._$failMessage = $view.find('.failMessage');
-          this._$cursorTime = $view.find('.cursorTime');
+          this._$failMessage   = $view.find('.failMessage');
+          this._$cursorTime    = $view.find('.cursorTime');
+          this._$disableButton = $view.find('.setToDisable button');
 
+          var self = this;
           $view
             .on('click', '.board', $.proxy(function(e) {
               var $board = $(e.target), offset = $board.offset();
@@ -637,7 +835,9 @@
               var vpos = this._storyboard.getPointVpos(x, y, page);
               if (isNaN(vpos)) { return; }
 
-              eventDispatcher.dispatchEvent('onStoryboardSelect', vpos);
+              $view.addClass('clicked');
+              window.setTimeout(function() { $view.removeClass('clicked'); }, 100);
+              this._eventDispatcher.dispatchEvent('onStoryboardSelect', vpos);
             }, this))
             .on('mousemove', '.board', $.proxy(function(e) {
               var $board = $(e.target), offset = $board.offset();
@@ -650,22 +850,23 @@
 
               var time = Math.floor(sec / 60) + ':' + ((sec % 60) + 100).toString().substr(1);
               this._$cursorTime.text(time).css({left: e.pageX});
-
             }, this))
             .on('mousewheel', $.proxy(function(e, delta) {
               e.preventDefault();
               e.stopPropagation();
               var left = $inner.scrollLeft();
-              $inner.scrollLeft(left - delta * 180);
-
+              $inner.scrollLeft(left - delta * 140);
             }, this))
             .hover(
-              $.proxy(function() {
-                this._isHover = true;
-              }, this),
-              $.proxy(function() {
-                this._isHover = false;
-              }, this));
+              function() {
+                self._isHover = true;
+              },
+              function() {
+                self._isHover = false;
+              });
+
+          this._$disableButton.on('click',
+            $.proxy(this._onDisableButtonClick, this));
 
           $('body').append($view);
         },
@@ -673,6 +874,7 @@
           this.disableTimer();
 
           this._initializeStoryboard();
+          this._$view.removeClass('show success');
           if (this._storyboard.getStatus() === 'ok') {
             this._updateSuccess();
           } else {
@@ -680,11 +882,21 @@
           }
         },
         _updateSuccess: function() {
+          var url = this._storyboard.getUrl();
+          if (this._currentUrl === url) {
+            this._$view.addClass('show success');
+            this.enableTimer();
+          } else {
+            this._currentUrl = url;
+            this._updateSuccessFull();
+          }
+        },
+        _updateSuccessFull: function() {
           var storyboard = this._storyboard;
-          var pages = storyboard.getPageCount();
+          var pages      = storyboard.getPageCount();
           var pageWidth  = storyboard.getPageWidth();
-          var height = storyboard.getHeight();
-          var rows  = storyboard.getRows();
+          var height     = storyboard.getHeight();
+          var rows       = storyboard.getRows();
 
           var $borders =
             this._createBorders(storyboard.getWidth(), storyboard.getHeight(), storyboard.getCols());
@@ -730,7 +942,12 @@
           this._$innerList = $list;
 
           this._$inner.empty().append($list).append(this._$pointer);
-          this._$view.addClass('show success');
+          this._$view.removeClass('fail').addClass('success');
+
+          window.setTimeout($.proxy(function() {
+            this._$view.addClass('show');
+          }, this), 100);
+
           this._$inner.scrollLeft(0);
           this.enableTimer();
         },
@@ -746,9 +963,10 @@
           return $div;
         },
         _updateFail: function() {
-          this._$view.addClass('fail');
+
+          this._$view.removeClass('success').addClass('fail');
           this.disableTimer();
-          this._watchController.popup.alert(this._storyboard.getMessage());
+          //this._watchController.popup.alert(this._storyboard.getMessage());
         },
         clear: function() {
           if (this._$view) {
@@ -771,13 +989,15 @@
         },
         _onTimerInterval: function() {
           if (this._isHover) { return; }
+
           var vpos = this._watchController.getVpos();
           if (this._lastVpos === vpos) { return; }
+
           this._lastVpos = vpos;
           this._onVposUpdate(vpos);
         },
         _onVposUpdate: function(vpos) {
-          if (!this._$view.hasClass('success')) {
+          if (!this._$view.hasClass('show')) {
             return;
           }
 
@@ -793,10 +1013,36 @@
         reset: function() {
           this._lastVpos = -1;
           this._lastPage = -1;
+          this._currentUrl = '';
           if (this._$view) {
-            this._$view.removeClass('show success fail');
+            this._$view.removeClass('show');
             this._$inner.empty();
           }
+        },
+        _onDisableButtonClick: function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          var $button = this._$disableButton;
+          $button.addClass('clicked');
+          window.setTimeout(function() {
+            $button.removeClass('clicked');
+          }, 1000);
+
+          this._eventDispatcher.dispatchEvent('onDisableStoryboard');
+        },
+        _onStoryboardUpdate: function() {
+          this.update();
+        },
+        _onStoryboardReset:  function() {
+        },
+        _onStoryboardUnload: function() {
+          if (this._$view) {
+            this._$view.removeClass('show');
+          }
+        },
+        _onWatchInfoReset:  function() {
+          this.reset();
         }
       });
 
@@ -811,7 +1057,7 @@
 
       window.WatchApp.mixin(StoryboardController.prototype, {
         initialize: function(params) {
-          console.log('%c initialize StoryboardController', 'background: lightgreen;', params);
+          console.log('%c initialize StoryboardController', 'background: lightgreen;');
 
           this._thumbnailInfo   = params.thumbnailInfo;
           this._watchController = params.watchController;
@@ -824,9 +1070,6 @@
 
           evt.addEventListener('onWatchInfoReset',
             $.proxy(this._onWatchInfoReset, this));
-
-          evt.addEventListener('onThumbnailInfoLoad',
-            $.proxy(this._onThumbnailInfoLoad, this));
 
           evt.addEventListener('onStoryboardSelect',
             $.proxy(this._onStoryboardSelect, this));
@@ -842,12 +1085,37 @@
 
           evt.addEventListener('onThumbnailInfoLoadStart',
             $.proxy(this._onThumbnailInfoLoadStart, this));
+
+          evt.addEventListener('onThumbnailInfoLoad',
+            $.proxy(this._onThumbnailInfoLoad, this));
+
+          this._initializeStoryboard();
         },
 
-        load: function(videoId) {
-          this._initializeStoryboardModel();
-          videoId = videoId || this._watchController.getVideoId();
-          this._storyboardModel.load(videoId);
+        _initializeStoryboard: function() {
+          this._initializeStoryboard = _.noop;
+
+          if (!this._storyboardModel) {
+            var nsv = window.NicovideoStoryboard;
+            this._storyboardModel = new nsv.model.StoryboardModel({
+              eventDispatcher: this._eventDispatcher,
+              thumbnailInfo:   this._thumbnailInfo,
+              watchController: this._watchController,
+              isEnabled:       this._config.get('enabled') === true
+            });
+          }
+          if (!this._storyboardView) {
+            this._storyboardView = new window.NicovideoStoryboard.view.StoryboardView({
+              watchController: this._watchController,
+              eventDispatcher: this._eventDispatcher,
+              storyboard: this._storyboardModel
+            });
+          }
+        },
+
+        load: function(watchId) {
+          watchId = watchId || this._watchController.getWatchId();
+          this._storyboardModel.load(watchId);
         },
 
         unload: function() {
@@ -856,59 +1124,35 @@
           }
         },
 
-        _initializeStoryboardModel: function() {
-          if (!this._storyboardModel) {
-            var nsv = window.NicovideoStoryboard;
-            this._storyboardModel = new nsv.model.StoryboardModel({
-              watchController: this._watchController,
-              eventDispatcher: this._eventDispatcher,
-              thumbnailInfo:   this._thumbnailInfo
-            });
-          }
-        },
-
         _onVideoInitialized: function() {
-          this._initializeStoryboardModel();
-          if (this._storyboardModel) {
-            this._storyboardModel.reset();
-          }
-
-          if (this._config.get('enabled') === true) {
-            window.setTimeout($.proxy(function() {
-              this.load();
-            }, this), 1000);
-          }
+          this._initializeStoryboard();
+          this._storyboardModel.reset();
         },
 
         _onWatchInfoReset: function() {
-          console.log('onWatchInfoReset');
-          if (this._storyboardModel) {
-            this._storyboardModel.reset();
-          }
         },
 
         _onThumbnailInfoLoad: function(info) {
-          console.log('StoryboardController._onThumbnailInfoLoad', info);
+          //console.log('StoryboardController._onThumbnailInfoLoad', info);
 
-          this._initializeStoryboardModel();
           this._storyboardModel.update(info);
         },
 
         _onStoryboardSelect: function(vpos) {
-          console.log('_onStoryboardSelect', vpos);
+          //console.log('_onStoryboardSelect', vpos);
           this._watchController.setVpos(vpos);
         },
 
         _onEnableStoryboard: function() {
           window.setTimeout($.proxy(function() {
-            this.config.set('enabled', true);
+            this._config.set('enabled', true);
             this.load();
           }, this), 0);
         },
 
         _onDisableStoryboard: function() {
           window.setTimeout($.proxy(function() {
-            this.config.set('enabled', false);
+            this._config.set('enabled', false);
             this.unload();
           }, this), 0);
         },
@@ -944,17 +1188,20 @@
         console.log('%c initialize NicovideoStoryboard', 'background: lightgreen;');
         this.initializeUserConfig();
 
-
-        this.eventDispatcher = eventDispatcher;
-
         var root = window.WatchApp.ns;
         this._playerAreaConnector =
           root.init.PlayerInitializer.playerAreaConnector;
         this._watchInfoModel =
           root.model.WatchInfoModel.getInstance();
 
+        this._getflv          = window.NicovideoStoryboard.api.getflv;
         this._thumbnailInfo   = window.NicovideoStoryboard.api.thumbnailInfo;
         this._watchController = window.NicovideoStoryboard.external.watchController;
+
+        if (!this._watchController.isPremium()) {
+          this._watchController.popup.alert('プレミアムの機能を使っているため、一般では動きません');
+          return;
+        }
 
         this._storyboardController = new window.NicovideoStoryboard.controller.StoryboardController({
           thumbnailInfo:       this._thumbnailInfo,
@@ -963,14 +1210,14 @@
           config:              this.config
         });
 
-        console.log('%c initialize NicovideoStoryboard', 'background: lightgreen;');
-
         this.initializeEvent();
 
         this._addStyle(__css__, 'NicovideoStoryboardCss');
       },
       initializeEvent: function() {
         console.log('%c initializeEvent NicovideoStoryboard', 'background: lightgreen;');
+
+        var eventDispatcher = window.NicovideoStoryboard.eventDispatcher;
 
         var onMessage = function(event) {
           if (event.origin.indexOf('nicovideo.jp') < 0) return;
@@ -981,21 +1228,39 @@
             eventDispatcher.dispatchEvent('onMessage', data.body, data.type);
           } catch (e) {
             console.log(
-              '%cError: window.onMessage - ',
+              '%cNicoVideoStoryboard.Error: window.onMessage  - ',
               'color: red; background: yellow',
-              e, event.origin, event.data);
+              e
+            );
+            console.log('%corigin: ', 'background: yellow;', event.origin);
+            console.log('%cdata: ',   'background: yellow;', event.data);
+            console.trace();
           }
         };
-
-        this._watchInfoModel.addEventListener('reset', $.proxy(function() {
-          this.eventDispatcher.dispatchEvent('onWatchInfoReset');
-        }, this));
-
-        this._playerAreaConnector.addEventListener('onVideoInitialized', $.proxy(function() {
-          this.eventDispatcher.dispatchEvent('onVideoInitialized');
-        }, this));
-
         window.addEventListener('message', onMessage);
+
+        this._watchInfoModel.addEventListener('reset', function() {
+          eventDispatcher.dispatchEvent('onWatchInfoReset');
+        });
+
+        this._playerAreaConnector.addEventListener('onVideoInitialized', function() {
+          eventDispatcher.dispatchEvent('onVideoInitialized');
+        });
+
+        this._getflv.addEventListener('onGetflvLoadStart', function() {
+          eventDispatcher.dispatchEvent('onGetflvLoadStart');
+        });
+        this._getflv.addEventListener('onGetflvLoad', function(info) {
+          eventDispatcher.dispatchEvent('onGetflvLoad', info);
+        });
+
+        this._thumbnailInfo.addEventListener('onThumbnailInfoLoadStart', function() {
+          eventDispatcher.dispatchEvent('onThumbnailInfoLoadStart');
+        });
+        this._thumbnailInfo.addEventListener('onThumbnailInfoLoad', function(info) {
+          eventDispatcher.dispatchEvent('onThumbnailInfoLoad', info);
+        });
+
       },
       initializeUserConfig: function() {
         var prefix = 'NicoStoryboard_';
@@ -1020,10 +1285,10 @@
           }
         };
       },
-      load: function(videoId) {
+      load: function(watchId) {
         // 動画ごとのcookieがないと取得できないので指定できてもあまり意味は無い
-        videoId = videoId || this._watchController.getVideoId();
-        this._storyboardController.load(videoId);
+        watchId = watchId || this._watchController.getWatchId();
+        this._storyboardController.load(watchId);
       }
 
     });
@@ -1108,7 +1373,7 @@
   if (host === 'flapi.nicovideo.jp') {
     flapi();
   } else
-  if (host.indexOf('smile') >= 0) {
+  if (host.indexOf('smile-') >= 0) {
     smileapi();
   } else {
     var script = document.createElement('script');

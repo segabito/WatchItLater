@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140428
+// @version        1.140502
 // ==/UserScript==
 
 /**
@@ -13485,6 +13485,9 @@
     } else
     if (location.host === 'i.nicovideo.jp') {
       spapi();
+    } else
+    if (location.host.indexOf('smile-') >= 0) {
+      return;
     } else
     if (location.host.indexOf('localhost.') === 0 || location.host.indexOf('www.') === 0 || !this.GM_getValue || this.GM_getValue.toString().indexOf("not supported")>-1) {
       isNativeGM = false;
