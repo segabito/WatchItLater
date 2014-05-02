@@ -866,6 +866,7 @@
           this._lastVpos = 0;
           this._lastGetVpos = 0;
           this._timerCount = 0;
+          this._scrollLeft = 0;
 
           this._enableButtonView =
             new window.NicovideoStoryboard.view.SetToEnableButtonView({
@@ -923,8 +924,8 @@
             .on('mousewheel', $.proxy(function(e, delta) {
               e.preventDefault();
               e.stopPropagation();
-              var left = $inner.scrollLeft();
-              $inner.scrollLeft(left - delta * 140);
+              var left = this.scrollLeft();
+              this.scrollLeft(left - delta * 140);
             }, this))
             .hover(
               function() {
@@ -968,6 +969,15 @@
             this._updateSuccess();
           } else {
             this._updateFail();
+          }
+        },
+        scrollLeft: function(left) {
+          if (left === undefined) {
+            return this._scrollLeft;
+          } else
+          if (left === 0 || Math.abs(this._scrollLeft - left) > 1) {
+            this._$inner.scrollLeft(left);
+            this._scrollLeft = left;
           }
         },
         _updateSuccess: function() {
@@ -1039,7 +1049,7 @@
             this._$view.addClass('show');
           }, this), 100);
 
-          this._$inner.scrollLeft(0);
+          this.scrollLeft(0);
           this.enableTimer();
         },
         _createBorders: function(width, height, count) {
@@ -1126,17 +1136,17 @@
           var width = storyboard.getWidth();
           var boardWidth = storyboard.getCount() * width;
           var targetLeft = boardWidth * per + width / 2;
-          var currentLeft = this._$inner.scrollLeft();
+          var currentLeft = this.scrollLeft();
           var leftDiff = Math.floor((targetLeft - currentLeft) / VPOS_RATE);
 
           this._lastVpos = vpos;
 
-          this._$inner.scrollLeft(currentLeft + leftDiff);
+          this.scrollLeft(currentLeft + leftDiff);
 
         },
-        _onScroll: function(left) {
+        _onScroll: function() {
           var storyboard = this._storyboard;
-          var scrollLeft = left !== undefined ? left : this._$inner.scrollLeft();
+          var scrollLeft = this.scrollLeft();
           var page = Math.round(scrollLeft / (storyboard.getPageWidth() * storyboard.getRows()));
           this._lazyLoadImage(Math.min(storyboard.getPageCount() - 1, page));
         },
