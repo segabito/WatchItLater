@@ -844,7 +844,8 @@
     })();
 
     window.NicovideoStoryboard.view.StoryboardView = (function() {
-      var VPOS_INTERVAL = 100;
+      var TIMER_INTERVAL = 33;
+      var VPOS_RATE = 10;
 
       function StoryboardView(params) {
         this.initialize(params);
@@ -1088,7 +1089,7 @@
         },
         enableTimer: function() {
           this._clearTimer();
-          this._timer = window.setInterval($.proxy(this._onTimerInterval, this), VPOS_INTERVAL);
+          this._timer = window.setInterval($.proxy(this._onTimerInterval, this), TIMER_INTERVAL);
         },
         disableTimer: function() {
           this._clearTimer();
@@ -1097,19 +1098,19 @@
           if (this._isHover) { return; }
           if (!this._storyboard.isEnabled()) { return; }
 
-          var div = 2;
+          var div = VPOS_RATE;
           var mod = this._timerCount % div;
           this._timerCount++;
 
           var vpos;
 
-          // TODO: getVposが意外に時間を取るので回数を減らす
-          // そもそもコメントパネルがgetVpos叩きまくってるのは・・・
+          //  getVposが意外に時間を取るので回数を減らす
+          // そもそもコメントパネルがgetVpos叩きまくってるんですがそれは
           if (this._watchController.isPlaying()) {
             if (mod === 0) {
               vpos = this._watchController.getVpos();
            } else {
-              vpos = this._lastVpos + VPOS_INTERVAL / div;
+              vpos = this._lastVpos;
             }
           } else {
             return;
@@ -1124,10 +1125,13 @@
           var per = vpos / (duration * 1000);
           var width = storyboard.getWidth();
           var boardWidth = storyboard.getCount() * width;
-          var left = boardWidth * per + width / 2;
+          var targetLeft = boardWidth * per + width / 2;
+          var currentLeft = this._$inner.scrollLeft();
+          var leftDiff = Math.floor((targetLeft - currentLeft) / VPOS_RATE);
 
           this._lastVpos = vpos;
-          this._$inner.scrollLeft(left);
+
+          this._$inner.scrollLeft(currentLeft + leftDiff);
 
         },
         _onScroll: function(left) {
