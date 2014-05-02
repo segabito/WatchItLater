@@ -939,6 +939,12 @@
             }, 500));
 
           this._watchController.addEventListener('onVideoSeeked', function() {
+            if (!self._storyboard.isEnabled()) {
+              return;
+            }
+            if (self._storyboard.getStatus() !== 'ok') {
+              return;
+            }
             var vpos  = self._watchController.getVpos();
             var index = self._storyboard.getIndex(vpos);
             var page  = self._storyboard.getPageIndex(index);
@@ -1006,9 +1012,7 @@
                   .attr({
                     'data-src': src,
                     'data-page': i,
-                    'data-top': height * j + height / 2,
-                    'data-left': pageWidth * rowCnt,
-                    'src': src
+                    'data-top': height * j + height / 2
                   })
                   .append($borders.clone());
 
@@ -1059,7 +1063,7 @@
           var src = this._storyboard.getPageUrl(pageNumber);
           var $target = this._$inner.find('.' + className);
 
-          console.log('%c set lazyLoadImage', 'background: cyan;', 'page: ' + pageNumber, '  url: ' + src);
+          //console.log('%c set lazyLoadImage', 'background: cyan;', 'page: ' + pageNumber, '  url: ' + src);
           $target
             .css('background-image', 'url(' + src + ')')
             .removeClass('lazyImage ' + className);
@@ -1111,7 +1115,6 @@
             return;
           }
 
-//          if (this._lastVpos === vpos) { return; }
 
           this._onVposUpdate(vpos);
         },
