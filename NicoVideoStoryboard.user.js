@@ -305,9 +305,9 @@
         nicoPlayerConnector.seekVideo(vpos);
       };
 
-      var _isPlaying = undefined;
+      var _isPlaying = null;
       var isPlaying = function() {
-        if (_isPlaying !== undefined) {
+        if (_isPlaying !== null) {
           return _isPlaying;
         }
         if (!externalNicoplayer) {
