@@ -459,7 +459,7 @@
       return getflv;
     })();
 
-   window.NicovideoStoryboard.api.thumbnailInfo = (function() {
+    window.NicovideoStoryboard.api.thumbnailInfo = (function() {
       var getflv = window.NicovideoStoryboard.api.getflv;
       var loaderFrame, loaderWindow, cache = {};
       var eventDispatcher = window.NicovideoStoryboard.eventDispatcher;
@@ -894,77 +894,77 @@
           this._$disableButton = $view.find('.setToDisable button');
 
           var self = this;
+          var onHoverIn  = function() { self._isHover = true;  };
+          var onHoverOut = function() { self._isHover = false; };
           $view
-            .on('click', '.board', $.proxy(function(e) {
-              var $board = $(e.target), offset = $board.offset();
-              var y = $board.attr('data-top') * 1;
-              var x = e.pageX - offset.left;
-              var page = $board.attr('data-page');
-              var vpos = this._storyboard.getPointVpos(x, y, page);
-              if (isNaN(vpos)) { return; }
-
-              $view.addClass('clicked');
-              window.setTimeout(function() { $view.removeClass('clicked'); }, 300);
-              this._eventDispatcher.dispatchEvent('onStoryboardSelect', vpos);
-
-              if ($board.hasClass('lazyImage')) { this._lazyLoadImage(page); }
-            }, this))
-            .on('mousemove', '.board', $.proxy(function(e) {
-              var $board = $(e.target), offset = $board.offset();
-              var y = $board.attr('data-top') * 1;
-              var x = e.pageX - offset.left;
-              var page = $board.attr('data-page');
-              var vpos = this._storyboard.getPointVpos(x, y, page);
-              if (isNaN(vpos)) { return; }
-              var sec = Math.floor(vpos / 1000);
-
-              var time = Math.floor(sec / 60) + ':' + ((sec % 60) + 100).toString().substr(1);
-              this._$cursorTime.text(time).css({left: e.pageX});
-
-              if ($board.hasClass('lazyImage')) { this._lazyLoadImage(page); }
-            }, this))
-            .on('mousewheel', $.proxy(function(e, delta) {
-              e.preventDefault();
-              e.stopPropagation();
-              var left = this.scrollLeft();
-              this.scrollLeft(left - delta * 140);
-            }, this))
-            .hover(
-              function() {
-                self._isHover = true;
-              },
-              function() {
-                self._isHover = false;
-              });
+            .on('click',     '.board', $.proxy(this._onBoardClick,     this))
+            .on('mousemove', '.board', $.proxy(this._onBoardMouseMove, this))
+            .on('mousewheel',          $.proxy(this._onMouseWheel, this))
+            .hover(onHoverIn, onHoverOut);
 
           $inner
-            .on('scroll', _.throttle(function() {
-              self._onScroll();
-            }, 500));
+            .on('scroll', _.throttle(function() { self._onScroll(); }, 500));
 
-          this._watchController.addEventListener('onVideoSeeked', function() {
-            if (!self._storyboard.isEnabled()) {
-              return;
-            }
-            if (self._storyboard.getStatus() !== 'ok') {
-              return;
-            }
-            var vpos  = self._watchController.getVpos();
-            var index = self._storyboard.getIndex(vpos);
-            var page  = self._storyboard.getPageIndex(index);
-
-            self._lazyLoadImage(page);
-            if (self.isHover || !self._watchController.isPlaying()) {
-              self._onVposUpdate(vpos, true);
-            } else {
-              self._onVposUpdate(vpos);
-            }
-          });
+          this._watchController
+            .addEventListener('onVideoSeeked', $.proxy(this._onVideoSeeked, this));
 
           this._$disableButton.on('click',
             $.proxy(this._onDisableButtonClick, this));
 
           $('body').append($view);
+        },
+        _onBoardClick: function(e) {
+          var $board = $(e.target), offset = $board.offset();
+          var y = $board.attr('data-top') * 1;
+          var x = e.pageX - offset.left;
+          var page = $board.attr('data-page');
+          var vpos = this._storyboard.getPointVpos(x, y, page);
+          if (isNaN(vpos)) { return; }
+
+          var $view = this._$view;
+          $view.addClass('clicked');
+          window.setTimeout(function() { $view.removeClass('clicked'); }, 300);
+          this._eventDispatcher.dispatchEvent('onStoryboardSelect', vpos);
+
+          if ($board.hasClass('lazyImage')) { this._lazyLoadImage(page); }
+        },
+        _onBoardMouseMove: function(e) {
+          var $board = $(e.target), offset = $board.offset();
+          var y = $board.attr('data-top') * 1;
+          var x = e.pageX - offset.left;
+          var page = $board.attr('data-page');
+          var vpos = this._storyboard.getPointVpos(x, y, page);
+          if (isNaN(vpos)) { return; }
+          var sec = Math.floor(vpos / 1000);
+
+          var time = Math.floor(sec / 60) + ':' + ((sec % 60) + 100).toString().substr(1);
+          this._$cursorTime.text(time).css({left: e.pageX});
+
+          if ($board.hasClass('lazyImage')) { this._lazyLoadImage(page); }
+        },
+        _onMouseWheel: function(e, delta) {
+          e.preventDefault();
+          e.stopPropagation();
+          var left = this.scrollLeft();
+          this.scrollLeft(left - delta * 140);
+        },
+        _onVideoSeeked: function() {
+          if (!this._storyboard.isEnabled()) {
+            return;
+          }
+          if (this._storyboard.getStatus() !== 'ok') {
+            return;
+          }
+          var vpos  = this._watchController.getVpos();
+          var index = this._storyboard.getIndex(vpos);
+          var page  = this._storyboard.getPageIndex(index);
+
+          this._lazyLoadImage(page);
+          if (this.isHover || !this._watchController.isPlaying()) {
+            this._onVposUpdate(vpos, true);
+          } else {
+            this._onVposUpdate(vpos);
+          }
         },
         update: function() {
           this.disableTimer();
@@ -1144,7 +1144,7 @@
           var per = vpos / (duration * 1000);
           var width = storyboard.getWidth();
           var boardWidth = storyboard.getCount() * width;
-          var targetLeft = boardWidth * per + width / 2;
+          var targetLeft = boardWidth * per; // + width / 2;
           var currentLeft = this.scrollLeft();
           var leftDiff = targetLeft - currentLeft;
 
