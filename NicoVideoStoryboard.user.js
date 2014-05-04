@@ -952,7 +952,11 @@
             var page  = self._storyboard.getPageIndex(index);
 
             self._lazyLoadImage(page);
-            self._onVposUpdate(vpos);
+            if (self.isHover || !self._watchController.isPlaying()) {
+              self._onVposUpdate(vpos, true);
+            } else {
+              self._onVposUpdate(vpos);
+            }
           });
 
           this._$disableButton.on('click',
@@ -1132,7 +1136,7 @@
 
           this._onVposUpdate(vpos);
         },
-        _onVposUpdate: function(vpos) {
+        _onVposUpdate: function(vpos, isImmediately) {
           var storyboard = this._storyboard;
           var duration = Math.max(1, storyboard.getDuration());
           var per = vpos / (duration * 1000);
@@ -1140,11 +1144,17 @@
           var boardWidth = storyboard.getCount() * width;
           var targetLeft = boardWidth * per + width / 2;
           var currentLeft = this.scrollLeft();
-          var leftDiff = Math.floor((targetLeft - currentLeft) / VPOS_RATE);
+          var leftDiff = targetLeft - currentLeft;
+
+          if (leftDiff > 5000) {
+            leftDiff = leftDiff * 0.8; // 大きくシークした時
+          } else {
+            leftDiff = leftDiff / VPOS_RATE;
+          }
 
           this._lastVpos = vpos;
 
-          this.scrollLeft(currentLeft + leftDiff);
+          this.scrollLeft(isImmediately ? targetLeft : (currentLeft + Math.round(leftDiff)));
 
         },
         _onScroll: function() {
