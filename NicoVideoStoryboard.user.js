@@ -1144,7 +1144,7 @@
           var per = vpos / (duration * 1000);
           var width = storyboard.getWidth();
           var boardWidth = storyboard.getCount() * width;
-          var targetLeft = boardWidth * per; // + width / 2;
+          var targetLeft = boardWidth * per + width * 0.4;
           var currentLeft = this.scrollLeft();
           var leftDiff = targetLeft - currentLeft;
 
