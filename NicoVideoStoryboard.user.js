@@ -49,10 +49,6 @@
         bottom: 0;
       }
 
-      .storyboardContainer.clicked *{
-        cursor: wait;
-      }
-
       .storyboardContainer .storyboardInner {
         display: none;
         position: relative;
@@ -79,6 +75,12 @@
         cursor: pointer;
         background-color: #101010;
       }
+
+      .storyboardContainer.clicked .storyboardInner .boardList .board {
+        cursor: wait;
+        opacity: 0.5;
+      }
+
       .storyboardContainer .boardList .board.lazyImage {
         background-color: #ccc;
       }
@@ -902,7 +904,7 @@
               if (isNaN(vpos)) { return; }
 
               $view.addClass('clicked');
-              window.setTimeout(function() { $view.removeClass('clicked'); }, 100);
+              window.setTimeout(function() { $view.removeClass('clicked'); }, 300);
               this._eventDispatcher.dispatchEvent('onStoryboardSelect', vpos);
 
               if ($board.hasClass('lazyImage')) { this._lazyLoadImage(page); }
