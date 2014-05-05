@@ -217,7 +217,7 @@
     var storyboardTemplate = [
       '<div id="storyboardContainer" class="storyboardContainer">',
         '<div class="storyboardHeader">',
-          '<div class="setToDisable"><button>▼　閉じる　</button></div>',
+          '<div class="setToDisable"><button>閉じる　▼</button></div>',
           '<div class="pointer">▼</div>',
           '<div class="cursorTime"></div>',
         '</div>',
@@ -279,7 +279,7 @@
           view: {},
           controller: {},
           external: {},
-          eventDispatcher: new EventDispatcher()
+          event: {}
         };
       })();
 
@@ -289,6 +289,34 @@
 //        return debug ? window.console : {log: n, trace: n, time: n, timeEnd: n};
 //      })(DEBUG);
     var console = window.console;
+
+    window.NicovideoStoryboard.event.windowEventDispatcher = (function() {
+      var eventDispatcher = new EventDispatcher();
+
+        var onMessage = function(event) {
+          if (event.origin.indexOf('nicovideo.jp') < 0) return;
+          try {
+            var data = JSON.parse(event.data);
+            if (data.id !== 'NicovideoStoryboard') { return; }
+
+            eventDispatcher.dispatchEvent('onMessage', data.body, data.type);
+          } catch (e) {
+            console.log(
+              '%cNicoVideoStoryboard.Error: window.onMessage  - ',
+              'color: red; background: yellow',
+              e
+            );
+            console.log('%corigin: ', 'background: yellow;', event.origin);
+            console.log('%cdata: ',   'background: yellow;', event.data);
+            console.trace();
+          }
+        };
+
+        window.addEventListener('message', onMessage);
+
+      return eventDispatcher;
+    })();
+
 
     window.NicovideoStoryboard.external.watchController = (function() {
       var root = window.WatchApp.ns;
@@ -351,29 +379,24 @@
       };
 
       playerAreaConnector.addEventListener('onVideoPlayed', function() {
-        console.log('onVideoPlayed');
         _isPlaying = true;
         watchController.dispatchEvent('onVideoPlayed');
       });
       playerAreaConnector.addEventListener('onVideoStopped', function() {
-        console.log('onVideoStopped');
         _isPlaying = false;
         watchController.dispatchEvent('onVideoStopped');
       });
 
       playerAreaConnector.addEventListener('onVideoStarted', function() {
-        console.log('onVideoStarted');
         _isPlaying = true;
         watchController.dispatchEvent('onVideoStarted');
       });
       playerAreaConnector.addEventListener('onVideoEnded', function() {
-        console.log('onVideoEnded');
         _isPlaying = false;
         watchController.dispatchEvent('onVideoEnded');
       });
 
       playerAreaConnector.addEventListener('onVideoSeeked', function() {
-        console.log('onVideoSeeked');
         watchController.dispatchEvent('onVideoSeeked');
       });
 
@@ -401,7 +424,7 @@
     window.NicovideoStoryboard.api.getflv = (function() {
       var BASE_URL = 'http://flapi.nicovideo.jp/api/getflv?v=';
       var loaderFrame, loaderWindow, cache = {};
-      var eventDispatcher = window.NicovideoStoryboard.eventDispatcher;
+      var eventDispatcher = window.NicovideoStoryboard.event.windowEventDispatcher;
       var getflv = new EventDispatcher();
 
       var parseInfo = function(q) {
@@ -462,7 +485,7 @@
     window.NicovideoStoryboard.api.thumbnailInfo = (function() {
       var getflv = window.NicovideoStoryboard.api.getflv;
       var loaderFrame, loaderWindow, cache = {};
-      var eventDispatcher = window.NicovideoStoryboard.eventDispatcher;
+      var eventDispatcher = window.NicovideoStoryboard.event.windowEventDispatcher;
       var thumbnailInfo = new EventDispatcher();
 
       var onGetflvLoad = function(info) {
@@ -501,7 +524,7 @@
         var xml = data.xml, $xml = $(xml), $storyboard = $xml.find('storyboard');
 
         if ($storyboard.length < 1) {
-          eventDispatcher.dispatchAsync(
+          thumbnailInfo.dispatchAsync(
             'onThumbnailInfoLoad',
             {status: 'ng', message: 'この動画にはサムネイルがありません'}
             );
@@ -562,10 +585,9 @@
     window.NicovideoStoryboard.model.StoryboardModel = (function() {
 
       function StoryboardModel(params) {
-        this._eventDispatcher = params.eventDispatcher;
         this._thumbnailInfo   = params.thumbnailInfo;
-        this._watchController = params.watchController;
         this._isEnabled       = params.isEnabled;
+        this._watchId         = params.watchId;
 
         window.WatchApp.extend(this, StoryboardModel, EventDispatcher);
       }
@@ -609,10 +631,13 @@
           this.dispatchEvent('reset');
         },
 
-        load: function(watchId) {
-          watchId = watchId || this._watchController.getWatchId();
+        load: function() {
           this._isEnabled = true;
-          this._thumbnailInfo.load(watchId);
+          this._thumbnailInfo.load(this._watchId);
+        },
+
+        setWatchId: function(watchId) {
+          this._watchId = watchId;
         },
 
         unload: function() {
@@ -726,6 +751,17 @@
           // vposは㍉秒単位なので1000倍
           return Math.floor(this.getDuration() * percent * 1000);
         },
+
+        /**
+         * vposは何ページ目に当たるか？を返す
+         */
+        getVposPage: function(vpos) {
+          var index = this._storyboard.getIndex(vpos);
+          var page  = this._storyboard.getPageIndex(index);
+
+          return page;
+        }
+
       });
 
       return StoryboardModel;
@@ -735,7 +771,7 @@
     window.NicovideoStoryboard.view.SetToEnableButtonView = (function() {
 
       var TEXT = {
-        DEFAULT:   '▲ サムネイルを開く ',
+        DEFAULT:   'サムネイルを開く　▲',
         LOADING:   '動画を読み込み中...',
         GETFLV:    '動画情報を読み込み中...',
         THUMBNAIL: 'サムネイル情報を読み込み中...'
@@ -815,9 +851,9 @@
           if (storyboard.getStatus() === 'ok') {
             window.setTimeout($.proxy(function() {
               this._$view
-              .removeClass('loading getflv thumbnailInfo')
-              .addClass('success')
-              .attr('title', '');
+                .removeClass('loading getflv thumbnailInfo')
+                .addClass('success')
+                .attr('title', '');
               this._setText(TEXT.DEFAULT);
             }, this), 3000);
           } else {
@@ -956,8 +992,7 @@
             return;
           }
           var vpos  = this._watchController.getVpos();
-          var index = this._storyboard.getIndex(vpos);
-          var page  = this._storyboard.getPageIndex(index);
+          var page = this._storyboard.getVposPage(vpos);
 
           this._lazyLoadImage(page);
           if (this.isHover || !this._watchController.isPlaying()) {
@@ -981,7 +1016,7 @@
           if (left === undefined) {
             return this._scrollLeft;
           } else
-          if (left === 0 || Math.abs(this._scrollLeft - left) > 1) {
+          if (left === 0 || Math.abs(this._scrollLeft - left) >= 1) {
             this._$inner[0].scrollLeft = left;
             this._scrollLeft = left;
           }
@@ -1123,18 +1158,17 @@
 
           var vpos;
 
-          //  getVposが意外に時間を取るので回数を減らす
-          // そもそもコメントパネルがgetVpos叩きまくってるんですがそれは
-          if (this._watchController.isPlaying()) {
-            if (mod === 0) {
-              vpos = this._watchController.getVpos();
-           } else {
-              vpos = this._lastVpos;
-            }
-          } else {
+          if (!this._watchController.isPlaying()) {
             return;
           }
 
+          //  getVposが意外に時間を取るので回数を減らす
+          // そもそもコメントパネルがgetVpos叩きまくってるんですがそれは
+          if (mod === 0) {
+            vpos = this._watchController.getVpos();
+          } else {
+            vpos = this._lastVpos;
+          }
 
           this._onVposUpdate(vpos);
         },
@@ -1256,10 +1290,9 @@
           if (!this._storyboardModel) {
             var nsv = window.NicovideoStoryboard;
             this._storyboardModel = new nsv.model.StoryboardModel({
-              eventDispatcher: this._eventDispatcher,
               thumbnailInfo:   this._thumbnailInfo,
-              watchController: this._watchController,
-              isEnabled:       this._config.get('enabled') === true
+              isEnabled:       this._config.get('enabled') === true,
+              watchId:         this._watchController.getWatchId()
             });
           }
           if (!this._storyboardView) {
@@ -1272,8 +1305,10 @@
         },
 
         load: function(watchId) {
-          watchId = watchId || this._watchController.getWatchId();
-          this._storyboardModel.load(watchId);
+          if (watchId) {
+            this._storyboardModel.setWatchId(watchId);
+          }
+          this._storyboardModel.load();
         },
 
         unload: function() {
@@ -1288,6 +1323,7 @@
         },
 
         _onWatchInfoReset: function() {
+          this._storyboardModel.setWatchId(this._watchController.getWatchId());
         },
 
         _onThumbnailInfoLoad: function(info) {
@@ -1356,6 +1392,8 @@
         this._thumbnailInfo   = window.NicovideoStoryboard.api.thumbnailInfo;
         this._watchController = window.NicovideoStoryboard.external.watchController;
 
+        this._eventDispatcher = new EventDispatcher();
+
         if (!this._watchController.isPremium()) {
           this._watchController.popup.alert('プレミアムの機能を使っているため、一般では動きません');
           return;
@@ -1364,7 +1402,7 @@
         this._storyboardController = new window.NicovideoStoryboard.controller.StoryboardController({
           thumbnailInfo:       this._thumbnailInfo,
           watchController:     this._watchController,
-          eventDispatcher:     this.eventDispatcher,
+          eventDispatcher:     this._eventDispatcher,
           config:              this.config
         });
 
@@ -1375,27 +1413,7 @@
       initializeEvent: function() {
         console.log('%c initializeEvent NicovideoStoryboard', 'background: lightgreen;');
 
-        var eventDispatcher = window.NicovideoStoryboard.eventDispatcher;
-
-        var onMessage = function(event) {
-          if (event.origin.indexOf('nicovideo.jp') < 0) return;
-          try {
-            var data = JSON.parse(event.data);
-            if (data.id !== 'NicovideoStoryboard') { return; }
-
-            eventDispatcher.dispatchEvent('onMessage', data.body, data.type);
-          } catch (e) {
-            console.log(
-              '%cNicoVideoStoryboard.Error: window.onMessage  - ',
-              'color: red; background: yellow',
-              e
-            );
-            console.log('%corigin: ', 'background: yellow;', event.origin);
-            console.log('%cdata: ',   'background: yellow;', event.data);
-            console.trace();
-          }
-        };
-        window.addEventListener('message', onMessage);
+        var eventDispatcher = this._eventDispatcher;
 
         this._watchInfoModel.addEventListener('reset', function() {
           eventDispatcher.dispatchEvent('onWatchInfoReset');

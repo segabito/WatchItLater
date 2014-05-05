@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140502
+// @version        1.140505
 // ==/UserScript==
 
 /**
@@ -9764,7 +9764,7 @@
         }
         .videoExplorerMenu .item .arrow {
           display: block; position: absolute; top: 14px; right: 12px; width: 9px; height: 12px;
-          background: url("http://res.nimg.jp/img/watch_zero/video_explorer/icon_normal.png") no-repeat 0 0;
+          background: url("http://res.nimg.jp/img/watch_q9/video_explorer/icon_normal.png") no-repeat 0 0;
         }
         .videoExplorerMenu .item .text {
           position: relative; width: 100%; height: 100%; display: block; text-align: left;
