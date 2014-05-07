@@ -7,8 +7,10 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.0.0
+// @version        1.0.1
 // ==/UserScript==
+
+// ver 1.0.1  フルスクリーンモードで開いた時はプレイヤー領域を押し上げるようにした
 
 (function() {
   var monkey = function() {
@@ -767,6 +769,62 @@
       return StoryboardModel;
     })();
 
+    window.NicovideoStoryboard.view.FullScreenModeView = (function() {
+      var __TEMPLATE__ = (function() {/*
+        body.full_with_browser{
+          background: #000;
+        }
+        body.full_with_browser.NicovideoStoryboardOpen #content{
+          margin-bottom: {$storyboardHeight}px;
+          transition: margin-bottom 0.5s ease-in-out;
+        }
+      */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
+
+      var addStyle = function(styles, id) {
+        var elm = document.createElement('style');
+        window.setTimeout(function() {
+          elm.type = 'text/css';
+          if (id) { elm.id = id; }
+
+          var text = styles.toString();
+          text = document.createTextNode(text);
+          elm.appendChild(text);
+          var head = document.getElementsByTagName('head');
+          head = head[0];
+          head.appendChild(elm);
+        }, 0);
+        return elm;
+      };
+
+      function FullScreenModeView() {
+
+        this._css = null;
+        this._lastHeight = -1;
+      }
+
+      window.WatchApp.mixin(FullScreenModeView.prototype, {
+        initialize: function() {
+          if (this._css) { return; }
+
+          console.log('%cinitialize NicovideoStorybaordFullScreenStyle', 'background: lightgreen;');
+          this._css = addStyle('/* undefined */', 'NicovideoStorybaordFullScreenStyle');
+        },
+        update: function($container) {
+          this.initialize();
+
+          var height = $container.outerHeight();
+
+          if (height === this._lastHeight) { return; }
+          this._lastHeight = height;
+
+          var newCss = __TEMPLATE__.replace('{$storyboardHeight}', height);
+          this._css.innerHTML = newCss;
+        }
+      });
+
+
+      return FullScreenModeView;
+    })();
 
     window.NicovideoStoryboard.view.SetToEnableButtonView = (function() {
 
@@ -912,6 +970,9 @@
               eventDispatcher: this._eventDispatcher
             });
 
+          this._fullScreenModeView =
+            new window.NicovideoStoryboard.view.FullScreenModeView();
+
           evt.addEventListener('onWatchInfoReset', $.proxy(this._onWatchInfoReset, this));
 
           sb.addEventListener('update', $.proxy(this._onStoryboardUpdate, this));
@@ -1006,6 +1067,7 @@
 
           this._initializeStoryboard();
           this._$view.removeClass('show success');
+          $('body').removeClass('NicovideoStoryboardOpen');
           if (this._storyboard.getStatus() === 'ok') {
             this._updateSuccess();
           } else {
@@ -1030,6 +1092,7 @@
             this._currentUrl = url;
             this._updateSuccessFull();
           }
+          $('body').addClass('NicovideoStoryboardOpen');
         },
         _updateSuccessFull: function() {
           var storyboard = this._storyboard;
@@ -1085,6 +1148,8 @@
 
           this._$inner.empty().append($list).append(this._$pointer);
           this._$view.removeClass('fail').addClass('success');
+
+          this._fullScreenModeView.update(this._$view);
 
           window.setTimeout($.proxy(function() {
             this._$view.addClass('show');
@@ -1207,6 +1272,7 @@
           this._scrollLeft = 0;
           this._lazyImage = {};
           if (this._$view) {
+            $('body').removeClass('NicovideoStoryboardOpen');
             this._$view.removeClass('show');
             this._$inner.empty();
           }
@@ -1229,6 +1295,7 @@
         _onStoryboardReset:  function() {
         },
         _onStoryboardUnload: function() {
+          $('body').removeClass('NicovideoStoryboardOpen');
           if (this._$view) {
             this._$view.removeClass('show');
           }
