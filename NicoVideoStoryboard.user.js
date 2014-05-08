@@ -7,7 +7,7 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.0.1
+// @version        1.0.2
 // ==/UserScript==
 
 // ver 1.0.1  フルスクリーンモードで開いた時はプレイヤー領域を押し上げるようにした
@@ -996,10 +996,10 @@
           $view
             .on('click',     '.board', $.proxy(this._onBoardClick,     this))
             .on('mousemove', '.board', $.proxy(this._onBoardMouseMove, this))
-            .on('mousewheel',          $.proxy(this._onMouseWheel, this))
-            .hover(onHoverIn, onHoverOut);
+            .on('mousewheel',          $.proxy(this._onMouseWheel, this));
 
           $inner
+            .hover(onHoverIn, onHoverOut)
             .on('scroll', _.throttle(function() { self._onScroll(); }, 500));
 
           this._watchController
@@ -1023,6 +1023,7 @@
           window.setTimeout(function() { $view.removeClass('clicked'); }, 300);
           this._eventDispatcher.dispatchEvent('onStoryboardSelect', vpos);
 
+          this._isHover = false;
           if ($board.hasClass('lazyImage')) { this._lazyLoadImage(page); }
         },
         _onBoardMouseMove: function(e) {
@@ -1037,11 +1038,13 @@
           var time = Math.floor(sec / 60) + ':' + ((sec % 60) + 100).toString().substr(1);
           this._$cursorTime.text(time).css({left: e.pageX});
 
+          this._isHover = true;
           if ($board.hasClass('lazyImage')) { this._lazyLoadImage(page); }
         },
         _onMouseWheel: function(e, delta) {
           e.preventDefault();
           e.stopPropagation();
+          this._isHover = true;
           var left = this.scrollLeft();
           this.scrollLeft(left - delta * 140);
         },
@@ -1208,6 +1211,7 @@
         },
         enableTimer: function() {
           this._clearTimer();
+          this._isHover = false;
           this._timer = window.setInterval($.proxy(this._onTimerInterval, this), TIMER_INTERVAL);
         },
         disableTimer: function() {
@@ -1247,8 +1251,8 @@
           var currentLeft = this.scrollLeft();
           var leftDiff = targetLeft - currentLeft;
 
-          if (leftDiff > 5000) {
-            leftDiff = leftDiff * 0.8; // 大きくシークした時
+          if (Math.abs(leftDiff) > 5000) {
+            leftDiff = leftDiff * 0.93; // 大きくシークした時
           } else {
             leftDiff = leftDiff / VPOS_RATE;
           }
