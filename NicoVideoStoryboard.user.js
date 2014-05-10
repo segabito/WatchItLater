@@ -7,8 +7,10 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.0.2
+// @version        1.0.3
 // ==/UserScript==
+
+// ver 1.0.3  WUXGAモニターフルスクリーン時に動画部分が1920x1080になるよう調整
 
 // ver 1.0.1  フルスクリーンモードで開いた時はプレイヤー領域を押し上げるようにした
 
@@ -58,7 +60,7 @@
         overflow-x: scroll;
         white-space: nowrap;
         background: #222;
-        margin: 4px 12px;
+        margin: 4px 12px 3px;
         border-style: inset;
         border-width: 2px 4px;
         border-radius: 10px 10px 0 0;
@@ -78,9 +80,13 @@
         background-color: #101010;
       }
 
-      .storyboardContainer.clicked .storyboardInner .boardList .board {
-        cursor: wait;
-        opacity: 0.5;
+      .storyboardContainer.clicked .storyboardInner * {
+        opacity: 0.3;
+        pointer-events: none;
+      }
+
+      .storyboardContainer.opening .storyboardInner .boardList .board {
+        pointer-events: none;
       }
 
       .storyboardContainer .boardList .board.lazyImage {
@@ -133,10 +139,17 @@
         border: 1px solid #000;
         z-index: 9010;
         background: #ffc;
+        pointer-events: none;
       }
       .storyboardContainer:hover .cursorTime {
         display: block;
       }
+
+      .storyboardContainer.clicked .cursorTime,
+      .storyboardContainer.opening .cursorTime {
+        display: none;
+      }
+
 
       .storyboardContainer .setToDisable {
         position: absolute;
@@ -398,9 +411,23 @@
         watchController.dispatchEvent('onVideoEnded');
       });
 
+      playerAreaConnector.addEventListener('onVideoSeeking', function() {
+        console.log('%conVideoSeeking', 'background: cyan');
+        watchController.dispatchEvent('onVideoSeeking');
+      });
       playerAreaConnector.addEventListener('onVideoSeeked', function() {
+        console.log('%conVideoSeeked', 'background: cyan');
         watchController.dispatchEvent('onVideoSeeked');
       });
+
+      playerAreaConnector.addEventListener('onVideoInitialized', function() {
+        watchController.dispatchEvent('onVideoInitialized');
+      });
+
+      watchInfoModel.addEventListener('reset', function() {
+        watchController.dispatchEvent('onWatchInfoReset');
+      });
+
 
 
       window.WatchApp.mixin(watchController, {
@@ -990,20 +1017,30 @@
           this._$cursorTime    = $view.find('.cursorTime');
           this._$disableButton = $view.find('.setToDisable button');
 
+          $view
+            .on('click',     '.board',
+                $.proxy(this._onBoardClick, this))
+            .on('mousemove', '.board',
+                $.proxy(this._onBoardMouseMove, this))
+            .on('mousemove', '.board',
+                _.debounce($.proxy(this._onBoardMouseMoveEnd, this), 300))
+            .on('mousewheel',
+                $.proxy(this._onMouseWheel, this))
+            .on('mousewheel',
+                _.debounce($.proxy(this._onMouseWheelEnd, this), 300));
+
           var self = this;
           var onHoverIn  = function() { self._isHover = true;  };
           var onHoverOut = function() { self._isHover = false; };
-          $view
-            .on('click',     '.board', $.proxy(this._onBoardClick,     this))
-            .on('mousemove', '.board', $.proxy(this._onBoardMouseMove, this))
-            .on('mousewheel',          $.proxy(this._onMouseWheel, this));
-
           $inner
             .hover(onHoverIn, onHoverOut)
             .on('scroll', _.throttle(function() { self._onScroll(); }, 500));
 
           this._watchController
             .addEventListener('onVideoSeeked', $.proxy(this._onVideoSeeked, this));
+
+          this._watchController
+            .addEventListener('onVideoSeeking', $.proxy(this._onVideoSeeking, this));
 
           this._$disableButton.on('click',
             $.proxy(this._onDisableButtonClick, this));
@@ -1020,8 +1057,9 @@
 
           var $view = this._$view;
           $view.addClass('clicked');
-          window.setTimeout(function() { $view.removeClass('clicked'); }, 300);
+          window.setTimeout(function() { $view.removeClass('clicked'); }, 1000);
           this._eventDispatcher.dispatchEvent('onStoryboardSelect', vpos);
+          this._$cursorTime.css({left: -999});
 
           this._isHover = false;
           if ($board.hasClass('lazyImage')) { this._lazyLoadImage(page); }
@@ -1039,14 +1077,24 @@
           this._$cursorTime.text(time).css({left: e.pageX});
 
           this._isHover = true;
+          this._isMouseMoving = true;
           if ($board.hasClass('lazyImage')) { this._lazyLoadImage(page); }
+        },
+        _onBoardMouseMoveEnd: function(e) {
+          this._isMouseMoving = false;
         },
         _onMouseWheel: function(e, delta) {
           e.preventDefault();
           e.stopPropagation();
           this._isHover = true;
+          this._isMouseMoving = true;
           var left = this.scrollLeft();
           this.scrollLeft(left - delta * 140);
+        },
+        _onMouseWheelEnd: function(e, delta) {
+          this._isMouseMoving = false;
+        },
+        _onVideoSeeking: function() {
         },
         _onVideoSeeked: function() {
           if (!this._storyboard.isEnabled()) {
@@ -1088,14 +1136,21 @@
         },
         _updateSuccess: function() {
           var url = this._storyboard.getUrl();
+          var $view = this._$view.addClass('opening');
+
           if (this._currentUrl === url) {
-            this._$view.addClass('show success');
+            $view.addClass('show success');
             this.enableTimer();
           } else {
             this._currentUrl = url;
             this._updateSuccessFull();
           }
           $('body').addClass('NicovideoStoryboardOpen');
+
+          window.setTimeout(function() {
+            $view.removeClass('opening');
+            $view = null;
+          }, 1000);
         },
         _updateSuccessFull: function() {
           var storyboard = this._storyboard;
@@ -1453,12 +1508,6 @@
         console.log('%c initialize NicovideoStoryboard', 'background: lightgreen;');
         this.initializeUserConfig();
 
-        var root = window.WatchApp.ns;
-        this._playerAreaConnector =
-          root.init.PlayerInitializer.playerAreaConnector;
-        this._watchInfoModel =
-          root.model.WatchInfoModel.getInstance();
-
         this._getflv          = window.NicovideoStoryboard.api.getflv;
         this._thumbnailInfo   = window.NicovideoStoryboard.api.thumbnailInfo;
         this._watchController = window.NicovideoStoryboard.external.watchController;
@@ -1466,7 +1515,7 @@
         this._eventDispatcher = new EventDispatcher();
 
         if (!this._watchController.isPremium()) {
-          this._watchController.popup.alert('プレミアムの機能を使っているため、一般では動きません');
+          this._watchController.popup.alert('NicovideoStoryboardはプレミアムの機能を使っているため、一般アカウントでは動きません');
           return;
         }
 
@@ -1486,11 +1535,11 @@
 
         var eventDispatcher = this._eventDispatcher;
 
-        this._watchInfoModel.addEventListener('reset', function() {
+        this._watchController.addEventListener('onWatchInfoReset', function() {
           eventDispatcher.dispatchEvent('onWatchInfoReset');
         });
 
-        this._playerAreaConnector.addEventListener('onVideoInitialized', function() {
+        this._watchController.addEventListener('onVideoInitialized', function() {
           eventDispatcher.dispatchEvent('onVideoInitialized');
         });
 
