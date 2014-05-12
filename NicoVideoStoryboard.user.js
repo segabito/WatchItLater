@@ -7,8 +7,10 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.0.3
+// @version        1.0.4
 // ==/UserScript==
+
+// ver 1.0.4  タッチパネルでの操作を改善 (Windows Chromeのみ。Firefoxはいまいち)
 
 // ver 1.0.3  WUXGAモニターフルスクリーン時に動画部分が1920x1080になるよう調整
 
@@ -412,11 +414,11 @@
       });
 
       playerAreaConnector.addEventListener('onVideoSeeking', function() {
-        console.log('%conVideoSeeking', 'background: cyan');
+        //console.log('%conVideoSeeking', 'background: cyan');
         watchController.dispatchEvent('onVideoSeeking');
       });
       playerAreaConnector.addEventListener('onVideoSeeked', function() {
-        console.log('%conVideoSeeked', 'background: cyan');
+        //console.log('%conVideoSeeked', 'background: cyan');
         watchController.dispatchEvent('onVideoSeeked');
       });
 
@@ -872,7 +874,7 @@
 
       window.WatchApp.mixin(SetToEnableButtonView.prototype, {
         initialize: function() {
-          console.log('%cinitialize SetToEnableButtonView', 'background: lightgreen;');
+          console.log('%c initialize SetToEnableButtonView', 'background: lightgreen;');
           this._$view = $([
               '<div class="setToEnableButtonContainer loadingVideo">',
                 '<button>', TEXT.DEFAULT, '</button>',
@@ -1034,6 +1036,10 @@
           var onHoverOut = function() { self._isHover = false; };
           $inner
             .hover(onHoverIn, onHoverOut)
+            .on('touchstart',  $.proxy(this._onTouchStart, this))
+            .on('touchend',    $.proxy(this._onTouchEnd,   this))
+//            .on('touchcancel', $.proxy(this._onTouchCancel, this))
+            .on('touchmove',   $.proxy(this._onTouchMove,  this))
             .on('scroll', _.throttle(function() { self._onScroll(); }, 500));
 
           this._watchController
@@ -1045,7 +1051,9 @@
           this._$disableButton.on('click',
             $.proxy(this._onDisableButtonClick, this));
 
-          $('body').append($view);
+          $('body')
+            .append($view)
+            .on('touchend', function() { self._isHover = false; });
         },
         _onBoardClick: function(e) {
           var $board = $(e.target), offset = $board.offset();
@@ -1093,6 +1101,19 @@
         },
         _onMouseWheelEnd: function(e, delta) {
           this._isMouseMoving = false;
+        },
+        _onTouchStart: function(e) {
+          e.stopPropagation();
+        },
+        _onTouchEnd: function(e) {
+          e.stopPropagation();
+//         window.setTimeout($.proxy(function() { this._isHover = false; }, this), 100);
+        },
+        _onTouchMove: function(e) {
+          e.stopPropagation();
+          this._isHover = true;
+        },
+        _onTouchCancel: function(e) {
         },
         _onVideoSeeking: function() {
         },
