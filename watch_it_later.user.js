@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140505
+// @version        1.140514
 // ==/UserScript==
 
 /**
@@ -1705,7 +1705,7 @@
       {* 1列表示の時、動画タイトルの横の空白部分にまでクリック判定があるのはVistaのエクスプローラみたいで嫌なので、文字部分だけにしたい *}
       {* GINZAで改善したのでいったんコメントアウト *}
       {*
-      #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .contentItemList .video .column1 .videoInformationOuter .title,
+      #videoExplorer .videoExplorerBody .videoExplorerContent .contentItemList.column1 .video .column1 .videoInformationOuter .title,
       #videoExplorer .videoExplorerBody .videoExplorerContent .suggestVideo .video .column1 .videoInformationOuter .title {
         display: inline;
       }
@@ -1738,10 +1738,10 @@
       .videoExplorerContent .contentItemList                 .column4 .videoInformationOuter {
         width: 100px; height: 48px; margin: auto; color: #666; text-align: left;
       }
-      .videoExplorerBody .videoExplorerContent.column4 .contentItemList .item {
+      .videoExplorerBody .videoExplorerContent .contentItemList.column4 .item {
         height: 220px;
       }
-      #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .thumbnailContainer .balloon {
+      #videoExplorer .videoExplorerBody .videoExplorerContent .column1 .thumbnailContainer .balloon {
         {* top: -20px; 一列の時に「再生リストに追加しました」が上の動画に被るのを防ぐ *}
       }
       .column1 .itemMylistComment {
@@ -9669,18 +9669,18 @@
         .w_adjusted .uadTagRelated .emptyItem .emptyMessageContainer {
           width: 130px; height: 100px;
         }
-        .w_adjusted .videoExplorerContent .itemList.column1 .videoInformationOuter .link,
-        .w_adjusted .videoExplorerContent .itemList.column1 .videoInformationOuter .link .title {
+        .w_adjusted .videoExplorerContent .column1 .videoInformationOuter .link,
+        .w_adjusted .videoExplorerContent .column1 .videoInformationOuter .link .title {
           display: inline;
         }
 
-        #videoExplorer.w_adjusted .videoExplorerContent .itemList.column1 .commentBlank {
+        #videoExplorer.w_adjusted .videoExplorerContent .column1 .commentBlank {
           width: 96%;
         }
-        #videoExplorer.w_adjusted .videoExplorerContent .itemList.column4 .commentBlank {
+        #videoExplorer.w_adjusted .videoExplorerContent .column4 .commentBlank {
           width: 24%;
         }
-        .videoExplorerBody .videoExplorerContent.column4 .contentItemList .item .createdTime .submit
+        .videoExplorerBody .videoExplorerContent .contentItemList.column4 .item .createdTime .submit
         {
           display: none !important;
         }
@@ -9720,16 +9720,16 @@
           z-index: 99;
           transition: right 0.3s ease-out;
         }
-        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent.column1 .contentItemList .item {
+        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .contentItemList.column1 .item {
           margin-left: 8px;
         }
-        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent.column4 .contentItemList .item {
+        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .contentItemList.column4 .item {
           width: 130px; margin-left: 8px; margin-right: 10px;
         }
-        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent.column1                 .videoInformationOuter {
+        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent                 .column1 .videoInformationOuter {
           width: 444px;
         }
-        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent.column1 .nicorepoResult .videoInformationOuter {
+        #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent                 .column1 .nicorepoResult .videoInformationOuter {
           width: auto;
         }
         #videoExplorer.w_adjusted .contentItemList .folder .column1 .description,
@@ -9779,7 +9779,7 @@
           display: none;
         }
 
-        #videoExplorer .videoExplorerBody .videoExplorerContent.column1 .contentItemList .video .column1 .videoInformationOuter .title
+        #videoExplorer .videoExplorerBody .videoExplorerContent .contentItemList.column1 .video .column1 .videoInformationOuter .title
         {
           white-space: normal;
         }
