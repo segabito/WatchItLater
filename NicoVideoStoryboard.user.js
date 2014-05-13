@@ -164,7 +164,7 @@
       .storyboardContainer .setToDisable {
         position: absolute;
         display: inline-block;
-        left: 250px;
+        right: 300px;
         bottom: -32px;
         transition: bottom 0.3s ease-in-out;
       }
@@ -218,10 +218,14 @@
       .setToEnableButtonContainer {
         position: fixed;
         z-index: 9003;
-        left: 250px;
+        right: 300px;
         bottom: 0px;
         transition: bottom 0.5s ease-in-out;
       }
+      .setToEnableButtonContainer.withCustomGinzaWatch {
+        z-index: 99999;
+      }
+
       .setToEnableButtonContainer.loadingVideo {
         bottom: -50px;
       }
@@ -295,6 +299,22 @@
         margin: 32px 0 16px;
         font-size: 150%;
         background: #ccc;
+      }
+
+      body.full_with_browser #divrightbar,
+      body.full_with_browser #divrightbar1,
+      body.full_with_browser #divrightbar2,
+      body.full_with_browser #divrightbar3,
+      body.full_with_browser #divrightbar4,
+      body.full_with_browser #divrightbar5,
+      body.full_with_browser #divrightbar6,
+      body.full_with_browser #divrightbar7,
+      body.full_with_browser #divrightbar8,
+      body.full_with_browser #divrightbar9,
+      body.full_with_browser #divrightbar10,
+      body.full_with_browser #divrightbar11,
+      body.full_with_browser #divrightbar12 {
+        display: none;
       }
 
 
@@ -922,7 +942,8 @@
         {
           height: calc(100% - {$storyboardHeight}px);
         }
-      */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
+
+       */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
 
       var addStyle = function(styles, id) {
         var elm = document.createElement('style');
@@ -983,6 +1004,7 @@
       function SetToEnableButtonView(params) {
         this._storyboard      = params.storyboard;
         this._eventDispatcher = params.eventDispatcher;
+        this._watchController = params.watchController;
 
         this.initialize();
       }
@@ -999,6 +1021,8 @@
             ''].join(''));
           this._$button = this._$view.find('button');
           this._$button.on('click', $.proxy(this._onButtonClick, this));
+
+          this._$view.toggleClass('withCustomGinzaWatch', this._watchController.isCustomGinzaWatchExist());
 
           var sb = this._storyboard;
           sb.addEventListener('reset',  $.proxy(this._onStoryboardReset, this));
@@ -1111,7 +1135,8 @@
           this._enableButtonView =
             new window.NicovideoStoryboard.view.SetToEnableButtonView({
               storyboard:      sb,
-              eventDispatcher: this._eventDispatcher
+              eventDispatcher: this._eventDispatcher,
+              watchController: this._watchController
             });
 
           this._fullScreenModeView =
