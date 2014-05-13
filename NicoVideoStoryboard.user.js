@@ -7,8 +7,10 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.0.5
+// @version        1.0.6
 // ==/UserScript==
+
+// ver 1.0.6  CustomGinzaWatchと併用した時に干渉するのを調整
 
 // ver 1.0.5  デモモードを追加。連続再生時、サムネイルの無い動画をスキップする (iPadで見せびらかす用モード)
 
@@ -51,6 +53,10 @@
         box-shadow: 0 -2px 2px #666;
 
         transition: bottom 0.5s ease-in-out;
+      }
+
+      .storyboardContainer.withCustomGinzaWatch {
+        z-index: 100000;
       }
 
       .storyboardContainer.show {
@@ -506,6 +512,16 @@
         watchController.dispatchEvent('onWatchInfoReset');
       });
 
+      var isWatchItLaterExist = function() {
+        return !!window.WatchItLater;
+      };
+      var isShinjukuWatchExist = function() {
+        return !!window.ShinjukuWatch;
+      };
+
+      var isCustomGinzaWatchExist = function() {
+        return $('body>#prefDiv').length > 0;
+      };
 
 
       window.WatchApp.mixin(watchController, {
@@ -522,7 +538,11 @@
         getVideoId: getVideoId,
 
         popup: popup,
-        playlist: _playlist
+        playlist: _playlist,
+
+        isWatchItLaterExist:     isWatchItLaterExist,
+        isShinjukuWatchExist:    isShinjukuWatchExist,
+        isCustomGinzaWatchExist: isCustomGinzaWatchExist
       });
 
       return watchController;
@@ -884,6 +904,24 @@
           margin-bottom: {$storyboardHeight}px;
           transition: margin-bottom 0.5s ease-in-out;
         }
+
+        {* フルスクリーン関係ないけど一旦ここに *}
+        body.NicovideoStoryboardOpen #divrightbar,
+        body.NicovideoStoryboardOpen #divrightbar1,
+        body.NicovideoStoryboardOpen #divrightbar2,
+        body.NicovideoStoryboardOpen #divrightbar3,
+        body.NicovideoStoryboardOpen #divrightbar4,
+        body.NicovideoStoryboardOpen #divrightbar5,
+        body.NicovideoStoryboardOpen #divrightbar6,
+        body.NicovideoStoryboardOpen #divrightbar7,
+        body.NicovideoStoryboardOpen #divrightbar8,
+        body.NicovideoStoryboardOpen #divrightbar9,
+        body.NicovideoStoryboardOpen #divrightbar10,
+        body.NicovideoStoryboardOpen #divrightbar11,
+        body.NicovideoStoryboardOpen #divrightbar12
+        {
+          height: calc(100% - {$storyboardHeight}px);
+        }
       */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
 
       var addStyle = function(styles, id) {
@@ -923,7 +961,7 @@
           if (height === this._lastHeight) { return; }
           this._lastHeight = height;
 
-          var newCss = __TEMPLATE__.replace('{$storyboardHeight}', height);
+          var newCss = __TEMPLATE__.split('{$storyboardHeight}').join(height);
           this._css.innerHTML = newCss;
         }
       });
@@ -1106,7 +1144,8 @@
             .on('mousewheel',
                 $.proxy(this._onMouseWheel, this))
             .on('mousewheel',
-                _.debounce($.proxy(this._onMouseWheelEnd, this), 300));
+                _.debounce($.proxy(this._onMouseWheelEnd, this), 300))
+            .toggleClass('withCustomGinzaWatch', this._watchController.isCustomGinzaWatchExist());
 
           var self = this;
           var onHoverIn  = function() { self._isHover = true;  };
