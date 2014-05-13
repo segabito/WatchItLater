@@ -925,7 +925,12 @@
           transition: margin-bottom 0.5s ease-in-out;
         }
 
-        {* フルスクリーン関係ないけど一旦ここに *}
+
+        {* フルスクリーン関係ないけど一旦ここに... *}
+        body.NicovideoStoryboardOpen #footer {
+          min-height: {$storyboardHeight}px;
+        }
+
         body.NicovideoStoryboardOpen #divrightbar,
         body.NicovideoStoryboardOpen #divrightbar1,
         body.NicovideoStoryboardOpen #divrightbar2,
