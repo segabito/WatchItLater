@@ -7,8 +7,10 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.0.4
+// @version        1.0.5
 // ==/UserScript==
+
+// ver 1.0.5  デモモードを追加。連続再生時、サムネイルの無い動画をスキップする (iPadで見せびらかす用モード)
 
 // ver 1.0.4  タッチパネルでの操作を改善 (Windows Chromeのみ。Firefoxはいまいち)
 
@@ -229,6 +231,67 @@
         font-size: 80%;
       }
 
+      .NicoVideoStoryboardSettingMenu {
+        height: 44px !important;
+      }
+      .NicoVideoStoryboardSettingMenu a {
+        font-weight: bolder;
+      }
+      #NicoVideoStoryboardSettingPanel {
+        position: fixed;
+        bottom: 2000px; right: 8px;
+        z-index: -1;
+        width: 500px;
+        background: #f0f0f0; border: 1px solid black;
+        padding: 8px;
+        transition: bottom 0.4s ease-out;
+        text-align: left;
+      }
+      #NicoVideoStoryboardSettingPanel.open {
+        display: block;
+        bottom: 8px;
+        box-shadow: 0 0 8px black;
+        z-index: 10000;
+      }
+      #NicoVideoStoryboardSettingPanel .close {
+        position: absolute;
+        cursor: pointer;
+        right: 8px; top: 8px;
+      }
+      #NicoVideoStoryboardSettingPanel .panelInner {
+        background: #fff;
+        border: 1px inset;
+        padding: 8px;
+        min-height: 300px;
+        overflow-y: scroll;
+        max-height: 500px;
+      }
+      #NicoVideoStoryboardSettingPanel .panelInner .item {
+        border-bottom: 1px dotted #888;
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+      }
+      #NicoVideoStoryboardSettingPanel .panelInner .item:hover {
+        background: #eef;
+      }
+      #NicoVideoStoryboardSettingPanel .windowTitle {
+        font-size: 150%;
+      }
+      #NicoVideoStoryboardSettingPanel .itemTitle {
+      }
+      #NicoVideoStoryboardSettingPanel label {
+        margin-right: 12px;
+      }
+      #NicoVideoStoryboardSettingPanel small {
+        color: #666;
+      }
+      #NicoVideoStoryboardSettingPanel .expert {
+        margin: 32px 0 16px;
+        font-size: 150%;
+        background: #ccc;
+      }
+
+
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
 
     var storyboardTemplate = [
@@ -341,6 +404,7 @@
       var watchInfoModel      = root.model.WatchInfoModel.getInstance();
       var viewerInfoModel     = root.init.CommonModelInitializer.viewerInfoModel;
       var playerAreaConnector = root.init.PlayerInitializer.playerAreaConnector;
+      var playlist            = root.init.PlaylistInitializer.playlist;
       var externalNicoplayer;
 
       var watchController = new EventDispatcher();
@@ -395,6 +459,18 @@
         }
       };
 
+      var _playlist = {
+        isContinuous: function() {
+          return playlist.isContinuous();
+        },
+        playNext: function() {
+          nicoPlayerConnector.playNextVideo();
+        },
+        playPrev: function() {
+          nicoPlayerConnector.playpreviousVideo();
+        }
+      };
+
       playerAreaConnector.addEventListener('onVideoPlayed', function() {
         _isPlaying = true;
         watchController.dispatchEvent('onVideoPlayed');
@@ -445,7 +521,8 @@
         getWatchId: getWatchId,
         getVideoId: getVideoId,
 
-        popup: popup
+        popup: popup,
+        playlist: _playlist
       });
 
       return watchController;
@@ -1527,7 +1604,7 @@
       },
       initialize: function() {
         console.log('%c initialize NicovideoStoryboard', 'background: lightgreen;');
-        this.initializeUserConfig();
+        this._initializeUserConfig();
 
         this._getflv          = window.NicovideoStoryboard.api.getflv;
         this._thumbnailInfo   = window.NicovideoStoryboard.api.thumbnailInfo;
@@ -1547,11 +1624,12 @@
           config:              this.config
         });
 
-        this.initializeEvent();
+        this._initializeEvent();
+        this._initializeSettingPanel();
 
         this._addStyle(__css__, 'NicovideoStoryboardCss');
       },
-      initializeEvent: function() {
+      _initializeEvent: function() {
         console.log('%c initializeEvent NicovideoStoryboard', 'background: lightgreen;');
 
         var eventDispatcher = this._eventDispatcher;
@@ -1574,16 +1652,18 @@
         this._thumbnailInfo.addEventListener('onThumbnailInfoLoadStart', function() {
           eventDispatcher.dispatchEvent('onThumbnailInfoLoadStart');
         });
-        this._thumbnailInfo.addEventListener('onThumbnailInfoLoad', function(info) {
+        this._thumbnailInfo.addEventListener('onThumbnailInfoLoad', $.proxy(function(info) {
           eventDispatcher.dispatchEvent('onThumbnailInfoLoad', info);
-        });
+          this._onThumbnailInfoLoad(info);
+       }, this));
 
       },
-      initializeUserConfig: function() {
+      _initializeUserConfig: function() {
         var prefix = 'NicoStoryboard_';
         var conf = {
           enabled: true,
-          autoScroll: true
+          autoScroll: true,
+          demoMode: false
         };
 
         this.config = {
@@ -1606,6 +1686,68 @@
         // 動画ごとのcookieがないと取得できないので指定できてもあまり意味は無い
         watchId = watchId || this._watchController.getWatchId();
         this._storyboardController.load(watchId);
+      },
+      _initializeSettingPanel: function() {
+        var $menu   = $('<li class="NicoVideoStoryboardSettingMenu"><a href="javascript:;" title="NicoVideoStoryboardの設定変更">NicoVideo-<br>Storyboard設定</a></li>');
+        var $panel  = $('<div id="NicoVideoStoryboardSettingPanel" />');//.addClass('open');
+        //var $button = $('<button class="toggleSetting playerBottomButton">設定</botton>');
+
+        //$button.on('click', function(e) {
+        //  e.stopPropagation(); e.preventDefault();
+        //  $panel.toggleClass('open');
+        //});
+
+        var config = this.config, eventDispatcher = this._eventDispatcher;
+        $menu.find('a').on('click', function() { $panel.toggleClass('open'); });
+
+        var __tpl__ = (function() {/*
+          <div class="panelHeader">
+          <h1 class="windowTitle">NicoVideoStoryboardの設定</h1>
+          <button class="close" title="閉じる">×</button>
+          </div>
+          <div class="panelInner">
+            <div class="item" data-setting-name="demoMode" data-menu-type="radio">
+              <h3 class="itemTitle">デモモード</h3>
+              <p>連続再生時、サムネイルが無い動画をスキップします</p>
+              <label><input type="radio" value="true" > ON</label>
+              <label><input type="radio" value="false"> OFF</label>
+            </div>
+          </div>
+        */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
+        $panel.html(__tpl__);
+        $panel.find('.item').on('click', function(e) {
+          var $this = $(this);
+          var settingName = $this.attr('data-setting-name');
+          var value = JSON.parse($this.find('input:checked').val());
+          var currentValue = config.get(settingName);
+          if (currentValue !== value) {
+            console.log('%cseting-name: ' + settingName, 'background: cyan', 'value', value);
+            config.set(settingName, value);
+            eventDispatcher.dispatchEvent('NicoVideoStoryboard.config.' + settingName, value);
+          }
+        }).each(function(e) {
+          var $this = $(this);
+          var settingName = $this.attr('data-setting-name');
+          var value = config.get(settingName);
+          $this.addClass(settingName);
+          $this.find('input').attr('name', settingName).val([JSON.stringify(value)]);
+        });
+        $panel.find('.close').click(function() {
+          $panel.removeClass('open');
+        });
+
+
+        $('#siteHeaderRightMenuFix').after($menu);
+        $('body').append($panel);
+      },
+      _onThumbnailInfoLoad: function(info) {
+        if (
+          info.status !== 'ok' &&
+          this.config.get('demoMode') === true &&
+          this._watchController.playlist.isContinuous()
+          ) {
+          this._watchController.playlist.playNext();
+        }
       }
 
     });
