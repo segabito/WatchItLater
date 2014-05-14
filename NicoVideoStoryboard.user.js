@@ -7,7 +7,7 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.0.8
+// @version        1.0.9
 // ==/UserScript==
 
 // ver 1.0.6  CustomGinzaWatchと併用した時に干渉するのを調整
@@ -316,7 +316,6 @@
       body.full_with_browser #divrightbar12 {
         display: none !important;
       }
-
 
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
 
@@ -920,30 +919,33 @@
         body.full_with_browser{
           background: #000;
         }
-        body.full_with_browser.NicovideoStoryboardOpen #content{
+        body.full_with_browser.NicoVideoStoryboardOpen #content{
           margin-bottom: {$storyboardHeight}px;
           transition: margin-bottom 0.5s ease-in-out;
         }
 
 
         {* フルスクリーン関係ないけど一旦ここに... *}
-        body.NicovideoStoryboardOpen #footer {
+        body.NicoVideoStoryboardOpen #footer {
           min-height: {$storyboardHeight}px;
         }
-
-        body.NicovideoStoryboardOpen #divrightbar,
-        body.NicovideoStoryboardOpen #divrightbar1,
-        body.NicovideoStoryboardOpen #divrightbar2,
-        body.NicovideoStoryboardOpen #divrightbar3,
-        body.NicovideoStoryboardOpen #divrightbar4,
-        body.NicovideoStoryboardOpen #divrightbar5,
-        body.NicovideoStoryboardOpen #divrightbar6,
-        body.NicovideoStoryboardOpen #divrightbar7,
-        body.NicovideoStoryboardOpen #divrightbar8,
-        body.NicovideoStoryboardOpen #divrightbar9,
-        body.NicovideoStoryboardOpen #divrightbar10,
-        body.NicovideoStoryboardOpen #divrightbar11,
-        body.NicovideoStoryboardOpen #divrightbar12
+        body.NicoVideoStoryboardOpen.videoExplorer #content.w_adjusted .videoExplorerMenuInner,
+        body.NicoVideoStoryboardOpen #leftPanel.sidePanel .sideVideoInfo .videoDescription {
+          margin-bottom: {$storyboardHeight}px;
+        }
+        body.NicoVideoStoryboardOpen #divrightbar,
+        body.NicoVideoStoryboardOpen #divrightbar1,
+        body.NicoVideoStoryboardOpen #divrightbar2,
+        body.NicoVideoStoryboardOpen #divrightbar3,
+        body.NicoVideoStoryboardOpen #divrightbar4,
+        body.NicoVideoStoryboardOpen #divrightbar5,
+        body.NicoVideoStoryboardOpen #divrightbar6,
+        body.NicoVideoStoryboardOpen #divrightbar7,
+        body.NicoVideoStoryboardOpen #divrightbar8,
+        body.NicoVideoStoryboardOpen #divrightbar9,
+        body.NicoVideoStoryboardOpen #divrightbar10,
+        body.NicoVideoStoryboardOpen #divrightbar11,
+        body.NicoVideoStoryboardOpen #divrightbar12
         {
           height: calc(100% - {$storyboardHeight}px);
         }
@@ -1285,7 +1287,7 @@
 
           this._initializeStoryboard();
           this._$view.removeClass('show success');
-          $('body').removeClass('NicovideoStoryboardOpen');
+          $('body').removeClass('NicoVideoStoryboardOpen');
           if (this._storyboard.getStatus() === 'ok') {
             this._updateSuccess();
           } else {
@@ -1312,7 +1314,7 @@
             this._currentUrl = url;
             this._updateSuccessFull();
           }
-          $('body').addClass('NicovideoStoryboardOpen');
+          $('body').addClass('NicoVideoStoryboardOpen');
 
           window.setTimeout(function() {
             $view.removeClass('opening');
@@ -1498,7 +1500,7 @@
           this._scrollLeft = 0;
           this._lazyImage = {};
           if (this._$view) {
-            $('body').removeClass('NicovideoStoryboardOpen');
+            $('body').removeClass('NicoVideoStoryboardOpen');
             this._$view.removeClass('show');
             this._$inner.empty();
           }
@@ -1521,7 +1523,7 @@
         _onStoryboardReset:  function() {
         },
         _onStoryboardUnload: function() {
-          $('body').removeClass('NicovideoStoryboardOpen');
+          $('body').removeClass('NicoVideoStoryboardOpen');
           if (this._$view) {
             this._$view.removeClass('show');
           }
