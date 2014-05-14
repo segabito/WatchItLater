@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140514
+// @version        1.140515
 // ==/UserScript==
 
 /**
@@ -9853,9 +9853,6 @@
         }
         .videoExplorerConfig::-moz-focus-inner { border: 0px; }
 
-        .thumbnailLoadSuccess .noimage {
-          display: none;
-        }
         .videoExplorer #playerContainer.appli_panel #appliPanel {
           width: auto !important; background: #333;
         }
@@ -11894,7 +11891,7 @@
       if (isSquare && !isSquareCssInitialized) {
         var __css__ = Util.here(function() {/*
           {* 元のCSSを打ち消すためにやや冗長 *}
-          .item.thumbnailLoadSuccess .noImage, #videoExplorer.w_adjusted .item .thumbnail {
+          #videoExplorer .noImage, #videoExplorer.w_adjusted .item .thumbnail {
             display: none !important;
           }
           #videoExplorer .thumbnailContainer {
