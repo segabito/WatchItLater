@@ -7,7 +7,7 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.0.9
+// @version        1.0.10
 // ==/UserScript==
 
 // ver 1.0.6  CustomGinzaWatchと併用した時に干渉するのを調整
