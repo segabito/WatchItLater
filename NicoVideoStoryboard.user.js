@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name           NicovideoStoryboard
+// @name           NicoVideoStoryboard
 // @namespace      https://github.com/segabito/
 // @description    シークバーに出るサムネイルを並べて表示
 // @match          http://www.nicovideo.jp/watch/*
@@ -376,7 +376,7 @@
       return AsyncEventDispatcher;
     })();
 
-    window.NicovideoStoryboard =
+    window.NicoVideoStoryboard =
       (function() {
         return {
           api: {},
@@ -395,14 +395,14 @@
 //      })(DEBUG);
     var console = window.console;
 
-    window.NicovideoStoryboard.event.windowEventDispatcher = (function() {
+    window.NicoVideoStoryboard.event.windowEventDispatcher = (function() {
       var eventDispatcher = new EventDispatcher();
 
         var onMessage = function(event) {
           if (event.origin.indexOf('nicovideo.jp') < 0) return;
           try {
             var data = JSON.parse(event.data);
-            if (data.id !== 'NicovideoStoryboard') { return; }
+            if (data.id !== 'NicoVideoStoryboard') { return; }
 
             eventDispatcher.dispatchEvent('onMessage', data.body, data.type);
           } catch (e) {
@@ -423,7 +423,7 @@
     })();
 
 
-    window.NicovideoStoryboard.external.watchController = (function() {
+    window.NicoVideoStoryboard.external.watchController = (function() {
       var root = window.WatchApp.ns;
       var nicoPlayerConnector = root.init.PlayerInitializer.nicoPlayerConnector;
       var watchInfoModel      = root.model.WatchInfoModel.getInstance();
@@ -568,10 +568,10 @@
     })();
 
 
-    window.NicovideoStoryboard.api.getflv = (function() {
+    window.NicoVideoStoryboard.api.getflv = (function() {
       var BASE_URL = 'http://flapi.nicovideo.jp/api/getflv?v=';
       var loaderFrame, loaderWindow, cache = {};
-      var eventDispatcher = window.NicovideoStoryboard.event.windowEventDispatcher;
+      var eventDispatcher = window.NicoVideoStoryboard.event.windowEventDispatcher;
       var getflv = new EventDispatcher();
 
       var parseInfo = function(q) {
@@ -629,10 +629,10 @@
       return getflv;
     })();
 
-    window.NicovideoStoryboard.api.thumbnailInfo = (function() {
-      var getflv = window.NicovideoStoryboard.api.getflv;
+    window.NicoVideoStoryboard.api.thumbnailInfo = (function() {
+      var getflv = window.NicoVideoStoryboard.api.getflv;
       var loaderFrame, loaderWindow, cache = {};
-      var eventDispatcher = window.NicovideoStoryboard.event.windowEventDispatcher;
+      var eventDispatcher = window.NicoVideoStoryboard.event.windowEventDispatcher;
       var thumbnailInfo = new EventDispatcher();
 
       var onGetflvLoad = function(info) {
@@ -729,7 +729,7 @@
       return thumbnailInfo;
     })();
 
-    window.NicovideoStoryboard.model.StoryboardModel = (function() {
+    window.NicoVideoStoryboard.model.StoryboardModel = (function() {
 
       function StoryboardModel(params) {
         this._thumbnailInfo   = params.thumbnailInfo;
@@ -914,7 +914,7 @@
       return StoryboardModel;
     })();
 
-    window.NicovideoStoryboard.view.FullScreenModeView = (function() {
+    window.NicoVideoStoryboard.view.FullScreenModeView = (function() {
       var __TEMPLATE__ = (function() {/*
         body.full_with_browser{
           background: #000;
@@ -978,8 +978,8 @@
         initialize: function() {
           if (this._css) { return; }
 
-          console.log('%cinitialize NicovideoStorybaordFullScreenStyle', 'background: lightgreen;');
-          this._css = addStyle('/* undefined */', 'NicovideoStorybaordFullScreenStyle');
+          console.log('%cinitialize NicoVideoStorybaordFullScreenStyle', 'background: lightgreen;');
+          this._css = addStyle('/* undefined */', 'NicoVideoStorybaordFullScreenStyle');
         },
         update: function($container) {
           this.initialize();
@@ -998,7 +998,7 @@
       return FullScreenModeView;
     })();
 
-    window.NicovideoStoryboard.view.SetToEnableButtonView = (function() {
+    window.NicoVideoStoryboard.view.SetToEnableButtonView = (function() {
 
       var TEXT = {
         DEFAULT:   'サムネイルを開く　▲',
@@ -1114,7 +1114,7 @@
       return SetToEnableButtonView;
     })();
 
-    window.NicovideoStoryboard.view.StoryboardView = (function() {
+    window.NicoVideoStoryboard.view.StoryboardView = (function() {
       var TIMER_INTERVAL = 33;
       var VPOS_RATE = 10;
 
@@ -1140,14 +1140,14 @@
           this._scrollLeft = 0;
 
           this._enableButtonView =
-            new window.NicovideoStoryboard.view.SetToEnableButtonView({
+            new window.NicoVideoStoryboard.view.SetToEnableButtonView({
               storyboard:      sb,
               eventDispatcher: this._eventDispatcher,
               watchController: this._watchController
             });
 
           this._fullScreenModeView =
-            new window.NicovideoStoryboard.view.FullScreenModeView();
+            new window.NicoVideoStoryboard.view.FullScreenModeView();
 
           evt.addEventListener('onWatchInfoReset', $.proxy(this._onWatchInfoReset, this));
 
@@ -1252,6 +1252,7 @@
         },
         _onTouchStart: function(e) {
           e.stopPropagation();
+          this._syncScrollLeft();
         },
         _onTouchEnd: function(e) {
           e.stopPropagation();
@@ -1260,6 +1261,7 @@
         _onTouchMove: function(e) {
           e.stopPropagation();
           this._isHover = true;
+          this._syncScrollLeft();
         },
         _onTouchCancel: function(e) {
         },
@@ -1302,6 +1304,12 @@
             this._$inner[0].scrollLeft = left;
             this._scrollLeft = left;
           }
+        },
+        /**
+         * 変数として持ってるscrollLeftを実際の値と同期
+         */
+        _syncScrollLeft: function() {
+          this._scrollLeft = this._$inner[0].scrollLeft;
         },
         _updateSuccess: function() {
           var url = this._storyboard.getUrl();
@@ -1536,7 +1544,7 @@
       return StoryboardView;
     })();
 
-    window.NicovideoStoryboard.controller.StoryboardController = (function() {
+    window.NicoVideoStoryboard.controller.StoryboardController = (function() {
 
       function StoryboardController(params) {
         this.initialize(params);
@@ -1583,7 +1591,7 @@
           this._initializeStoryboard = _.noop;
 
           if (!this._storyboardModel) {
-            var nsv = window.NicovideoStoryboard;
+            var nsv = window.NicoVideoStoryboard;
             this._storyboardModel = new nsv.model.StoryboardModel({
               thumbnailInfo:   this._thumbnailInfo,
               isEnabled:       this._config.get('enabled') === true,
@@ -1591,7 +1599,7 @@
             });
           }
           if (!this._storyboardView) {
-            this._storyboardView = new window.NicovideoStoryboard.view.StoryboardView({
+            this._storyboardView = new window.NicoVideoStoryboard.view.StoryboardView({
               watchController: this._watchController,
               eventDispatcher: this._eventDispatcher,
               storyboard: this._storyboardModel
@@ -1657,7 +1665,7 @@
     })();
 
 
-    window.WatchApp.mixin(window.NicovideoStoryboard, {
+    window.WatchApp.mixin(window.NicoVideoStoryboard, {
       _addStyle: function(styles, id) {
         var elm = document.createElement('style');
         window.setTimeout(function() {
@@ -1674,21 +1682,21 @@
         return elm;
       },
       initialize: function() {
-        console.log('%c initialize NicovideoStoryboard', 'background: lightgreen;');
+        console.log('%c initialize NicoVideoStoryboard', 'background: lightgreen;');
         this._initializeUserConfig();
 
-        this._getflv          = window.NicovideoStoryboard.api.getflv;
-        this._thumbnailInfo   = window.NicovideoStoryboard.api.thumbnailInfo;
-        this._watchController = window.NicovideoStoryboard.external.watchController;
+        this._getflv          = window.NicoVideoStoryboard.api.getflv;
+        this._thumbnailInfo   = window.NicoVideoStoryboard.api.thumbnailInfo;
+        this._watchController = window.NicoVideoStoryboard.external.watchController;
 
         this._eventDispatcher = new EventDispatcher();
 
         if (!this._watchController.isPremium()) {
-          this._watchController.popup.alert('NicovideoStoryboardはプレミアムの機能を使っているため、一般アカウントでは動きません');
+          this._watchController.popup.alert('NicoVideoStoryboardはプレミアムの機能を使っているため、一般アカウントでは動きません');
           return;
         }
 
-        this._storyboardController = new window.NicovideoStoryboard.controller.StoryboardController({
+        this._storyboardController = new window.NicoVideoStoryboard.controller.StoryboardController({
           thumbnailInfo:       this._thumbnailInfo,
           watchController:     this._watchController,
           eventDispatcher:     this._eventDispatcher,
@@ -1698,10 +1706,10 @@
         this._initializeEvent();
         this._initializeSettingPanel();
 
-        this._addStyle(__css__, 'NicovideoStoryboardCss');
+        this._addStyle(__css__, 'NicoVideoStoryboardCss');
       },
       _initializeEvent: function() {
-        console.log('%c initializeEvent NicovideoStoryboard', 'background: lightgreen;');
+        console.log('%c initializeEvent NicoVideoStoryboard', 'background: lightgreen;');
 
         var eventDispatcher = this._eventDispatcher;
 
@@ -1832,14 +1840,14 @@
       var watchInfoModel = window.WatchApp.ns.model.WatchInfoModel.getInstance();
       if (watchInfoModel.initialized) {
         console.log('%c initialize', 'background: lightgreen;');
-        window.NicovideoStoryboard.initialize();
+        window.NicoVideoStoryboard.initialize();
       } else {
         var onReset = function() {
           watchInfoModel.removeEventListener('reset', onReset);
           window.setTimeout(function() {
             watchInfoModel.removeEventListener('reset', onReset);
             console.log('%c initialize', 'background: lightgreen;');
-            window.NicovideoStoryboard.initialize();
+            window.NicoVideoStoryboard.initialize();
           }, 0);
         };
         watchInfoModel.addEventListener('reset', onReset);
@@ -1856,7 +1864,7 @@
 
     try {
       parent.postMessage(JSON.stringify({
-          id: 'NicovideoStoryboard',
+          id: 'NicoVideoStoryboard',
           type: 'getflv',
           body: {
             url: location.href,
@@ -1884,7 +1892,7 @@
 
     try {
       parent.postMessage(JSON.stringify({
-          id: 'NicovideoStoryboard',
+          id: 'NicoVideoStoryboard',
           type: 'storyboard',
           body: {
             url: location.href,
