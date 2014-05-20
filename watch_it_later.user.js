@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140515
+// @version        1.140520
 // ==/UserScript==
 
 /**
@@ -9737,6 +9737,16 @@
         #videoExplorer.w_adjusted .descriptionShort {
           width: 440px;
         }
+
+        #videoExplorer .descriptionShort {
+          line-height: 1.5;
+          margin: 0 0 4px;
+          word-break: break-all;
+          clear: both;
+          color: #666;
+          font-size: 93%;
+        }
+
         .w_adjusted .column1 .createdTime.at {
           width: 130px; text-align: center;
         }
@@ -9782,10 +9792,6 @@
         #videoExplorer .videoExplorerBody .videoExplorerContent .contentItemList.column1 .video .column1 .videoInformationOuter .title
         {
           white-space: normal;
-        }
-
-        .column1 .balloon .mylistComment {
-          display: none; {* バルーンの中にマイリストコメントとか意味不明すぎる *}
         }
 
         .videoExplorer #playlist {
@@ -10213,8 +10219,13 @@
           $template.find('.column1 .thumbnailContainer').append($menu).end()
             .find('.column4 .balloon').before($menu.clone()).end()
             .find('.column4 .balloon').remove().end()
-            .find('.descriptionShort')
-              .after($('<p class="itemMylistComment mylistComment"/>')).end()
+            .find('.messageContainer').remove().end()
+            .find('.lastResBody')
+              .before($('<p class="descriptionShort"/><p class="itemMylistComment mylistComment"/>')).end()
+              //.find.remove('div.descriptionShort').end()
+//              .before($('<p class="descriptionShort"/>')).end()
+//            .find('.descriptionShort')
+//              .after($('<p class="itemMylistComment mylistComment"/>')).end()
               .find('.createdTime').after($('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>'));
             watch.VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html($template.html());
             $template = $menu = null;
@@ -10267,9 +10278,16 @@
 
         this._$item.find('.deleteFromMyMylist').data('watchId', this._item.getId());
         if (item._mylistComment) { // マイリストコメント
-          $item.find('.itemMylistComment').css({display: 'block'});
+          $item.find('.mylistComment').css({display: 'block'});
         } else {
-          $item.find('.itemMylistComment').remove();
+          $item.find('.mylistComment').remove();
+        }
+
+        var lastResBody = item.getLastResBody();
+        if (lastResBody.length > 0) {
+          this._$lastResBody.css('cssText', 'display: block !important').text(lastResBody);
+        } else {
+          this._$lastResBody.remove();
         }
 
         this._$item.find('.thumbnailContainer')
