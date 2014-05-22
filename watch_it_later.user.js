@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140520
+// @version        1.140522
 // ==/UserScript==
 
 /**
@@ -41,6 +41,9 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 //
+// * ver 1.140522
+// - 本家のサムネイル仕様変更に対応
+
 // * ver 1.140428
 // - 本家の仕様変更で使えなくなっていた、プレイリストのブックマーク保存機能を復活
 
@@ -72,167 +75,6 @@
 // - 検索フォームのオートコンプリートを調整
 // - ニコメンドまわりのコード除去
 // - 微妙にNicorenizerとの相性を改善
-
-// * ver 1.131224
-// - 本家のCSS更新に対応
-
-// * ver 1.131216
-// - 一部入力欄でオートコンプリートが効くようにした (Firefoxだけ？)
-
-// * ver 1.131213
-// - マイリストメニューの位置を右下・左下から選べるようにした
-
-// * ver 1.131203
-// - コメントパネル下のソーシャルボタンを隠す設定を追加
-
-// * ver 1.131128
-// - スクロールが若干軽くなったかも
-
-// * ver 1.131125
-// - 本家バージョンアップで動かなくなっていた部分の対応
-
-// * ver 1.131122
-// - 本家の更新にとりあえず対応
-
-// * ver 1.131115
-// - 動画ランキングをカテゴリごとに折りたたむ対応
-
-// * ver 1.131110
-// - プレイリスト復元機能の挙動修正
-
-// * ver 1.131107
-// - 新検索β有効時、「人気が高い順」の並び替えに対応 -> http://blog.nicovideo.jp/niconews/ni042607.html
-// - Nicorenizerとの干渉を少し改善
-
-// * ver 1.131101
-// - GINZAで不要になったコードをコメントアウト
-// - 説明文のURL自動リンクの正規表現を調整
-
-// * ver 1.131023
-// - 検索結果の一番下にチャンネル動画が出るようになったので、色をつけてわかりやすく
-// - 広告が0ポイントの時は表示を消す
-
-// * ver 1.131010
-// - ?ref=xxxxつきのURLでページを開いたら除去する対応  (リンク側の除去処理とはまた別)
-// - 細かい凡ミスタイプミス・GINZAでいらなくなったCSSなどを修正
-
-// * ver 1.131008
-// - 銀座対応？
-// - 省スペース/軽量化の設定に「横スクロールバーを出なくする」を追加
-
-// * ver 1.131004
-// - 動画リンクの?ref=xxxxを除去
-
-// * ver 1.131002
-// - プレーヤーのサイズが変わったのに対応
-
-// * ver 1.130930
-// - タグの自動更新無効化の設定を追加
-
-// * ver 1.130926
-// - プレイリストがプレイリストじゃなくなったのに対応
-
-// * ver 1.130925
-// - ニコるをなくす設定にするとコメントパネルが軽くなるようにした。ホイール操作の謎の重さがなくなる。
-//   (Chromeだと変わらないけどFirefoxだと効果が大きいです)
-
-// * ver 1.130924
-// - レイアウトの崩れを修正
-
-// * ver 1.130923
-// - 検索モードを無効にするやつ
-
-// * ver 1.130914
-// - 急に原宿で動かなくなったので暫定対応
-// - 省スペース/軽量化設定 → コメントパネルのマウスオーバー時にチラチラするのをなくす設定 (動作の軽さを優先する用)
-
-// * ver 1.130906
-// - 動画説明文中の動画IDに「次に再生」ボタンを追加
-
-// * ver 1.130905
-// - 本家側の仕様変更によりマイリスト外すボタンが出なくなったのを修正
-
-// * ver 1.130903
-// - 全画面モードの仕様変更に暫定対応
-// - トップページのホラーっぽいのが表示されなくなっていた不具合を修正
-
-// * ver 1.130828
-// - 4列表示の改善
-// - songriumも大・大画面に合わせる
-// - チャンネル動画を60件まで表示するように
-
-// * ver 1.130821
-// - マイリストパネルを自動で目立たない色に
-// - 不要になったコードの整理
-
-// * ver 1.130816
-// - プレイヤーの設定 →  「大画面をもっと大画面にする」追加。 大画面がモニターに合わせてもっと大きくなります。(WQHDモニターだと1080p)
-
-// * ver 1.130813
-// - 隠し機能 にシークコマンドをつけた
-// - ショートカットキー「停止/再生」
-
-// * ver 1.130812
-// - マイリストの絞り込み条件に「チャンネル・コミュニティ・マイメモリーのみ」を追加
-// - 隠し機能 ChromeはALT+C FirefoxはALT+SHIFT+Cでいつでもコメント入力欄
-// - 検索モードの1ページに表示する件数の設定を追加
-
-// * ver 1.130810
-// - 細かな処理タイミングの調整
-// - 検索モードで画面を大きくする設定の変更がリロード不要になった
-
-// * ver 1.130809
-// - マイリストの動画一覧をタイトル/説明文で絞り込み検索出来るようにした。(ランキングやとりマイでも使用可能)
-// - 見ている動画が今開いているマイリストにあるかどうかをわかりやすく
-// - 検索モードのコメントパネルの出し方を変更。 ホバーをやめてボタンでトグルにした
-// - とりマイとマイリストのUIを統一
-
-// * ver 1.130807
-// - ニコレポの表示を修正。同じ動画はなるべくまとめる (マイリストコメント付やレビューはまとめない)
-// - プレイリストの仕様変更で動かなくなった機能を対応
-
-// * ver 1.130805b
-// - コメントパネルを広くするとフルスクリーンが崩れる不具合の修正
-
-// * ver 1.130805
-// - コメントパネルを広くする機能の復活
-// - 新検索β使用時、現在見ている動画の投稿者の動画だけを探す機能を追加
-// - 角丸をなくす設定が無意味になったので廃止。 プレイヤーの背景色の設定を追加
-
-// * ver 1.130804
-// - 検索画面のメニューの所にある入力欄を少しだけ賢く&サジェスト対応
-
-// * ver 1.130803
-// - 動画終了時に自動でニコメンドを開かない・または中身がある時だけ開くようにする設定を追加
-
-// * ver 1.130801
-// - タグ・キーワード検索にniconico新検索βを組み込んでみた
-
-// * ver 1.130731
-// - 関連タグの取得はもっといいAPIがあった
-// - ニコニコ新検索を使うようにするための布石
-
-// * ver 1.130730
-// - キーワード/タグ検索時結果に関連タグが出るようにしてみた(リアルタイムの表示はできない)
-// - ニコニコ新検索を使うようにするための布石
-
-// * ver 1.130729
-// - プレイリスト消えないモードの挙動改善
-
-// * ver 1.130728
-// - プレイリストメニューが一部機能しなくなっていたのを対応
-// - ニコレポなどが出るポップアップをいじった。クリックですぐ消えるように ＆ Firefoxでもプレイヤーの上に表示できるように(まだデフォルトではオフ)
-// - ニコメンドが空かどうかクリックするまでもなくわかるよう、グレーにする
-// - タグ表示のポップアップからniconico新検索(http://search.nicovideo.jp/)に飛べるようにした
-
-// * ver 1.130727
-// - ダミーマイリスト系のソートがおかしい問題を解決
-// - マイリスト・とりあえずマイリストを100件ずつ表示にしてみた
-// - 検索画面から「次に再生」した時に動画時間が入るようにした
-
-// * ver 1.130726
-// - 本家の更新に暫定対応。まだ不安定だったり動かない機能もあります。
-// - チャンネルのアイコンをクリックしたらチャンネル動画一覧を表示。ただし最新20件のみ
 
 (function() {
   var isNativeGM = true;
@@ -1702,14 +1544,6 @@
         display: inline-block;
       }
 
-      {* 1列表示の時、動画タイトルの横の空白部分にまでクリック判定があるのはVistaのエクスプローラみたいで嫌なので、文字部分だけにしたい *}
-      {* GINZAで改善したのでいったんコメントアウト *}
-      {*
-      #videoExplorer .videoExplorerBody .videoExplorerContent .contentItemList.column1 .video .column1 .videoInformationOuter .title,
-      #videoExplorer .videoExplorerBody .videoExplorerContent .suggestVideo .video .column1 .videoInformationOuter .title {
-        display: inline;
-      }
-      *}
       .videoExplorerMenu .quickSearchInput {
         background: none repeat scroll 0 0 #F4F4F4;
         border: 1px inset silver;
@@ -2342,6 +2176,19 @@
       }
       body #videoHeader.menuOpened #videoHeaderDetail {
         margin-top: 8px;
+      }
+
+
+      .largeThumbnailPopup, .largeThumbnailPopup div{
+        background-color: #000;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center center;
+        background-size: contain;
+        -moz-background-size: contain;
+        -webkit-background-size: contain;
+        -o-background-size: contain;
+        -ms-background-size: contain;
       }
 
    */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
@@ -7373,6 +7220,9 @@
       console = conf.debugMode ? window.console : {log: _.noop, trace: _.noop, time: _.noop, timeEnd: _.noop},
       watch = WatchApp.ns.init,
       watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
+    if (!WatchApp.mixin) {
+      WatchApp.mixin = _.mixin;
+    }
 
     console.log('%cGinza', 'background: lightgreen;');
 
@@ -9327,17 +9177,18 @@
     function showLargeThumbnail(baseUrl) {
       var largeUrl = baseUrl, size;
       if (baseUrl.indexOf('smilevideo.jp') >= 0) {
-        largeUrl = baseUrl + '.L';
-        size = 'width: 360px; height: 270px;max-height: 500px;';
+        largeUrl = baseUrl.replace(/\.([LM])/, '') + '.L';
+        size = 'width: 360px; height: 270px; max-height: 500px;';
       } else {
         largeUrl = baseUrl.replace(/z$/, 'l');
         size = 'width: 360px; max-height: 500px;';
       }
       var
         html = [
-          '<div onmousedown="if (event.button == 0) { $(\'#popupMarquee\').removeClass(\'show\'); event.preventDefault(); }" style="background:#000;">',
-          '<img src="', largeUrl, '" style="', size, ' z-index: 3; position: absolute; display: none;" onload="this.style.display = \'\';">',
-          '<img src="', baseUrl, '"  style="', size, ' z-index: 2;">',
+          '<div class="largeThumbnailPopup" onmousedown="if (event.button == 0) { $(\'#popupMarquee\').removeClass(\'show\'); event.preventDefault(); }" style="width: 360px; height: 270px; background-image: url(' , largeUrl, ')">',
+          '<img src="', largeUrl, '" style="display: none;" onload="$(\'#popupMarquee .largeThumbnailPopup *\').hide()">',
+//          '<img src="', baseUrl, '"  style="', size, ' z-index: 2;">',
+          '<div style="', size, ' background-image: url(' + baseUrl + '); "></div>',
           '</div>',
         ''].join('');
       Popup.show(html);
@@ -9727,7 +9578,7 @@
           width: 130px; margin-left: 8px; margin-right: 10px;
         }
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent                 .column1 .videoInformationOuter {
-          width: 444px;
+          width: 414px;
         }
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent                 .column1 .nicorepoResult .videoInformationOuter {
           width: auto;
@@ -9735,7 +9586,7 @@
         #videoExplorer.w_adjusted .contentItemList .folder .column1 .description,
         #videoExplorer.w_adjusted .suggestVideo    .folder .column1 .description,
         #videoExplorer.w_adjusted .descriptionShort {
-          width: 440px;
+          width: 410px;
         }
 
         #videoExplorer .descriptionShort {
@@ -9748,10 +9599,10 @@
         }
 
         .w_adjusted .column1 .createdTime.at {
-          width: 130px; text-align: center;
+          width: 160px; text-align: center;
         }
         .w_adjusted .createdTime {
-          white-space: nowrap; {*background: #fff;*}
+          white-space: nowrap;
         }
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .contentItemList .folder .container,
         #videoExplorer.w_adjusted .videoExplorerBody .videoExplorerContent .suggestVideo .folder .container {
@@ -11929,12 +11780,22 @@
           #videoExplorer.w_adjusted .uadTagRelated .default .itemList .item .imageContainer {
             width: 130px; height: 100px;
           }
-        */});
+
+          #videoExplorer.w_adjusted .column1 .item .thumbnailContainer {
+            width: 160px; height: 100px;
+            {*max-width: 130px; height: auto; top: 0; left: 0;*} margin-right: 8px;
+          }
+
+          #videoExplorer.w_adjusted .column1 .uadFrame {
+            width: 160px; height: 100px;
+            background-size: 100% 100%;
+          }
+         */});
 
         addStyle(__css__, 'squareThumbnailCss');
         isSquareCssInitialized = true;
       }
-      $('#videoExplorer').toggleClass('squareThumbnail', isSquare);
+      //$('#videoExplorer').toggleClass('squareThumbnail', isSquare);
     } //
 
     function initPageBottom($, conf, w) {
