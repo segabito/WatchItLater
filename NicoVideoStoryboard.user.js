@@ -7,8 +7,10 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.0.10
+// @version        1.0.11
 // ==/UserScript==
+
+// ver 1.0.10 長時間動画でCookieの期限が切れるとサムネイルが取得できない問題に対処
 
 // ver 1.0.6  CustomGinzaWatchと併用した時に干渉するのを調整
 
@@ -1390,6 +1392,9 @@
             this._$view.addClass('show');
           }, this), 100);
 
+          this._lazyLoadImageTimer =
+            window.setTimeout($.proxy(this._lazyLoadAll, this), 1000 * 60 * 10);
+
           this.scrollLeft(0);
           this.enableTimer();
         },
@@ -1424,6 +1429,14 @@
 
           window.setTimeout(load, 0);
           //window.setTimeout(load, 1000);
+        },
+        // のんびり遅延ロードしてるとcookieの期限が切れてしまうので、
+        // 10分ぐらいで全部読みに行く
+        _lazyLoadAll: function(pageNumber) {
+          console.log('%c_lazyLoadAll', 'background: cyan;');
+          for (var i = 1, len = this._storyboard.getPageCount(); i < len; i++) {
+            this._lazyLoadImage(i);
+          }
         },
         _updateFail: function() {
           this._$view.removeClass('success').addClass('fail');
@@ -1507,6 +1520,10 @@
           this._timerCount = 0;
           this._scrollLeft = 0;
           this._lazyImage = {};
+          if (this._lazyLoadImageTimer) {
+            window.clearTimeout(this._lazyLoadImageTimer);
+            this._lazyLoadImageTimer = null;
+          }
           if (this._$view) {
             $('body').removeClass('NicoVideoStoryboardOpen');
             this._$view.removeClass('show');
