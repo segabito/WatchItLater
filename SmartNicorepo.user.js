@@ -5,7 +5,7 @@
 // @include     http://www.nicovideo.jp/my/*
 // @include     http://www.nicovideo.jp/user/*
 // @include     http://www.nicovideo.jp/my/fav/user
-// @version     2.0.1
+// @version     2.0.2
 // @grant       none
 // ==/UserScript==
 
@@ -37,6 +37,7 @@
       }
       .nicorepo .log.log-user-video-upload .video , .nicorepo .log.log-user-seiga-image-upload .seiga_image {
         height: auto !important; width: 130px !important; margin-top: 0px;
+        margin-bottom: 0 !important; margin-left: 0 !important;
       }
       #nicorepo .timeline > .log {
         max-height: 500px;
