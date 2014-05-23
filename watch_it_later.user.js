@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140522
+// @version        1.140524
 // ==/UserScript==
 
 /**
@@ -41,6 +41,7 @@
  * ・タグ領域の圧縮方法をShinjukuWatch形式にする
  */
 //
+// * ver 1.140524
 // * ver 1.140522
 // - 本家のサムネイル仕様変更に対応
 
@@ -1574,9 +1575,6 @@
       }
       .videoExplorerBody .videoExplorerContent .contentItemList.column4 .item {
         height: 220px;
-      }
-      #videoExplorer .videoExplorerBody .videoExplorerContent .column1 .thumbnailContainer .balloon {
-        {* top: -20px; 一列の時に「再生リストに追加しました」が上の動画に被るのを防ぐ *}
       }
       .column1 .itemMylistComment {
         font-size: 85%; color: #666; display: none;
@@ -5855,6 +5853,21 @@
       if (this.length === '00:00' && this.length_seconds > 0) {
         this.length = parseInt(this.length_seconds / 60, 10) + ':' + (this.length_seconds % 60);
       }
+
+      if (typeof info.is_middle_thumbnail !== 'boolean') {
+        if (this.thumbnail_url.indexOf('.M') >= 0) {
+          this.thumbnail_url = this.thumbnail_url.replace(/\.M$/, '');
+          this.is_middle_thumbnail = true;
+        } else
+        if (this.thumbnail_url.indexOf('.M') < 0 &&
+            this.id.indexOf('sm') === 0) {
+          var threshold = 23608629, // .Mのついた最小ID?
+              _id = _.parseInt(this.id.substr(2));
+          if (_id >= threshold) {
+            this.is_middle_thumbnail = true;
+          }
+        }
+      }
     },
     getType:        function() { return this.type; },
     getInfo:        function() { return this; }, // 手抜き
@@ -6094,6 +6107,21 @@
           var len = items.length;
           for (var i = 0; i < len; i++) {
             var item = items[i], description = item.description ? item.description.replace(/<.*?>/g, '') : '';
+
+            item.id = item.cmsid;
+            if (item.thumbnail_url.indexOf('.M') >= 0) {
+              item.thumbnail_url = item.thumbnail_url.replace(/\.M$/, '');
+              item.is_middle_thumbnail = true;
+            } else
+            if (item.thumbnail_url.indexOf('.M') < 0 &&
+                item.id.indexOf('sm') === 0) {
+              var threshold = 23608629, // .Mのついた最小ID?
+                  _id = _.parseInt(item.id.substr(2));
+              if (_id >= threshold) {
+                item.is_middle_thumbnail = true;
+              }
+            }
+
             searchResult.list.push({
               id:                item.cmsid,
               type:              0, // 0 = VIDEO,
@@ -6109,7 +6137,8 @@
               description_short: description.substr(0, 150),
               description_full:  description,
               length_seconds:    item.length_seconds,
-              last_res_body:     item.last_res_body
+              last_res_body:     item.last_res_body,
+              is_middle_thumbnail: item.is_middle_thumbnail
   //            channel_id:        item.channel_id,
   //            main_community_id: item.main_community_id
             });
@@ -10073,6 +10102,7 @@
             .find('.messageContainer').remove().end()
             .find('.lastResBody')
               .before($('<p class="descriptionShort"/><p class="itemMylistComment mylistComment"/>')).end()
+            .find('.noImage').remove().end()
               //.find.remove('div.descriptionShort').end()
 //              .before($('<p class="descriptionShort"/>')).end()
 //            .find('.descriptionShort')
@@ -10086,8 +10116,9 @@
           var ContentType = WatchApp.ns.components.videoexplorer.model.ContentType;
           var contentList = WatchApp.ns.init.VideoExplorerInitializer.videoExplorer.getContentList();
           var
-            $videoItem = $(elm).parent().parent(),
-            watchId    = $videoItem.find('.link').attr('href').split('/').reverse()[0],
+            $elm       = $(elm),
+            $videoItem = $elm.parent().parent(),
+            watchId    = $elm.parent().attr('data-watch-id'),
             ac         = contentList.getActiveContent(),
             type       = contentList.getActiveContentType(),
             onUpdate   = function(status, result) {
@@ -10107,9 +10138,7 @@
           }
         },
         onShowLargeThumbnailClick = function (elm) {
-          var
-            $videoItem = $(elm).parent().parent(),
-            src        = $videoItem.find('.thumbnail').attr('src');
+          var src  = $(elm).parent().attr('data-thumbnail');
           if (!src) { return; }
           showLargeThumbnail(src);
         };
@@ -10141,8 +10170,21 @@
           this._$lastResBody.remove();
         }
 
-        this._$item.find('.thumbnailContainer')
-          .css('background-image', 'url(' + this._$thumbnail.attr('src') + ')');
+        var thumbnail = this._$thumbnail.attr('src');
+        if (item.isMiddleThumbnail()) {
+          this._$item.find('.thumbnailContainer')
+            .css('background-image', 'url(' + thumbnail + ')').end()
+            .find('.showLargeThumbnail').attr('data-thumbnail', thumbnail);
+          this._$thumbnail.remove();
+        } else {
+          this._$item.find('.column4 .thumbnailContainer')
+            .css('background-image', 'url(' + thumbnail + ')').end()
+            .find('.showLargeThumbnail').attr('data-thumbnail', thumbnail);
+        }
+        this._$item.find('.thumbnailHoverMenu').attr({
+          'data-thumbnail': thumbnail,
+          'data-watch-id': item.getId()
+        });
 
         if (item._seed && item._seed._info) {
           var info = item._seed._info;
@@ -11760,7 +11802,9 @@
       if (isSquare && !isSquareCssInitialized) {
         var __css__ = Util.here(function() {/*
           {* 元のCSSを打ち消すためにやや冗長 *}
-          #videoExplorer .noImage, #videoExplorer.w_adjusted .item .thumbnail {
+          #videoExplorer .noImage,
+          #videoExplorer.w_adjusted .column4 .item .thumbnail
+          {* #videoExplorer.w_adjusted .column1 .item .thumbnail:not(.smallThumbnail) *}{
             display: none !important;
           }
           #videoExplorer .thumbnailContainer {
@@ -11768,12 +11812,14 @@
             background-repeat: no-repeat;
             background-position: center center;
           }
-          #videoExplorer.w_adjusted .item .thumbnailContainer {
+          #videoExplorer.w_adjusted .column4 .item .thumbnailContainer {
             width: 130px; height: 100px;
-            {*max-width: 130px; height: auto; top: 0; left: 0;*} margin-right: 8px;
+            margin-right: 7px;
+            border: 1px solid #888;
           }
 
-          #videoExplorer.w_adjusted .uadFrame {
+          #videoExplorer.w_adjusted .column4 .uadFrame,
+          #videoExplorer.w_adjusted .uadTagRelated .uadFrame {
             width: 130px; height: 100px;
             background-size: 100% 100%;
           }
@@ -11782,13 +11828,8 @@
           }
 
           #videoExplorer.w_adjusted .column1 .item .thumbnailContainer {
-            width: 160px; height: 100px;
-            {*max-width: 130px; height: auto; top: 0; left: 0;*} margin-right: 8px;
-          }
-
-          #videoExplorer.w_adjusted .column1 .uadFrame {
-            width: 160px; height: 100px;
-            background-size: 100% 100%;
+            border: 1px solid #888;
+            margin-right: 8px;
           }
          */});
 
