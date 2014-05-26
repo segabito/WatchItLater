@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140524
+// @version        1.140526
 // ==/UserScript==
 
 /**
@@ -9627,6 +9627,9 @@
           font-size: 93%;
         }
 
+        .w_adjusted .column1 .smallThumbnail .createdTime.at {
+          width: 130px;
+        }
         .w_adjusted .column1 .createdTime.at {
           width: 160px; text-align: center;
         }
@@ -10117,15 +10120,16 @@
           var contentList = WatchApp.ns.init.VideoExplorerInitializer.videoExplorer.getContentList();
           var
             $elm       = $(elm),
-            $videoItem = $elm.parent().parent(),
-            watchId    = $elm.parent().attr('data-watch-id'),
+            $item      = $elm.closest('.item'),
+            $videoItem = $item, //.find(''),//$elm.parent().parent(),
+            watchId    = $item.attr('data-watch-id'),
             ac         = contentList.getActiveContent(),
             type       = contentList.getActiveContentType(),
             onUpdate   = function(status, result) {
               if (status !== "ok") {
                 Popup.alert('削除に失敗: ' + result.error.description);
               } else {
-                $videoItem.parent().animate({opacity: 0.3}, 500);
+                $videoItem.animate({opacity: 0.3}, 500);
               }
             };
 
@@ -10138,7 +10142,8 @@
           }
         },
         onShowLargeThumbnailClick = function (elm) {
-          var src  = $(elm).parent().attr('data-thumbnail');
+          var $item = $(elm).closest('.item');
+          var src  = $item.attr('data-thumbnail');
           if (!src) { return; }
           showLargeThumbnail(src);
         };
@@ -10173,18 +10178,19 @@
         var thumbnail = this._$thumbnail.attr('src');
         if (item.isMiddleThumbnail()) {
           this._$item.find('.thumbnailContainer')
-            .css('background-image', 'url(' + thumbnail + ')').end()
-            .find('.showLargeThumbnail').attr('data-thumbnail', thumbnail);
+            .css('background-image', 'url(' + thumbnail + ')');
           this._$thumbnail.remove();
         } else {
-          this._$item.find('.column4 .thumbnailContainer')
-            .css('background-image', 'url(' + thumbnail + ')').end()
-            .find('.showLargeThumbnail').attr('data-thumbnail', thumbnail);
+          this._$item
+            .addClass('smallThumbnail')
+            .find('.thumbnailContainer')
+            .css('background-image', 'url(' + thumbnail + ')');
         }
-        this._$item.find('.thumbnailHoverMenu').attr({
+        $item.attr({
           'data-thumbnail': thumbnail,
           'data-watch-id': item.getId()
         });
+
 
         if (item._seed && item._seed._info) {
           var info = item._seed._info;
@@ -11803,8 +11809,7 @@
         var __css__ = Util.here(function() {/*
           {* 元のCSSを打ち消すためにやや冗長 *}
           #videoExplorer .noImage,
-          #videoExplorer.w_adjusted .column4 .item .thumbnail
-          {* #videoExplorer.w_adjusted .column1 .item .thumbnail:not(.smallThumbnail) *}{
+          #videoExplorer.w_adjusted .item .thumbnail {
             display: none !important;
           }
           #videoExplorer .thumbnailContainer {
@@ -11812,13 +11817,16 @@
             background-repeat: no-repeat;
             background-position: center center;
           }
-          #videoExplorer.w_adjusted .column4 .item .thumbnailContainer {
+
+          #videoExplorer.w_adjusted .column4        .thumbnailContainer,
+          #videoExplorer.w_adjusted .smallThumbnail .thumbnailContainer {
             width: 130px; height: 100px;
             margin-right: 7px;
             border: 1px solid #888;
           }
 
-          #videoExplorer.w_adjusted .column4 .uadFrame,
+          #videoExplorer.w_adjusted .column4        .uadFrame,
+          #videoExplorer.w_adjusted .smallThumbnail .uadFrame,
           #videoExplorer.w_adjusted .uadTagRelated .uadFrame {
             width: 130px; height: 100px;
             background-size: 100% 100%;
@@ -11830,6 +11838,10 @@
           #videoExplorer.w_adjusted .column1 .item .thumbnailContainer {
             border: 1px solid #888;
             margin-right: 8px;
+          }
+          #videoExplorer.w_adjusted .column1 .item.smallThumbnail .thumbnailContainer {
+            border-width: 0px 15px 0px 15px;
+            border-color: #888;
           }
          */});
 
