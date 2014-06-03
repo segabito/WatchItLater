@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140526
+// @version        1.140603
 // ==/UserScript==
 
 /**
@@ -1556,6 +1556,24 @@
       }
       .videoExplorerMenu.w_touch .quickSearchInput {
         top: 4px; font-size: 20px;
+      }
+      .videoExplorerMenu .clear-button {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        top: 4px;
+        left: 250px;
+        line-height: 18px;
+        font-size: 16px;
+        padding: 0;
+        background: #e5e5e5;
+        text-align: center;
+        color: #999;
+        cursor: pointer;
+        display: none;
+        box-sizing: border-box;
+        -webkit-box-sizing: border-box;
+        -moz-box-sizing: border-box;
       }
 
       .videoExplorerContent .contentItemList                 .column4 {
@@ -9862,9 +9880,12 @@
           }
         }
       });
+
+      var clearButton = new window.Nico.ClearButton({targetInput: $searchInput});
       EventDispatcher.addEventListener('onSearchStart', function(word, type) {
         searchType = type.replace(/^.*\./, '');
         $searchInput.val(word);
+        window.setTimeout(function() {clearButton.refresh(); }, 0);
       });
       initAutoComplete($searchInput);
 
@@ -9961,6 +9982,7 @@
             playerConnector.updatePlayerConfig({playerViewSize: ''}); // ノーマル画面モード
           }
         }, 100);
+        clearButton.refresh();
 
         $('body').removeClass('videoExplorerOpening');
         $('.videoExplorerMenu').addClass('initialized');
