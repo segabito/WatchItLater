@@ -9857,7 +9857,7 @@
         playerConnector = watch.PlayerInitializer.nicoPlayerConnector,
         searchType      = 'tag',
         $menu           = $('.videoExplorerMenu'),
-        $searchInput    = $('<input class="quickSearchInput" type="search" name="q" accesskey="q" required="required" />')
+        $searchInput    = $('<input class="quickSearchInput" type="search" name="q" accesskey="q" required="required" x-webkit-speech />')
           .attr({'title': '検索ワードを入力', 'placeholder': '検索ワードを入力(Q)'}),
         $closeExplorer  = $('<div class="closeVideoExplorer"><a href="javascript:;">▲ 画面を戻す</a></div>'),
         $inputForm      = $('<form  action="javascript:void(0);" />').append($searchInput),
