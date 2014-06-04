@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140603
+// @version        1.140605
 // ==/UserScript==
 
 /**
@@ -115,7 +115,7 @@
       searchPageItemCount: 50, // 検索モードの1ページあたりの表示数
       enableMylistDeleteButton: false, // 動画検索画面で、自分のマイリストから消すボタンを追加する
       enableHoverPopup: true, // 動画リンクのマイリストポップアップを有効にする
-      enableAutoTagContainerHeight: false, // タグが2行以内なら自動で高さ調節(ピン留め時のみ
+      enableAutoTagContainerHeight: true, // タグが2行以内なら自動で高さ調節(ピン留め時のみ
       autoSmallScreenSearch: false, // ポップアップからのタグ検索でもプレイヤーを小さくする
       enableNewsHistory: false, // ニコニコニュースの履歴を保持する
       defaultSearchOption: '', // 検索時のデフォルトオプション
@@ -1463,6 +1463,11 @@
       #videoHeaderMenu .searchContainer .searchText {
         margin-top: -8px;
       }
+      #videoHeaderMenu .clear-button {
+        position: absolute;
+        top: -8px;
+        right: 0px;
+      }
 
       body.size_small #playerContainerWrapper {
         padding: 0;
@@ -1605,6 +1610,12 @@
       .column1 .itemMylistComment:after {
         content: '';
       }
+      .column1 .itemMylistComment pre {
+        font-family: inherit;
+        display: inline;
+        white-space: pre-wrap;
+      }
+
       .videoExplorerContent .contentItemList                 .column1 .nicorepoOwnerIconContainer {
         display: none;
       }
@@ -8762,6 +8773,7 @@
 
 
       pager._pageItemCount = conf.searchPageItemCount;
+      pager._displayPageCount = 5;
       EventDispatcher.addEventListener('on.config.searchPageItemCount', function(v) {
         pager._pageItemCount = v;
       });
@@ -8786,6 +8798,7 @@
         this._filter = filter;
       }, content);
       content.getFilter     = $.proxy(function()       { return this._filter; }, content);
+
 
       content.clear_org = content.clear;
       content.clear = $.proxy(function() {
@@ -9112,6 +9125,7 @@
 
 
       pager._pageItemCount = conf.searchPageItemCount;
+      pager._displayPageCount = 5;
       EventDispatcher.addEventListener('on.config.searchPageItemCount', function(v) {
         pager._pageItemCount = v;
       });
@@ -11039,6 +11053,9 @@
         EventDispatcher.addEventListener('onVideoInitialized', onTagReset);
       });
       watch.TagInitializer.tagList.addEventListener('reset', onTagReset);
+      if (conf.enableAutoTagContainerHeight) {
+        watch.TagInitializer.tagViewController.tagViewPinStatus.changeStatus(true);
+      }
       window.setTimeout(onTagReset, 1000);
 
       $videoHeaderTagEditLinkArea = $toggleTagEditText = null;
@@ -11052,7 +11069,6 @@
         }
         WatchApp.ns.model.player.NicoPlayerConnector.onTagDataReceived_org(a);
       };
-
 
     } // end initVideoTagContainer
 
@@ -11805,9 +11821,11 @@
       var pager       = content._pager;
 
       pager._pageItemCount = conf.searchPageItemCount;
+      pager._displayPageCount = 5;
       EventDispatcher.addEventListener('on.config.searchPageItemCount', function(v) {
         pager._pageItemCount = v;
       });
+
     }
 
     function initUploadedVideoContent($, conf, w) {
@@ -11817,7 +11835,19 @@
       var content     = explorer.getContentList().getContent(ContentType.UPLOADED_VIDEO);
       var pager       = content._pager;
 
+
+      // 本家のマイナーバグ修正
+      content.setUserId_org = content.setUserId;
+      content.setUserId = $.proxy(function(id) {
+        var currentId = this.getUserId();
+        if (currentId !== id) {
+          this.setPage(1);
+        }
+        this.setUserId_org(id);
+      }, content);
+
       pager._pageItemCount = conf.searchPageItemCount;
+      pager._displayPageCount = 5;
       EventDispatcher.addEventListener('on.config.searchPageItemCount', function(v) {
         pager._pageItemCount = v;
       });
