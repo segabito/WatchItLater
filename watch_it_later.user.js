@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140605
+// @version        1.140606
 // ==/UserScript==
 
 /**
@@ -6586,7 +6586,7 @@
         ownerName  = $owner.text(),
         ownerId    = (ownerMatch !== null && ownerMatch.length >= 3) ? ownerMatch[2] : null,
         ownerIcon  = $item.find('.log-author img').attr('data-src'),
-        mylistComment = $item.find('.log-content .log-subdetails').text()
+        mylistComment = $item.find('.log-content .log-subdetails').text().trim()
         ;
 
       $item.removeClass('log').removeClass('passive').removeClass('first');
