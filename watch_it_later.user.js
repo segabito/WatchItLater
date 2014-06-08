@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140606
+// @version        1.140607
 // ==/UserScript==
 
 /**
@@ -1604,8 +1604,15 @@
         color: #400; border: 1px solid #ccc; padding: 0 4px 0px; line-height: 130%; border-radius: 4px;
       }
       .column1 .itemMylistComment:before {
-        content: '本人コメント ';
+        content: 'マイリストコメント ';
         background: #ccc; border-radius: 0 0 8px 0; display: inline-block; margin: 0 4px 4px -4px; padding: 2px;
+        min-width: 100px;
+      }
+      .log-user-video-review .column1 .itemMylistComment {
+        color: #004;
+      }
+      .log-user-video-review .column1 .itemMylistComment:before {
+        content: 'レビュー ';
       }
       .column1 .itemMylistComment:after {
         content: '';
