@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140607
+// @version        1.140623
 // ==/UserScript==
 
 /**
@@ -2329,6 +2329,7 @@
             {'有効(ウィンドウを閉じるまで)': 'sessionStorage', '無効': ''})
       },
       {title: '説明文中の動画IDにサムネイル表示(実験中)',  varName: 'enableDescriptionThumbnail', reload: true,
+        description: 'Chrome+Tampermonkeyでは動きません',
         values: {'有効': true, '無効': false}},
 
 
@@ -2344,9 +2345,6 @@
       {title: 'お気に入りマイリストを表示', varName: 'enableFavMylists',
         description: '更新のあったリストが上に来るので、新着動画のチェックに便利です。',
         values: {'する': true, 'しない': false}},
-//      {title: 'サムネを4:3にする', varName: 'squareThumbnail',
-//        description: '上下がカットされなくなり、サムネの全体が見えるようになります。',
-//        values: {'する': true, 'しない': false}},
       {title: '「マイリストから外す」ボタンを表示', varName: 'enableMylistDeleteButton',
         description: 'マイリストの整理に便利。\n ※ 消す時に確認ダイアログは出ないので注意',
         values: {'する': true, 'しない': false}},
@@ -10218,7 +10216,7 @@
           this._$lastResBody.remove();
         }
 
-        var thumbnail = this._$thumbnail.attr('src');
+        var thumbnail = this._$thumbnail.attr('src').replace('.jpg.M', '');
         if (item.isMiddleThumbnail()) {
           this._$item.find('.thumbnailContainer')
             .css('background-image', 'url(' + thumbnail + ')');
