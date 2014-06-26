@@ -7,8 +7,10 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.0.11
+// @version        1.1.0
 // ==/UserScript==
+
+// ver 1.1.0  Chrome + Tampermonkeyでも動くようにした
 
 // ver 1.0.10 長時間動画でCookieの期限が切れるとサムネイルが取得できない問題に対処
 
@@ -571,7 +573,7 @@
 
 
     window.NicoVideoStoryboard.api.getflv = (function() {
-      var BASE_URL = 'http://flapi.nicovideo.jp/api/getflv?v=';
+      var BASE_URL = 'http://flapi.nicovideo.jp/api/getflv/';
       var loaderFrame, loaderWindow, cache = {};
       var eventDispatcher = window.NicoVideoStoryboard.event.windowEventDispatcher;
       var getflv = new EventDispatcher();
@@ -655,6 +657,9 @@
         }
 
         var url = info.url + '&sb=1';
+        // Tampermonkeyでは、Content-type: text/xmlのページでスクリプトを実行できないため、
+        // いったんxmlと同一ドメインにあるサムネイルを表示してそこ経由でスクリプトを起動する
+        var thumbnailUrl = info.url.replace(/smile\?.=(\d+).*$/, 'smile?i=$1');
 
         thumbnailInfo.dispatchEvent('onThumbnailInfoLoadStart');
         if (cache[url]) {
@@ -662,7 +667,14 @@
           thumbnailInfo.dispatchAsync('onThumbnailInfoLoad', cache[url]);
           return;
         }
-        loaderWindow.location.replace(url);
+
+        if (window.navigator.userAgent.toLowerCase().indexOf('webkit') < -1) {
+          // Firefox + Greasemonkey
+          loaderWindow.location.replace(url);
+        } else {
+          // Chrome (Tampermonkey)
+          loaderWindow.location.replace(thumbnailUrl + '#' + url);
+        }
       };
 
       var onMessage = function(data, type) {
@@ -1873,6 +1885,7 @@
 
   };
 
+  // クロスドメインでのgetflv情報の通信用
   var flapi = function() {
     if (window.name.indexOf('getflvLoader') < 0 ) { return; }
 
@@ -1895,9 +1908,58 @@
     }
   };
 
+  var xmlHttpRequest = function(options) {
+    try {
+      var req = new XMLHttpRequest();
+      var method = options.method || 'GET';
+      req.onreadystatechange = function() {
+        if (req.readyState === 4) {
+          if (typeof options.onload === "function") options.onload(req);
+        }
+      };
+      req.open(method, options.url, true);
+      if (options.headers) {
+        for (var h in options.headers) {
+          req.setRequestHeader(h, options.headers[h]);
+        }
+      }
 
+      req.send(options.data || null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Tampermonkeyでは、Content-type: text/xmlのページでスクリプトを実行できないため、
+  // いったんxmlと同一ドメインにあるサムネイルを表示してそこ経由でスクリプトを起動する
+  var smileapiForTampermonkey = function() {
+    var origin  = 'http://' + location.host.replace(/^.*?\./, 'www.');
+    var url     = location.hash.split('#')[1];
+
+    xmlHttpRequest({
+      url: url,
+      onload: function(req) {
+        var xml = req.responseText;
+        parent.postMessage(JSON.stringify({
+            id: 'NicoVideoStoryboard',
+            type: 'storyboard',
+            body: {
+              url: url,
+              xml: xml
+            }
+          }),
+          origin);
+      }
+    });
+  };
+
+  // クロスドメインでのStoryboard情報の通信用
   var smileapi = function() {
     if (window.name.indexOf('StoryboardLoader') < 0 ) { return; }
+
+    if (location.href.match(/\.nicovideo\.jp\/smile?i=/) >= 0) {
+      return smileapiForTampermonkey();
+    }
 
     var resp    = document.getElementsByTagName('smile');
     var origin  = 'http://' + location.host.replace(/^.*?\./, 'www.');
