@@ -20,7 +20,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140623
+// @version        1.140626
 // ==/UserScript==
 
 /**
@@ -2091,6 +2091,10 @@
       {* 不要な時まで横スクロールバーが出てしまうので *}
       #songrium_inline { overflow: hidden; }
 
+      .sideVideoInfo .videoLinkContainer {
+        display: inline-block;
+        white-space: nowrap;
+      }
       .sideVideoInfo .nextPlayButton {
         position: absolute;
         margin-top: -6px;
@@ -7964,12 +7968,16 @@
         var url = this.href, text, $this = $(this);
         if (videoReg.test(url)) {
           var watchId = RegExp.$1;
+          var $videoLinkContainer = $([
+            '<div class="videoLinkContainer"></div>',
+            ''].join(''));
           var $nextButton = $([
             '<div class="nextPlayButton" title="次に再生" onclick="WatchItLater.WatchController.insertVideoToPlaylist(\'', watchId, '\')">次に再生</div>',
             ''].join(''));
-          $this.after($nextButton);
+          $this.after($videoLinkContainer);
+          $videoLinkContainer.append($this).append($nextButton);
 
-          watchLinks.push({id: watchId, $target: $nextButton});
+          watchLinks.push({id: watchId, $target: $videoLinkContainer});
           watchIds.push(watchId);
         } else if (seigaReg.test(url)) {
           var illustId = RegExp.$1;
