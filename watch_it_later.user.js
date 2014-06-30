@@ -16,11 +16,12 @@
 // @match          http://www.nicovideo.jp/*
 // @match          http://ch.nicovideo.jp/*
 // @match          http://i.nicovideo.jp/*
+// @match          http://api.ce.nicovideo.jp/api/v1/system.unixtime?
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140626
+// @version        1.140701
 // ==/UserScript==
 
 /**
@@ -520,7 +521,7 @@
         display: none !important;
       }
 
-      .watchItLaterAPILoaderFrame {
+      .xDomainLoaderFrame {
         width: 1px;
         height: 1px;
         position: fixed;
@@ -2241,7 +2242,7 @@
   conf.load = function() {
     try {
       function loadStorage(key, def) {
-        if (window.localStorage[key] === undefined) { return def; }
+        if (window.localStorage[key] === void 0) { return def; }
         return JSON.parse(window.localStorage.getItem(key));
       }
 
@@ -2712,12 +2713,12 @@
       expect: function(a) {
         try {
           var assert = window.WatchItLater.test.assert, exp = {
-            toBeTrue:    function(   desc) { assert(a === true      , desc); },
-            toBeFalse:   function(   desc) { assert(a === false     , desc); },
-            toEqual:     function(b, desc) { assert(a === b         , desc); },
-            toBeNull:    function(   desc) { assert(a === null      , desc); },
-            toBeNotNull: function(   desc) { assert(a !== null      , desc); },
-            toBeDefined: function(   desc) { assert(a !== undefined , desc); },
+            toBeTrue:    function(   desc) { assert(a === true   , desc); },
+            toBeFalse:   function(   desc) { assert(a === false  , desc); },
+            toEqual:     function(b, desc) { assert(a === b      , desc); },
+            toBeNull:    function(   desc) { assert(a === null   , desc); },
+            toBeNotNull: function(   desc) { assert(a !== null   , desc); },
+            toBeDefined: function(   desc) { assert(a !== void 0 , desc); },
             toBeTruthy:  function(   desc) { assert(a ? true : false, desc); }
           };
           return exp;
@@ -4762,6 +4763,7 @@
     var currentRequestIds = '', currentPromise;
     var loaderFrame, loaderWindow;
     var BASE_URL = 'http://i.nicovideo.jp/v3/video.array?v=';
+    var isChrome = window.navigator.userAgent.toLowerCase().indexOf('chrome') >= 0;
 
     //WatchItLater.loader.videoArrayAPILoader.load('sm9').then(function(info) { console.log(info); });
 
@@ -4822,7 +4824,15 @@
       var def = new $.Deferred();
       currentPromise = def;
       deferredList[sessionId] = def;
-      loaderWindow.location.replace(BASE_URL + ids.join(',') + '#' + sessionId);
+      if (isChrome && conf.debugMode) {
+        // 基本的に i.nicovideo.jpのほうが高機能だが、Chrome + Tampermonkeyからは使えないため回避策
+        window.WatchItLater.loader.ceAPILoader.videoArray(ids, 'xml').then(
+          function(xml) { onXmlLoad(sessionId, xml); },
+          function()    { onXmlFail(sessionId); }
+        );
+      } else {
+        loaderWindow.location.replace(BASE_URL + ids.join(',') + '#' + sessionId);
+      }
       return def.promise();
     };
 
@@ -4869,34 +4879,41 @@
       return info;
     };
 
+    var onXmlLoad = function(sessionId, xml) {
+      if (deferredList[sessionId]) {
+        deferredList[sessionId].resolve(parseVideoArray(xml));
+        delete deferredList[sessionId];
+        currentPromise = null;
+      }
+    };
+
+    var onXmlFail = function(sessionId) {
+      if (deferredList[sessionId]) {
+        deferredList[sessionId].reject();
+        delete deferredList[sessionId];
+        currentPromise = null;
+      }
+    };
 
     var initialize = function() {
       initialize = window._.noop;
 
       loaderFrame = document.createElement('iframe');
       loaderFrame.name      = 'watchItLaterAPILoader';
-      loaderFrame.className = 'watchItLaterAPILoaderFrame';
+      loaderFrame.className = 'watchItLaterAPILoaderFrame xDomainLoaderFrame';
       document.body.appendChild(loaderFrame);
 
       loaderWindow = loaderFrame.contentWindow;
 
       EventDispatcher.addEventListener('onMessage', function(data, type) {
         if (type !== 'VideoArrayAPILoader') { return; }
+        var sessionId = data.session, xml = data.xml;
         try {
-          var session = data.session, xml = data.xml;
           //console.log('VideoArrayAPILoader.onMessage', data.session, data.xml);
-          if (deferredList[session]) {
-            deferredList[session].resolve(parseVideoArray(xml));
-            delete deferredList[session];
-            currentPromise = null;
-          }
+          onXmlLoad(sessionId, xml);
         } catch (e) {
           console.log('message parse error', e);
-          if (deferredList[session]) {
-            deferredList[session].reject();
-            delete deferredList[session];
-            currentPromise = null;
-          }
+          onXmlFail(sessionId);
         }
       });
 
@@ -4910,7 +4927,127 @@
     };
   })();
 
+  // 参考: http://www59.atwiki.jp/nicoapi/pages/24.html
+  // TampermonkeyはContent-Type: text/xmlのページで動かないため、
+  // 同じドメインにある適当なテキストapiを踏み台にして通信する
+  window.WatchItLater.loader.ceAPILoader = (function() {
+    var BASE_URL = 'http://api.ce.nicovideo.jp/api/v1/system.unixtime?';
+    var MESSAGE_ORIGIN = 'http://api.ce.nicovideo.jp/';
+    var loaderFrame, loaderWindow;
+    var initialDef, sessions = {};
+    var cacheData = {};
 
+    var initialize = function() {
+      initialize = initialize_;
+      initialDef = new $.Deferred();
+
+      console.log('%cinitialize ceApiLoader', 'background: lightgreen;');
+
+      loaderFrame = document.createElement('iframe');
+      loaderFrame.name      = 'ceAPILoader';
+      loaderFrame.className = 'ceAPILoaderFrame xDomainLoaderFrame';
+      document.body.appendChild(loaderFrame);
+
+      window.loaderWindow = loaderWindow = loaderFrame.contentWindow;
+
+      EventDispatcher.addEventListener('onMessage', function(data, type) {
+        if (type !== 'ceAPILoader') { return; }
+        if (data.status === 'initialized') {
+          return onInitialized();
+        }
+
+        if (data.sessionId) {
+          var def = sessions[data.sessionId];
+          delete sessions[data.sessionId];
+
+          if (data.status === 'ok') {
+            cacheData[data.url] = data.body;
+            return def.resolve(data.body);
+          } else {
+            cacheData[data.url] = data.body;
+            window.setTimeout(function() { delete cacheData[data.url]; }, 60000);
+            return def.reject(data.status);
+          }
+        }
+      });
+
+      loaderWindow.location.replace(BASE_URL);
+
+      return initialDef.promise();
+    };
+
+    var onInitialized = function() {
+      return initialDef.resolve();
+    };
+
+    var initialize_ = function() {
+      var def = new $.Deferred();
+      window.setTimeout(function() { def.resolve(); }, 0);
+      return def;
+    };
+
+    var load = function(url) {
+      var def = new $.Deferred();
+      if (cacheData[url]) {
+        window.setTimeout(function() { def.resolve(cacheData[url]); }, 0);
+        return def.promise();
+      }
+
+      var sessionId = 'session_' + Math.random();
+      sessions[sessionId] = def;
+      try {
+        loaderWindow.postMessage(JSON.stringify({
+          sessionId: sessionId,
+          url: url
+        }),
+        MESSAGE_ORIGIN);
+      } catch (e) {
+        console.log('%cException!', 'background: red;', e);
+        delete sessions[sessionId];
+        return def.reject();
+      }
+      return def.promise();
+    };
+
+    var videoArray = function(watchId, format) {
+      return initialize().then(function() {
+        var url = '/nicoapi/v1/video.array?v=';
+        var ids = [], def = new $.Deferred();
+
+        $(typeof watchId !== 'string' ? watchId : [watchId]).each(function(i, id) {
+          ids.push(id);
+        });
+        ids = window._.unique(ids);
+        if (ids.length < 1) {
+          window.setTimeout(function() { def.resolve({}); }, 0);
+          return;
+        }
+
+        url = url + ids.join(',');
+        if (!format || format !== 'xml') {
+          url += '&__format=json';
+        }
+
+        load(url).then(function(result) {
+          try {
+            if (!format && format !== 'xml') {
+              result = JSON.parse(result);
+            }
+          } catch (e) {
+            console.log('%cJSON parse Error!', 'background: red;', e);
+            def.reject({});
+          }
+          return def.resolve(result);
+        });
+
+        return def.promise();
+      });
+    };
+
+    return {
+      videoArray: videoArray
+    };
+  })();
 
 
   //===================================================
@@ -4975,7 +5112,7 @@
       scrollTop: function(top, dur) {
         var header = (this.isFixedHeader() ? $("#siteHeader").outerHeight() : 0);
 
-        if (top !== undefined) {
+        if (top !== void 0) {
           return $(window).scrollTop(top - header, dur);
         } else {
           return $(window).scrollTop() + header;
@@ -5196,12 +5333,12 @@
         if (mode === 'next') {
           for (i = searchItems.length - 1; i >= 0; i--) {
             c = searchItems[i];
-            ("undefined" === typeof c.type || "video" === c.type) && uniq[c.id] === undefined && items.splice(playingIndex + 1, 0, c);
+            ("undefined" === typeof c.type || "video" === c.type) && uniq[c.id] === void 0 && items.splice(playingIndex + 1, 0, c);
           }
         } else {
           for (i = 0, len = searchItems.length; i < len; i++) {
             c = searchItems[i];
-            ("undefined" === typeof c.type || "video" === c.type) && uniq[c.id] === undefined && items.push(c);
+            ("undefined" === typeof c.type || "video" === c.type) && uniq[c.id] === void 0 && items.push(c);
           }
         }
         this.setPlaylistItems(items, currentItem);
@@ -13388,7 +13525,7 @@
   (function() {
     if (!w.Video) return;
     if (!location.href.match(/\/watch\/(sm\d+|nm\d+|so\d+|\d+)/)) return;
-    var watchId = undefined, videoId = undefined;
+    var watchId = void 0, videoId = void 0;
     if (w.Video === null) {
       watchId = RegExp.$1;
       w.Video = {id: watchId};
@@ -13397,7 +13534,7 @@
       watchId = Video.v;
       videoId = Video.id;
     }
-    var watchId = RegExp.$1;
+    watchId = RegExp.$1;
     var iframe = Mylist.getPanel('');
     iframe.id = "mylist_add_frame";
     iframe.setAttribute('style', 'position: fixed; right: 0; bottom: 0;');
@@ -13446,9 +13583,9 @@
   }); // end of monkey();
 
   /**
-   * スマートフォン用APIを利用して動画情報を取得する
+   * スマートフォン用APIを利用して動画情報を取得する Firefox + Greasemonkey用
    */
-  var spapi = (function() {
+  var spapi = function() {
     if (window.name.indexOf('watchItLaterAPILoader') < 0 ) { return; }
     var resp    = document.getElementsByTagName('nicovideo_video_response');
     var session = location.hash.length > 1 ? location.hash.substr(1) : location.search;
@@ -13471,7 +13608,100 @@
     } catch (e) {
       console.log('err', e);
     }
-  });
+  };
+
+  /**
+   * Vita/3DS用APIを利用して情報を取得する Chrome + Tampermonkey用
+   * 参考: http://www59.atwiki.jp/nicoapi/pages/24.html
+   */
+  var ceapi = function() {
+    if (window.name.indexOf('ceAPILoader') < 0 ) { return; }
+    var origin  = 'http://www.nicovideo.jp'; //'http://' + location.host.replace(/^.*?\./, 'www.');
+
+    var xmlHttpRequest = function(options) {
+      try {
+        var req = new XMLHttpRequest();
+        var method = options.method || 'GET';
+        req.onreadystatechange = function() {
+          if (req.readyState === 4) {
+            if (typeof options.onload === 'function') options.onload(req);
+          }
+        };
+        req.open(method, options.url, true);
+        if (options.headers) {
+          for (var h in options.headers) {
+            req.setRequestHeader(h, options.headers[h]);
+          }
+        }
+
+        req.send(options.data || null);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    window.addEventListener('message', function(event) {
+      var data = JSON.parse(event.data), timeoutTimer = null, isTimeout = false;
+      if (!data.url) { return; }
+      var sessionId = data.sessionId;
+      xmlHttpRequest({
+        url: data.url,
+        onload: function(resp) {
+
+          if (isTimeout) { return; }
+          else { window.clearTimeout(timeoutTimer); }
+
+          try {
+            parent.postMessage(JSON.stringify({
+              id: 'WatchItLater',
+              type: 'ceAPILoader',
+              body: {
+                sessionId: sessionId,
+                status: 'ok',
+                url: data.url,
+                body: resp.responseText
+              }
+            }),
+            origin);
+          } catch (e) {
+            console.log(
+              '%cError: parent.postMessage - ',
+              'color: red; background: yellow',
+              e, event.origin, event.data);
+          }
+        }
+      });
+
+      timeoutTimer = window.setTimeout(function() {
+        isTimeout = true;
+        parent.postMessage(JSON.stringify({
+          id: 'WatchItLater',
+          type: 'ceAPILoader',
+          body: {
+            sessionId: sessionId,
+            status: 'timeout',
+            url: data.url
+          }
+        }),
+        origin);
+      }, 30000);
+
+    });
+
+    try {
+      parent.postMessage(JSON.stringify({
+          id: 'WatchItLater',
+          type: 'ceAPILoader',
+          body: {
+            status: 'initialized'
+          }
+        }),
+        origin);
+    } catch (e) {
+      console.log('err', e);
+    }
+  };
+
 
   try {
     if (location.host === 'flapi.nicovideo.jp') {
@@ -13479,6 +13709,9 @@
     } else
     if (location.host === 'i.nicovideo.jp') {
       spapi();
+    } else
+    if (location.host === 'api.ce.nicovideo.jp') {
+      ceapi();
     } else
     if (location.host.indexOf('smile-') >= 0) {
       return;
