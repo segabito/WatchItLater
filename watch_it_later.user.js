@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140701
+// @version        1.140703
 // ==/UserScript==
 
 /**
@@ -4836,7 +4836,7 @@
       deferredList[sessionId] = def;
       if (isChrome && conf.debugMode) {
         // 基本的に i.nicovideo.jpのほうが高機能だが、Chrome + Tampermonkeyからは使えないため回避策
-        window.WatchItLater.loader.ceAPILoader.videoArray(ids, 'xml').then(
+        window.WatchItLater.loader.ceAPIClient.videoArray(ids, 'xml').then(
           function(xml) { onXmlLoad(sessionId, xml); },
           function()    { onXmlFail(sessionId); }
         );
@@ -4940,127 +4940,124 @@
   // 参考: http://www59.atwiki.jp/nicoapi/pages/24.html
   // TampermonkeyはContent-Type: text/xmlのページで動かないため、
   // 同じドメインにある適当なテキストapiを踏み台にして通信する
-  window.WatchItLater.loader.ceAPILoader = (function() {
+  window.WatchItLater.loader.ceAPIClient = (function() {
     var BASE_URL = 'http://api.ce.nicovideo.jp/api/v1/system.unixtime?';
     var MESSAGE_ORIGIN = 'http://api.ce.nicovideo.jp/';
-    var loaderFrame, loaderWindow;
-    var initialDef, sessions = {};
-    var cacheData = {};
 
-    var initialize = function() {
-      initialize = initialize_;
-      initialDef = new $.Deferred();
+    function CeAPIClient() {}
 
-      console.log('%cinitialize ceApiLoader', 'background: lightgreen;');
+    CeAPIClient.prototype = {
+      initialize: function() {
+        this.initialize = this.initialize_;
+        console.log('%cinitialize CeAPIClient', 'background: lightgreen;');
+        this._initialDef = new $.Deferred();
 
-      loaderFrame = document.createElement('iframe');
-      loaderFrame.name      = 'ceAPILoader';
-      loaderFrame.className = 'ceAPILoaderFrame xDomainLoaderFrame';
-      document.body.appendChild(loaderFrame);
+        var sessions  = this._sessions  = {};
+        var cacheData = this._cacheData = {};
 
-      window.loaderWindow = loaderWindow = loaderFrame.contentWindow;
+        var loaderFrame = document.createElement('iframe');
+        loaderFrame.name      = 'ceAPILoader';
+        loaderFrame.className = 'ceAPILoaderFrame xDomainLoaderFrame';
+        document.body.appendChild(loaderFrame);
 
-      EventDispatcher.addEventListener('onMessage', function(data, type) {
-        if (type !== 'ceAPILoader') { return; }
-        if (data.status === 'initialized') {
-          return onInitialized();
-        }
+        this._loaderWindow = loaderFrame.contentWindow;
 
-        if (data.sessionId) {
-          var def = sessions[data.sessionId];
-          delete sessions[data.sessionId];
-
-          if (data.status === 'ok') {
-            cacheData[data.url] = data.body;
-            return def.resolve(data.body);
-          } else {
-            cacheData[data.url] = data.body;
-            window.setTimeout(function() { delete cacheData[data.url]; }, 60000);
-            return def.reject(data.status);
+        EventDispatcher.addEventListener('onMessage', $.proxy(function(data, type) {
+          if (type !== 'ceAPILoader') { return; }
+          if (data.status === 'initialized') {
+            return this._onInitialized();
           }
-        }
-      });
 
-      loaderWindow.location.replace(BASE_URL);
+          if (data.sessionId) {
+            var def = sessions[data.sessionId];
+            delete sessions[data.sessionId];
 
-      return initialDef.promise();
-    };
-
-    var onInitialized = function() {
-      return initialDef.resolve();
-    };
-
-    var initialize_ = function() {
-      var def = new $.Deferred();
-      window.setTimeout(function() { def.resolve(); }, 0);
-      return def;
-    };
-
-    var load = function(url) {
-      var def = new $.Deferred();
-      if (cacheData[url]) {
-        window.setTimeout(function() { def.resolve(cacheData[url]); }, 0);
-        return def.promise();
-      }
-
-      var sessionId = 'session_' + Math.random();
-      sessions[sessionId] = def;
-      try {
-        loaderWindow.postMessage(JSON.stringify({
-          sessionId: sessionId,
-          url: url
-        }),
-        MESSAGE_ORIGIN);
-      } catch (e) {
-        console.log('%cException!', 'background: red;', e);
-        delete sessions[sessionId];
-        return def.reject();
-      }
-      return def.promise();
-    };
-
-    var videoArray = function(watchId, format) {
-      return initialize().then(function() {
-        var url = '/nicoapi/v1/video.array?v=';
-        var ids = [], def = new $.Deferred();
-
-        $(typeof watchId !== 'string' ? watchId : [watchId]).each(function(i, id) {
-          ids.push(id);
-        });
-        ids = window._.unique(ids);
-        if (ids.length < 1) {
-          window.setTimeout(function() { def.resolve({}); }, 0);
-          return;
-        }
-
-        url = url + ids.join(',');
-        if (!format || format !== 'xml') {
-          url += '&__format=json';
-        }
-
-        load(url).then(function(result) {
-          try {
-            if (!format && format !== 'xml') {
-              result = JSON.parse(result).nicovideo_video_response;
-              result.status = result['@status'];
-              delete result['@status'];
+            if (data.status === 'ok') {
+              cacheData[data.url] = data.body;
+              return def.resolve(data.body);
+            } else {
+              cacheData[data.url] = data.body;
+              window.setTimeout(function() { delete cacheData[data.url]; }, 60000);
+              return def.reject(data.status);
             }
-          } catch (e) {
-            console.log('%cJSON parse Error!', 'background: red;', e);
-            def.reject({});
           }
-          return def.resolve(result);
-        }, function() {
-          return def.reject();
-        });
+        }, this));
 
+        this._loaderWindow.location.replace(BASE_URL);
+
+        return this._initialDef.promise();
+      },
+      initialize_: function() {
+        var def = new $.Deferred();
+        window.setTimeout(function() { def.resolve(); }, 0);
         return def.promise();
-      });
+      },
+      _onInitialized: function() {
+        return this._initialDef.resolve();
+      },
+      _load: function(url) {
+        var def = new $.Deferred(), cacheData = this._cacheData;
+        if (cacheData[url]) {
+          window.setTimeout(function() { def.resolve(cacheData[url]); }, 0);
+          return def.promise();
+        }
+
+        var sessionId = 'session_' + Math.random();
+        this._sessions[sessionId] = def;
+        try {
+          this._loaderWindow.postMessage(JSON.stringify({
+            sessionId: sessionId,
+            url: url
+          }),
+          MESSAGE_ORIGIN);
+        } catch (e) {
+          console.log('%cException!', 'background: red;', e);
+          delete this._sessions[sessionId];
+          return def.reject();
+        }
+        return def.promise();
+      },
+      videoArray: function(watchId, format) {
+        return this.initialize().then($.proxy(function() {
+          var url = '/nicoapi/v1/video.array?v=';
+          var ids = [], def = new $.Deferred();
+
+          $(typeof watchId !== 'string' ? watchId : [watchId]).each(function(i, id) {
+            ids.push(id);
+          });
+          ids = window._.unique(ids);
+          if (ids.length < 1) {
+            window.setTimeout(function() { def.resolve({}); }, 0);
+            return;
+          }
+
+          url = url + ids.join(',');
+          if (!format || format !== 'xml') {
+            url += '&__format=json';
+          }
+
+          this._load(url).then(function(result) {
+            try {
+              if (!format && format !== 'xml') {
+                result = JSON.parse(result).nicovideo_video_response;
+                result.status = result['@status'];
+                delete result['@status'];
+              }
+            } catch (e) {
+              console.log('%cJSON parse Error!', 'background: red;', e);
+              def.reject({});
+            }
+            return def.resolve(result);
+          }, function() {
+            return def.reject();
+          });
+
+          return def.promise();
+        }, this));
+      }
     };
 
-    return {
-      videoArray: videoArray
-    };
+    return new CeAPIClient();
   })();
 
 
@@ -8756,8 +8753,10 @@
         this._$input     = this._$view.find('.grepInput').attr('list', params.listName);
         this._$community = this._$view.find('.community');
         this._$alive     = this._$view.find('.alive');
+        this._$duration  = this._$view.find('.duration');
         this._$invert    = this._$view.find('.invert');
         this._$checkboxes = this._$view.find('input[type=checkbox]');
+        this._$selectors  = this._$view.find('select');
 
         this._not = false;
 
@@ -8768,6 +8767,9 @@
 
         this._$form.on('submit', $.proxy(this._onFormSubmit, this));
         this._$checkboxes.on('click', $.proxy(this._onCheckClick, this));
+        this._$selectors
+          .on('click',  $.proxy(this._onSelectorClick, this))
+          .on('change', $.proxy(this._onSelectorChange, this));
 
         this._$input.on('click', $.proxy(function(e) {
           e.stopPropagation();
@@ -8789,6 +8791,7 @@
         this._$input.val('');
         this._$checkboxes.prop('checked', false);
         this._$view.removeClass('active');
+        this._$selectors.val('');
       },
       update: function() {
         var list = this._content.getRawList();
@@ -8807,12 +8810,20 @@
       _isActive: function() {
         return (this._$input.val().length > 0 ||
           !!this._$community.prop('checked') ||
+          !!this._$duration.val() ||
           !!this._$alive    .prop('checked'));
       },
       _getWord: function() {
         return $.trim(this._$input.val());
       },
       _onCheckClick: function(e) {
+        e.stopPropagation();
+        this._submit();
+      },
+      _onSelectorClick: function(e) {
+        e.stopPropagation();
+      },
+      _onSelectorChange: function(e) {
         e.stopPropagation();
         this._submit();
       },
@@ -8848,8 +8859,10 @@
         var word = to_h(this._getWord());
         var communityReg = /^so|^\d+$/;
         var wordFilter      = word.length > 0;
+        var durationVal     = parseInt(this._$duration.val(), 10);
         var communityFilter = !!this._$community.prop('checked');
         var aliveFilter     = !!this._$alive.prop('checked');
+        var durationFilter  = !isNaN(durationVal);
         var isInvert        = !!this._$invert.prop('checked');
 
 
@@ -8872,6 +8885,22 @@
           return false;
         };
 
+        var durationMatch = function(item) {
+          var itemDuration;
+          if (item.length_seconds) {
+            itemDuration = item.length_seconds;
+          } else {
+            var tmp = item.length.split(':');
+            itemDuration = parseInt(tmp[0], 10) * 60 + parseInt(tmp[1], 10);
+          }
+
+          if (durationVal < 0) {
+            return itemDuration <= Math.abs(durationVal);
+          } else {
+            return itemDuration >= durationVal;
+          }
+        };
+
         var grepFilter = function(item) {
           var result = true, i = func.length, f;
           while (--i >= 0 && (result || isInvert)) {
@@ -8885,6 +8914,7 @@
         if (wordFilter)      { func.push(isMatch); }
         if (communityFilter) { func.push(isCommunity); }
         if (aliveFilter)     { func.push(isAlive); }
+        if (durationFilter)  { func.push(durationMatch); }
 
         if (func.length < 1) { return null; }
 
@@ -8929,6 +8959,19 @@
               '<input type="search" class="grepInput" autocomplete="on" placeholder="タイトル・説明文で絞り込む(G)" accesskey="g">',
               '<label class="communityFilter filter"><input type="checkbox" class="community">チャンネル・コミュニティ・マイメモリーのみ</label>',
               '<label class="aliveFilter filter"><input type="checkbox" class="alive">生存動画のみ</label>',
+              '<label class="durationFilter filter">',
+                '動画時間<select class="duration">',
+                  '<option value="">指定無し</option>',
+                  '<option value="-180">3分以内</option>',
+                  '<option value="180" >3分以上</option>',
+                  '<option value="-300">5分以内</option>',
+                  '<option value="300" >5分以上</option>',
+                  '<option value="-600">10分以内</option>',
+                  '<option value="600" >10分以上</option>',
+                  '<option value="-1800">30分以内</option>',
+                  '<option value="1800" >30分以上</option>',
+                '</select>',
+              '</label>',
               '<label class="invertFilter filter"><input type="checkbox" class="invert">絞り込みの反転</label>',
             '</form>',
           '</div>',
@@ -9280,6 +9323,19 @@
               '<input type="search" class="grepInput" autocomplete="on" placeholder="とりマイをタイトル・説明文で絞り込む(G)" accesskey="g">',
               '<label class="communityFilter filter"><input type="checkbox" class="community">チャンネル・コミュニティ・マイメモリーのみ</label>',
               '<label class="aliveFilter filter"><input type="checkbox" class="alive">生存動画のみ</label>',
+              '<label class="durationFilter filter">',
+                '動画長<select class="duration">',
+                  '<option value="">指定無し</option>',
+                  '<option value="-180">3分以内</option>',
+                  '<option value="180" >3分以上</option>',
+                  '<option value="-300">5分以内</option>',
+                  '<option value="300" >5分以上</option>',
+                  '<option value="-600">10分以内</option>',
+                  '<option value="600" >10分以上</option>',
+                  '<option value="-1800">30分以内</option>',
+                  '<option value="1800" >30分以上</option>',
+                '</select>',
+              '</label>',
               '<label class="invertFilter filter"><input type="checkbox" class="invert">絞り込みの反転</label>',
             '</form>',
           '</div>',
@@ -13452,8 +13508,8 @@
           });
         },
         testCeAPIVideoArray: function(def) {
-          window.WatchItLater.loader.ceAPILoader.videoArray(['sm9', 'sm13']).then(function(result) {
-            console.log('ceAPIAPILoader.videoArray', result);
+          window.WatchItLater.loader.ceAPIClient.videoArray(['sm9', 'sm13']).then(function(result) {
+            console.log('ceAPIAPIClient.videoArray', result);
             expect(result.status).toEqual('ok', 'status');
             expect(result.video_info).toBeTruthy('動画情報がある');
             expect(result.video_info[0].video.id).toEqual('sm9', '動画id');
