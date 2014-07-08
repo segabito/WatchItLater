@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140703
+// @version        1.140709
 // ==/UserScript==
 
 /**
@@ -632,17 +632,6 @@
       }
       #outline .openConfButton { padding: 0 8px; letter-spacing: 4px; width: 60px; }
 
-      {* 全画面時にタグとプレイリストを表示しない時*}
-      {*body.full_and_mini.full_with_browser #playerAlignmentArea{
-        margin-bottom: 0 !important;
-      }
-      body.full_and_mini.full_with_browser #playlist{
-        z-index: auto;
-      }
-      body.full_and_mini.full_with_browser .generationMessage{
-        display: inline-block;
-      }*}
-
       {* 全画面時にプレイリスト表示 *}
       body.full_with_browser.fullWithPlaylist #playlist{
         z-index: 100 !important;
@@ -764,6 +753,11 @@
       }
       #siteHeader .videoCountDiff.blink, #fullScreenToggleContainer .videoCountDiff.blink {
         opacity: 1; color: yellow;
+      }
+      .size_medium #siteHeaderNicopoPurchase,
+      .size_medium #siteHeaderUserNickNameContainer,
+      #siteHeaderNotificationPremium {
+        display: none !important;
       }
       #fullScreenToggleContainer .blink, #videoCounter .blink {
         color: #000;
@@ -6855,11 +6849,11 @@
 
     var request = function(param) {
       var url, nickname, userId, type, baseUrl;
-      var def = new $.Deferred;
+      var def = new $.Deferred();
       try {
           url      = '';
-          nickname = param.nickname || WatchController.getMyNick();
-          userId   = param.userId   || WatchController.getMyUserId();
+          nickname = param.nickname || window.WatchController.getMyNick();
+          userId   = param.userId   || window.WatchController.getMyUserId();
           type     = param.type     || 'user';
           baseUrl  = '/my/top/' + type + '?innerPage=1&mode=next_page';
           if (param.userId) {
@@ -9574,6 +9568,8 @@
       if (force !== true && (!conf.videoExplorerHack || !WatchController.isSearchMode())) { return; }
       $('#videoExplorer, #content, #bottomContentTabContainer').toggleClass('w_adjusted', conf.videoExplorerHack);
       var
+        isWindows = window.navigator.platform.toLowerCase().indexOf('win') >= 0,
+        scrollBarMargin = isWindows ? 16 : 0,
         rightAreaWidth = $('.videoExplorerBody').outerWidth(), // 592
         availableWidth = Math.max($(window).innerWidth() - rightAreaWidth, 300),
         commentInputHeight = $('#playerContainer').hasClass('oldTypeCommentInput') ? 30 : 0,
@@ -9679,7 +9675,7 @@
           'body.videoExplorer #bottomContentTabContainer.w_adjusted .videoExplorerFooterAdsContainer { width: 520px; }\n',
 
           'body.videoExplorer #content.w_adjusted #playerTabWrapper {',
-            'height: ', (availableHeight), 'px !important;',
+            'height: ', availableHeight, 'px !important;',
           '}',
 
           'body.videoExplorer #content.w_adjusted #playerTabWrapper .sidePanelInner {',
