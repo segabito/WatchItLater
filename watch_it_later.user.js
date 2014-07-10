@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140709
+// @version        1.140711
 // ==/UserScript==
 
 /**
@@ -754,6 +754,8 @@
       #siteHeader .videoCountDiff.blink, #fullScreenToggleContainer .videoCountDiff.blink {
         opacity: 1; color: yellow;
       }
+      .videoExplorer #siteHeaderNicopoPurchase,
+      .videoExplorer #siteHeaderUserNickNameContainer,
       .size_medium #siteHeaderNicopoPurchase,
       .size_medium #siteHeaderUserNickNameContainer,
       #siteHeaderNotificationPremium {
