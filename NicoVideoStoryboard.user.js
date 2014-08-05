@@ -7,7 +7,7 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.1.0
+// @version        1.1.1
 // ==/UserScript==
 
 // ver 1.1.0  Chrome + Tampermonkeyでも動くようにした
@@ -59,6 +59,13 @@
         transition: bottom 0.5s ease-in-out;
       }
 
+      {* FlashPlayerに重なる可能性のない状況ではGPUレイヤーにする *}
+      .full_with_brower .storyboardContainer,
+      .videoExplorer    .storyboardContainer {
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
+      }
+
       .storyboardContainer.withCustomGinzaWatch {
         z-index: 100000;
       }
@@ -105,12 +112,10 @@
 
       .storyboardContainer .boardList .board.lazyImage {
         background-color: #ccc;
+        cursor: wait;
       }
       .storyboardContainer .boardList .board.loadFail {
         background-color: #c99;
-      }
-      .storyboardContainer .boardList .board.lazyImage {
-        cursor: wait;
       }
 
       .storyboardContainer .boardList .board > div {
@@ -426,150 +431,151 @@
       return eventDispatcher;
     })();
 
+    var initializeWatchController = function() {
+      window.NicoVideoStoryboard.external.watchController = (function() {
+        var root = window.WatchApp.ns;
+        var nicoPlayerConnector = root.init.PlayerInitializer.nicoPlayerConnector;
+        var watchInfoModel      = root.model.WatchInfoModel.getInstance();
+        var viewerInfoModel     = root.init.CommonModelInitializer.viewerInfoModel;
+        var playerAreaConnector = root.init.PlayerInitializer.playerAreaConnector;
+        var playlist            = root.init.PlaylistInitializer.playlist;
+        var externalNicoplayer;
 
-    window.NicoVideoStoryboard.external.watchController = (function() {
-      var root = window.WatchApp.ns;
-      var nicoPlayerConnector = root.init.PlayerInitializer.nicoPlayerConnector;
-      var watchInfoModel      = root.model.WatchInfoModel.getInstance();
-      var viewerInfoModel     = root.init.CommonModelInitializer.viewerInfoModel;
-      var playerAreaConnector = root.init.PlayerInitializer.playerAreaConnector;
-      var playlist            = root.init.PlaylistInitializer.playlist;
-      var externalNicoplayer;
+        var watchController = new EventDispatcher();
 
-      var watchController = new EventDispatcher();
+        var getVpos = function() {
+          return nicoPlayerConnector.getVpos();
+        };
+        var setVpos = function(vpos) {
+          nicoPlayerConnector.seekVideo(vpos);
+        };
 
-      var getVpos = function() {
-        return nicoPlayerConnector.getVpos();
-      };
-      var setVpos = function(vpos) {
-        nicoPlayerConnector.seekVideo(vpos);
-      };
+        var _isPlaying = null;
+        var isPlaying = function() {
+          if (_isPlaying !== null) {
+            return _isPlaying;
+          }
+          if (!externalNicoplayer) {
+            externalNicoplayer = $("#external_nicoplayer")[0];
+          }
+          var status = externalNicoplayer.ext_getStatus();
+          return status === 'playing';
+        };
+        var play = function() {
+          nicoPlayerConnector.playVideo();
+        };
+        var pause = function() {
+          nicoPlayerConnector.stopVideo();
+        };
 
-      var _isPlaying = null;
-      var isPlaying = function() {
-        if (_isPlaying !== null) {
-          return _isPlaying;
-        }
-        if (!externalNicoplayer) {
-          externalNicoplayer = $("#external_nicoplayer")[0];
-        }
-        var status = externalNicoplayer.ext_getStatus();
-        return status === 'playing';
-      };
-      var play = function() {
-        nicoPlayerConnector.playVideo();
-      };
-      var pause = function() {
-        nicoPlayerConnector.stopVideo();
-      };
+        var isPremium = function() {
+          return !!viewerInfoModel.isPremium;
+        };
 
-      var isPremium = function() {
-        return !!viewerInfoModel.isPremium;
-      };
+        var getWatchId = function() {// スレッドIDだったりsmXXXXだったり
+          return watchInfoModel.v;
+        };
+        var getVideoId = function() {// smXXXXXX, soXXXXX など
+          return watchInfoModel.id;
+        };
 
-      var getWatchId = function() {// スレッドIDだったりsmXXXXだったり
-        return watchInfoModel.v;
-      };
-      var getVideoId = function() {// smXXXXXX, soXXXXX など
-        return watchInfoModel.id;
-      };
+        var popupMarquee = root.init.PopupMarqueeInitializer.popupMarqueeViewController;
+        var popup = {
+          message: function(text) {
+            popupMarquee.onData(
+              '<span style="background: black;">' + text + '</span>'
+            );
+          },
+          alert: function(text) {
+            popupMarquee.onData(
+              '<span style="background: black; color: red;">' + text + '</span>'
+            );
+          }
+        };
 
-      var popupMarquee = root.init.PopupMarqueeInitializer.popupMarqueeViewController;
-      var popup = {
-        message: function(text) {
-          popupMarquee.onData(
-            '<span style="background: black;">' + text + '</span>'
-          );
-        },
-        alert: function(text) {
-          popupMarquee.onData(
-            '<span style="background: black; color: red;">' + text + '</span>'
-          );
-        }
-      };
+        var _playlist = {
+          isContinuous: function() {
+            return playlist.isContinuous();
+          },
+          playNext: function() {
+            nicoPlayerConnector.playNextVideo();
+          },
+          playPrev: function() {
+            nicoPlayerConnector.playpreviousVideo();
+          }
+        };
 
-      var _playlist = {
-        isContinuous: function() {
-          return playlist.isContinuous();
-        },
-        playNext: function() {
-          nicoPlayerConnector.playNextVideo();
-        },
-        playPrev: function() {
-          nicoPlayerConnector.playpreviousVideo();
-        }
-      };
+        playerAreaConnector.addEventListener('onVideoPlayed', function() {
+          _isPlaying = true;
+          watchController.dispatchEvent('onVideoPlayed');
+        });
+        playerAreaConnector.addEventListener('onVideoStopped', function() {
+          _isPlaying = false;
+          watchController.dispatchEvent('onVideoStopped');
+        });
 
-      playerAreaConnector.addEventListener('onVideoPlayed', function() {
-        _isPlaying = true;
-        watchController.dispatchEvent('onVideoPlayed');
-      });
-      playerAreaConnector.addEventListener('onVideoStopped', function() {
-        _isPlaying = false;
-        watchController.dispatchEvent('onVideoStopped');
-      });
+        playerAreaConnector.addEventListener('onVideoStarted', function() {
+          _isPlaying = true;
+          watchController.dispatchEvent('onVideoStarted');
+        });
+        playerAreaConnector.addEventListener('onVideoEnded', function() {
+          _isPlaying = false;
+          watchController.dispatchEvent('onVideoEnded');
+        });
 
-      playerAreaConnector.addEventListener('onVideoStarted', function() {
-        _isPlaying = true;
-        watchController.dispatchEvent('onVideoStarted');
-      });
-      playerAreaConnector.addEventListener('onVideoEnded', function() {
-        _isPlaying = false;
-        watchController.dispatchEvent('onVideoEnded');
-      });
+        playerAreaConnector.addEventListener('onVideoSeeking', function() {
+          //console.log('%conVideoSeeking', 'background: cyan');
+          watchController.dispatchEvent('onVideoSeeking');
+        });
+        playerAreaConnector.addEventListener('onVideoSeeked', function() {
+          //console.log('%conVideoSeeked', 'background: cyan');
+          watchController.dispatchEvent('onVideoSeeked');
+        });
 
-      playerAreaConnector.addEventListener('onVideoSeeking', function() {
-        //console.log('%conVideoSeeking', 'background: cyan');
-        watchController.dispatchEvent('onVideoSeeking');
-      });
-      playerAreaConnector.addEventListener('onVideoSeeked', function() {
-        //console.log('%conVideoSeeked', 'background: cyan');
-        watchController.dispatchEvent('onVideoSeeked');
-      });
+        playerAreaConnector.addEventListener('onVideoInitialized', function() {
+          watchController.dispatchEvent('onVideoInitialized');
+        });
 
-      playerAreaConnector.addEventListener('onVideoInitialized', function() {
-        watchController.dispatchEvent('onVideoInitialized');
-      });
+        watchInfoModel.addEventListener('reset', function() {
+          watchController.dispatchEvent('onWatchInfoReset');
+        });
 
-      watchInfoModel.addEventListener('reset', function() {
-        watchController.dispatchEvent('onWatchInfoReset');
-      });
+        var isWatchItLaterExist = function() {
+          return !!window.WatchItLater;
+        };
+        var isShinjukuWatchExist = function() {
+          return !!window.ShinjukuWatch;
+        };
 
-      var isWatchItLaterExist = function() {
-        return !!window.WatchItLater;
-      };
-      var isShinjukuWatchExist = function() {
-        return !!window.ShinjukuWatch;
-      };
-
-      var isCustomGinzaWatchExist = function() {
-        return $('body>#prefDiv').length > 0;
-      };
+        var isCustomGinzaWatchExist = function() {
+          return $('body>#prefDiv').length > 0;
+        };
 
 
-      window.WatchApp.mixin(watchController, {
-        getVpos: getVpos,
-        setVpos: setVpos,
+        window.WatchApp.mixin(watchController, {
+          getVpos: getVpos,
+          setVpos: setVpos,
 
-        isPlaying: isPlaying,
-        play:  play,
-        pause: pause,
+          isPlaying: isPlaying,
+          play:  play,
+          pause: pause,
 
-        isPremium: isPremium,
+          isPremium: isPremium,
 
-        getWatchId: getWatchId,
-        getVideoId: getVideoId,
+          getWatchId: getWatchId,
+          getVideoId: getVideoId,
 
-        popup: popup,
-        playlist: _playlist,
+          popup: popup,
+          playlist: _playlist,
 
-        isWatchItLaterExist:     isWatchItLaterExist,
-        isShinjukuWatchExist:    isShinjukuWatchExist,
-        isCustomGinzaWatchExist: isCustomGinzaWatchExist
-      });
+          isWatchItLaterExist:     isWatchItLaterExist,
+          isShinjukuWatchExist:    isShinjukuWatchExist,
+          isCustomGinzaWatchExist: isCustomGinzaWatchExist
+        });
 
-      return watchController;
-    })();
+        return watchController;
+      })();
+    };
 
 
     window.NicoVideoStoryboard.api.getflv = (function() {
@@ -1200,7 +1206,6 @@
             .hover(onHoverIn, onHoverOut)
             .on('touchstart',  $.proxy(this._onTouchStart, this))
             .on('touchend',    $.proxy(this._onTouchEnd,   this))
-//            .on('touchcancel', $.proxy(this._onTouchCancel, this))
             .on('touchmove',   $.proxy(this._onTouchMove,  this))
             .on('scroll', _.throttle(function() { self._onScroll(); }, 500));
 
@@ -1270,7 +1275,6 @@
         },
         _onTouchEnd: function(e) {
           e.stopPropagation();
-//         window.setTimeout($.proxy(function() { this._isHover = false; }, this), 100);
         },
         _onTouchMove: function(e) {
           e.stopPropagation();
@@ -1334,7 +1338,9 @@
             this.enableTimer();
           } else {
             this._currentUrl = url;
+            console.time('createStoryboardDOM');
             this._updateSuccessFull();
+            console.timeEnd('createStoryboardDOM');
           }
           $('body').addClass('NicoVideoStoryboardOpen');
 
@@ -1869,6 +1875,7 @@
       var watchInfoModel = window.WatchApp.ns.model.WatchInfoModel.getInstance();
       if (watchInfoModel.initialized) {
         console.log('%c initialize', 'background: lightgreen;');
+        initializeWatchController();
         window.NicoVideoStoryboard.initialize();
       } else {
         var onReset = function() {
@@ -1876,6 +1883,7 @@
           window.setTimeout(function() {
             watchInfoModel.removeEventListener('reset', onReset);
             console.log('%c initialize', 'background: lightgreen;');
+            initializeWatchController();
             window.NicoVideoStoryboard.initialize();
           }, 0);
         };

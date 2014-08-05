@@ -21,26 +21,10 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140711
+// @version        1.140723
 // ==/UserScript==
 
-/**
- *
- *
- * やりたい事・アイデア
- * ・検索画面にコミュニティ動画一覧を表示 (チャンネルより難しい。力技でなんとかする)
- * ・シークバーのサムネイルを並べて表示するやつ   (単体スクリプトのほうがよさそう)
- * ・キーワード検索/タグ検索履歴の改修
- * ・ユーザーの投稿動画一覧に「xxさんのニコレポ」という架空のマイリストフォルダを出す
- * ・動画ランキングを「ニコニコ動画さん」という架空ユーザーの公開マイリストにする
- * ・「ニコニコチャンネルさん」という架空ユーザーを作って各ジャンルの新着を架空マイリストにする
- * ・横スクロールを賢くする
- * ・お気に入りユーザーの時は「@ジャンプ」許可
- * ・軽量化
- * ・綺麗なコード
- *
- * ・タグ領域の圧縮方法をShinjukuWatch形式にする
- */
+
 //
 // * ver 1.140524
 // * ver 1.140522
@@ -11557,7 +11541,10 @@
 
     function initSearchContent($, conf, w) {
       var ContentType      = WatchApp.ns.components.videoexplorer.model.ContentType;
-      var SearchSortOrder  = WatchApp.ns.components.videoexplorer.model.SearchSortOrder;
+      var searchStatus     = WatchApp.ns.components.nicosearchstatus ?
+        WatchApp.ns.components.nicosearchstatus : WatchApp.ns.components.videoexplorer;
+      var SearchSortOrder  = searchStatus.model.SearchSortOrder;
+      var SearchType       = searchStatus.model.SearchType;
       var View             = WatchApp.ns.components.videoexplorer.view.content.SearchContentView;
       var vec              = watch.VideoExplorerInitializer.videoExplorerController;
       var explorer         = vec.getVideoExplorer();
@@ -11872,14 +11859,17 @@
       }, content);
 
       // 新検索独自のソート順への対応
-      content._searchSortOrder._flush_org = content._searchSortOrder._flush;
-      content._searchSortOrder._flush = $.proxy(function() {
-        var sort = this._sort[WatchApp.ns.components.videoexplorer.model.SearchType.KEYWORD];
+      var _searchSortOrder =
+        content._nicoSearchStatus ?
+          content._nicoSearchStatus._searchSortOrder : content._searchSortOrder;
+      _searchSortOrder._flush_org = _searchSortOrder._flush;
+      _searchSortOrder._flush = $.proxy(function() {
+        var sort = this._sort[SearchType.KEYWORD];
         if (sort === '_hot' || sort === '_popular' || sort === '_explore') { // 新検索にしかないパラメータは保存しない
           return;
         }
         this._flush_org();
-      }, content._searchSortOrder);
+      }, _searchSortOrder);
 
 
       EventDispatcher.addEventListener('on.config.searchPageItemCount', function() {
@@ -11909,8 +11899,8 @@
       // デフォルト値を書き換えるという力技で対抗
       SearchSortOrder.TAG_DEFAULT_SORT  = conf.searchSortType;
       SearchSortOrder.TAG_DEFAULT_ORDER = conf.searchSortOrder;
-      content._searchSortOrder.getSortFromCookie  = function() { return conf.searchSortType; };
-      content._searchSortOrder.getOrderFromCookie = function() { return conf.searchSortOrder; };
+      _searchSortOrder.getSortFromCookie  = function() { return conf.searchSortType; };
+      _searchSortOrder.getOrderFromCookie = function() { return conf.searchSortOrder; };
 
       content.load_org = content.load;
       content.load = $.proxy(function(params, callback) {
@@ -13588,7 +13578,7 @@
               _watchController(window);
 
             ZeroFunc(window);
-          }, 0);
+          }, 100);
         };
         watchInfoModel.addEventListener('reset', onReset);
       }
