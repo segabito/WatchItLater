@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140723
+// @version        1.140806
 // ==/UserScript==
 
 
@@ -2265,7 +2265,9 @@
       error: noop,
       trace: noop,
       warn: noop,
-      table: noop
+      table: noop,
+      time: noop,
+      timeEnd: noop
     };
   })(conf);
 
@@ -2734,7 +2736,7 @@
             var d = new $.Deferred();
             setTimeout(function() {
               try {
-              $.proxy(self.spec[name], self)(d);
+                $.proxy(self.spec[name], self)(d);
               } catch (e) {
                 window.console.log(e);
                 d.reject();
@@ -6915,11 +6917,11 @@
       loadOwner: function(callback, p) {
         p = p || {};
         p.type = 'owner';
-        p.userId = WatchController.getOwnerId();
+        p.userId = window.WatchController.getOwnerId();
         return self.load(callback, p);
       }
     };
-    WatchItLater.NicorepoVideo = self;
+    window.WatchItLater.NicorepoVideo = self;
 
     return self;
   })(w, Util);
@@ -10216,6 +10218,7 @@
       EventDispatcher.addEventListener('onVideoExplorerRefreshStart', function(content) {
         window.WatchApp.ns.util.WindowUtil.scrollFit('#videoExplorer');
       });
+
       EventDispatcher.addEventListener('onVideoExplorerOpening', function(content) {
         $('body').addClass('videoExplorerOpening');
         adjustVideoExplorerSize(true);
@@ -10242,6 +10245,7 @@
         window.console.time('onFirstVideoExplorerOpen');
         EventDispatcher.addEventListener('onWindowResizeEnd',  adjustVideoExplorerSize);
         EventDispatcher.addEventListener('onVideoInitialized', adjustVideoExplorerSize);
+        adjustVideoExplorerSize(true);
         window.console.timeEnd('onFirstVideoExplorerOpen');
       });
 
