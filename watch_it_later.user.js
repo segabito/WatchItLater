@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140806
+// @version        1.140811
 // ==/UserScript==
 
 
@@ -174,6 +174,8 @@
       shortcutToggleStageVideo:   {char: 'H', shift: true,  ctrl: false, alt: false, enable: false}, // ハードウェアアクセラレーション(StageVideo)のショートカット
 
       shortcutInvisibleInput:     {char: 'C', shift: false, ctrl: false,  alt: true, enable: true}, // 停止/再生
+
+      initializeImmediately: false, // 動画のロードを待たずに初期化する
 
       watchCounter: 0, // お前は今までに見た動画の数を覚えているのか？をカウントする
       forceEnableStageVideo: false,
@@ -2271,7 +2273,7 @@
     };
   })(conf);
 
-  var ConfigPanel = (function($, conf, w) {
+  var ConfigPanel = (function($, conf, w) { // SettingPanel
     var pt = function(){};
     var $panel = null, $shadow = null;
     var menus = [
@@ -2450,7 +2452,9 @@
       {title: 'ゆっくり再生(スロー再生)ボタンを表示', varName: 'enableYukkuriPlayButton',
         values: {'する': true, 'しない': false}},
 
-      {title: '実験中の設定', debugOnly: true, className: 'forDebug'},
+      {title: '実験中の設定', debugOnly: true},
+      {title: '動画のロードを待たずに初期化する', varName: 'initializeImmediately',
+        values: {'する': true, 'しない': false}},
 //      {title: 'プレイリスト消えないモード(※実験中)',       varName: 'hashPlaylistMode', debugOnly: true, reload: true,
 //        values: {'有効(連続再生中のみ)': 1, '有効(常時)': 2, '無効': 0}},
 
@@ -13585,6 +13589,16 @@
           }, 100);
         };
         watchInfoModel.addEventListener('reset', onReset);
+        if (conf.initializeImmediately) {
+          console.log('%cinitialize Immediately', 'background: lightgreen;');
+          WatchApp.ns.EmbeddedWatchData.run_ = WatchApp.ns.EmbeddedWatchData.run;
+          WatchApp.ns.EmbeddedWatchData.run = function() {};
+          window.setTimeout(function() {
+            console.time('initialize Immediately');
+            WatchApp.ns.EmbeddedWatchData.run_(JSON.parse($('#configDataContainer').html()));
+            console.timeEnd('initialize Immediately');
+          }, 0);
+        }
       }
     })();
   } else
