@@ -2320,14 +2320,14 @@
       {title: '大画面をもっと大画面にする', varName: 'customPlayerSize',
         description: '※有効にするとニコニコニュースが表示できなくなります。',
         values: {'フルHD': '1080p', '720p': '720p',  '自動調整(推奨)': 'auto', 'しない': ''}},
-      {title: 'プレイリスト消えないモード(実験中)', varName: 'storagePlaylistMode', reload: true,
+      {title: 'プレイリスト消えないモード', varName: 'storagePlaylistMode', reload: true,
         description: '有効にすると、リロードしてもプレイリストが消えなくなります。',
         values:
           (conf.debugMode ?
             {'ウィンドウを閉じるまで': 'sessionStorage', 'ずっと保持': 'localStorage', 'しない': ''} :
             {'有効(ウィンドウを閉じるまで)': 'sessionStorage', '無効': ''})
       },
-      {title: '説明文中の動画IDにサムネイル表示(実験中)',  varName: 'enableDescriptionThumbnail', reload: true,
+      {title: '説明文中の動画IDにサムネイル表示',  varName: 'enableDescriptionThumbnail', reload: true,
 //        description: 'Chrome+Tampermonkeyでは動きません',
         values: {'有効': true, '無効': false}},
 
@@ -2452,7 +2452,7 @@
       {title: 'ゆっくり再生(スロー再生)ボタンを表示', varName: 'enableYukkuriPlayButton',
         values: {'する': true, 'しない': false}},
 
-      {title: '実験中の設定', debugOnly: true},
+      {title: '実験中の設定', className: 'forDebug'},
       {title: '動画のロードを待たずに初期化する', varName: 'initializeImmediately',
         values: {'する': true, 'しない': false}},
 //      {title: 'プレイリスト消えないモード(※実験中)',       varName: 'hashPlaylistMode', debugOnly: true, reload: true,
