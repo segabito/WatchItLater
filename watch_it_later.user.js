@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140811
+// @version        1.140816
 // ==/UserScript==
 
 
@@ -2220,6 +2220,12 @@
         -webkit-background-size: contain;
         -o-background-size: contain;
         -ms-background-size: contain;
+      }
+
+      #nicoSpotAdAds >*:nth-child(2) {
+        display: none !imortant;
+        position: fixed;
+        top: -999px;
       }
 
    */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
@@ -13592,7 +13598,9 @@
         if (conf.initializeImmediately) {
           console.log('%cinitialize Immediately', 'background: lightgreen;');
           WatchApp.ns.EmbeddedWatchData.run_ = WatchApp.ns.EmbeddedWatchData.run;
-          WatchApp.ns.EmbeddedWatchData.run = function() {};
+          WatchApp.ns.EmbeddedWatchData.run = function() {
+            $('#nicoSpotAdAds >*:nth-child(2)').remove();
+          };
           window.setTimeout(function() {
             console.time('initialize Immediately');
             WatchApp.ns.EmbeddedWatchData.run_(JSON.parse($('#configDataContainer').html()));
