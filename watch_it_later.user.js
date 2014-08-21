@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140816
+// @version        1.140822
 // ==/UserScript==
 
 
@@ -3058,8 +3058,8 @@
     function getToken() {
       if (!isNativeGM && host !== location.host) return null; //
 
-      var _token = (w.NicoAPI) ? w.NicoAPI.token : '';
-      if (w.NicoAPI) {
+      var _token = (w.NicoAPI && w.NicoAPI.token) ? w.NicoAPI.token : '';
+      if (w.NicoAPI && w.NicoAPI.token) {
         return w.NicoAPI.token;
       } else
       if (w.WatchApp && w.WatchJsApi) {
