@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140822
+// @version        1.140822a
 // ==/UserScript==
 
 
@@ -1846,6 +1846,9 @@
       }
       #content.w_compact        #topVideoInfo .videoDescription.description {
         background: #fff; margin: 10px 0 0;padding: 4px ;width: 1000px;{* base - 8 *} {*font-size: 90%;*}
+      }
+      .size_normal #videoHeaderDetail h2 {
+        max-width: 898px;
       }
 
       {* 本家の幅が変わったら変える必要がある。 変数化した方が楽かも base = 1008 *}
