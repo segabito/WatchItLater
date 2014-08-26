@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140822a
+// @version        1.140827
 // ==/UserScript==
 
 
@@ -148,6 +148,7 @@
       searchEngine:              'sugoi', // 'normal' 'sugoi'
       searchStartTimeRange:      '', //
       searchLengthSecondsRange:  '', //
+      searchCommentCountRange:   '', //
       searchMusicDlFilter:       false, //
 
       hideVideoExplorerExpand: true, // 「動画をもっと見る」ボタンを小さくする
@@ -6043,7 +6044,7 @@
         if (this.thumbnail_url.indexOf('.M') < 0 &&
             this.id.indexOf('sm') === 0) {
           var threshold = 23608629, // .Mのついた最小ID?
-              _id = _.parseInt(this.id.substr(2));
+              _id = window._.parseInt(this.id.substr(2));
           if (_id >= threshold) {
             this.is_middle_thumbnail = true;
           }
@@ -6229,6 +6230,14 @@
       }
       if (typeof params.channelId === 'string' && params.channelId.match(/^\d+$/)) {
         query.filters.push({type: 'equal', field: 'channel_id', value: params.channelId});
+      }
+      if (typeof params.commentCount === 'string' && params.commentCount.match(/^[0-9]+$/)) {
+        query.filters.push({
+          type: 'range',
+          field: 'comment_counter',
+          include_lower: true,
+          from: params.commentCount
+        });
       }
 
       if (params.l === 'short') { // 5分以内
@@ -11590,6 +11599,12 @@
         .w_sugoiSearch .newSearchOption {
           display: block;
         }
+        .newSearchOption select option{
+          background: #eef;
+        }
+        .newSearchOption select option:nth-child(1) {
+          background: #fff;
+        }
 
         .relatedTagList {
         }
@@ -11701,14 +11716,17 @@
           this._$musicDlFilter      = this._$view.find('.musicDlFilter');
           this._$ownerFilter        = this._$view.find('.ownerFilter');
             this._$ownerName        = this._$view.find('.ownerName');
+          this._$commentCountRange  = this._$view.find('.commentCountRange');
           this._$resetButton        = this._$view.find('.reset');
 
           this._$startTimeRange    .val(params.startTimeRange     || '');
           this._$lengthSecondsRange.val(params.lengthSecondsRange || '');
+          this._$commentCountRange .val(params.commentCountRange || '');
           this._$musicDlFilter     .attr('checked', !!params.musicDlFilter);
 
           this._$startTimeRange    .on('change', $.proxy(this._onStartTimeRangeSelect    , this));
           this._$lengthSecondsRange.on('change', $.proxy(this._onLengthSecondsRangeSelect, this));
+          this._$commentCountRange .on('change', $.proxy(this._onCommentCountRangeSelect , this));
           this._$musicDlFilter     .on('click',  $.proxy(this._onMusicDlFilterChange     , this));
           this._$ownerFilter       .on('click',  $.proxy(this._onOwnerFilterChange       , this));
           this._$resetButton       .on('click',  $.proxy(this.reset                      , this));
@@ -11735,6 +11753,10 @@
         },
         _onLengthSecondsRangeSelect: function() {
           this._content.setLengthSecondsRange(this._$lengthSecondsRange.val());
+          this.contentRefresh();
+        },
+        _onCommentCountRangeSelect: function() {
+          this._content.setCommentCountRange(this._$commentCountRange.val());
           this.contentRefresh();
         },
         _onMusicDlFilterChange: function() {
@@ -11781,6 +11803,7 @@
         content: content,
         startTimeRange:     conf.searchStartTimeRange,
         lengthSecondsRange: conf.searchLengthSecondsRange,
+        commentCountRange:  conf.searchCommentCountRange,
         musicDlFilter:      conf.searchMusicDlFilter,
         $view: $([
           '<div class="newSearchOption">',
@@ -11798,6 +11821,14 @@
               '<option selected="selected" value=""     >指定なし</option>',
               '<option                     value="short">5分以内</option>',
               '<option                     value="long" >20分以上</option>',
+            '</select>',
+            '<br>',
+            '<span>コメント数: </span>',
+            '<select class="commentCountRange" name="commentCount">',
+              '<option selected="selected" value=""     >指定なし</option>',
+              '<option                     value="10"   >  10以上</option>',
+              '<option                     value="100"  > 100以上</option>',
+              '<option                     value="1000" >1000以上</option>',
             '</select>',
             '<p>',
               '<label>',
@@ -11852,11 +11883,13 @@
 
       content._startTimeRange       = conf.searchStartTimeRange;
       content._lengthSecondsRange   = conf.searchLengthSecondsRange;
+      content._commentCountRange    = conf.searchCommentCountRange;
       content._musicDlFilter        = conf.searchMusicDlFilter;
       content._ownerFilter          = false;
 
       content.getStartTimeRange     = $.proxy(function() { return this._startTimeRange;           }, content);
       content.getLengthSecondsRange = $.proxy(function() { return this._lengthSecondsRange;       }, content);
+      content.getCommentCountRange  = $.proxy(function() { return this._commentCountRange;        }, content);
       content.getMusicDlFilter      = $.proxy(function() { return this._musicDlFilter;            }, content);
       content.getOwnerFilter        = $.proxy(function() { return this._ownerFilter;              }, content);
       content.setStartTimeRange     = $.proxy(function(value) {
@@ -11866,6 +11899,10 @@
       content.setLengthSecondsRange = $.proxy(function(value) {
         this._lengthSecondsRange = value;
         conf.setValue('searchLengthSecondsRange',value);
+      }, content);
+      content.setCommentCountRange = $.proxy(function(value) {
+        this._commentCountRange = value;
+        conf.setValue('searchCommentCountRange',value);
       }, content);
       content.setMusicDlFilter      = $.proxy(function(value) {
         this._musicDlFilter = !!value;
@@ -11900,7 +11937,8 @@
             l:    this.getLengthSecondsRange(),
             u:    this.getStartTimeRange(),
             m:    this.getMusicDlFilter(),
-            size: this._pager._pageItemCount
+            size: this._pager._pageItemCount,
+            commentCount: this.getCommentCountRange()
         }, params);
         if (this.getOwnerFilter()) {
           if (WatchController.isChannelVideo()) {
