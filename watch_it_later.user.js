@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140827
+// @version        1.140902
 // ==/UserScript==
 
 
@@ -135,7 +135,7 @@
       disableHorizontalScroll: false, // 横スクロールバーを出なくする
       hideCommentPanelSocialButtons: false, // コメントパネル下のソーシャルボタンを隠す
       mylistPanelPosition: '',
-      enableDescriptionThumbnail: false, // 説明文の動画リンクにサムネイルとタイトル表示
+      enableDescriptionThumbnail: true, // 説明文の動画リンクにサムネイルとタイトル表示
 
       enableLocalMylistCache: false,
 
@@ -176,7 +176,7 @@
 
       shortcutInvisibleInput:     {char: 'C', shift: false, ctrl: false,  alt: true, enable: true}, // 停止/再生
 
-      initializeImmediately: false, // 動画のロードを待たずに初期化する
+      initializeImmediately: true, // 動画のロードを待たずに初期化する
 
       watchCounter: 0, // お前は今までに見た動画の数を覚えているのか？をカウントする
       forceEnableStageVideo: false,
@@ -4830,7 +4830,7 @@
       var def = new $.Deferred();
       currentPromise = def;
       deferredList[sessionId] = def;
-      if (isChrome && conf.debugMode) {
+      if (isChrome) {
         // 基本的に i.nicovideo.jpのほうが高機能だが、Chrome + Tampermonkeyからは使えないため回避策
         window.WatchItLater.loader.ceAPIClient.videoArray(ids, 'xml').then(
           function(xml) { onXmlLoad(sessionId, xml); },
