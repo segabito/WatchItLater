@@ -7,8 +7,10 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.1.1
+// @version        1.1.2
 // ==/UserScript==
+
+// ver 1.1.2  仕様変更への暫定対応(後で調べてちゃんと直す)
 
 // ver 1.1.0  Chrome + Tampermonkeyでも動くようにした
 
@@ -688,7 +690,8 @@
         //console.log('thumbnailInfo.onMessage: ', data, type);
 
         var url = data.url;
-        var xml = data.xml, $xml = $(xml), $storyboard = $xml.find('storyboard');
+        var xml = data.xml, $xml = $(xml), $storyboard = $xml.find('storyboard:first');
+        var storyboardId = $storyboard.attr('id') || '1';
 
         if ($storyboard.length < 1) {
           thumbnailInfo.dispatchAsync(
@@ -700,7 +703,8 @@
         var info = {
           status:   'ok',
           message:  '成功',
-          url:      data.url,
+          id:       storyboardId,
+          url:      data.url.replace('sb=1', 'sb=' + storyboardId),
           movieId:  $xml.find('movie').attr('id'),
           duration: $xml.find('duration').text(),
           thumbnail:{
@@ -768,6 +772,7 @@
         update: function(info) {
           if (info.status !== 'ok') {
             window.WatchApp.mixin(info, {
+              id: 1,
               url: '',
               width: 1,
               height: 1,
