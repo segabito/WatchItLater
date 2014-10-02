@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.140902
+// @version        1.141002
 // ==/UserScript==
 
 
@@ -1787,7 +1787,7 @@
         display: none;
       }
       #bottomContentTabContainer.noBottom .outer, #bottomContentTabContainer.noBottom #pageFooter {
-        display: none;
+        display: none !important;
       }
       #bottomContentTabContainer.noBottom #outline {
         background: #141414; padding-top: 0; padding-bottom: 35px;
@@ -5179,9 +5179,7 @@
         }
       },
       openSearch: function() {
-          WatchApp.ns.init.VideoExplorerInitializer.expandButtonView.open();
-//        videoExplorer.openByCurrentCondition();
-//        videoExplorer.changeState(true);
+        WatchApp.ns.init.VideoExplorerInitializer.expandButtonView.open();
       },
       closeSearch: function() {
         videoExplorer.changeState(false);
@@ -10696,25 +10694,45 @@
       });
 
       var $fullScreenMenuContainer = $('<div id="fullScreenMenuContainer"/>');
-      var $fullScreenModeSwitch = $([
-          '<button class="fullScreenModeSwitch button">',
+      var $fullScreenMenuButtons = $([
+          '<button class="fullScreenModeSwitch button" data-button-type="playlist">',
             'プレイリスト: ',
             '<span class="modeStatus playlistOpening">▼</span>',
             '<span class="modeStatus playlistClosing">▲</span>',
-          '</button>'
-      ].join('')).click(togglePlaylist);
-       var $toggleStageVideo = $([
-          '<button class="stageVideoSwitch button">',
+          '</button>',
+          '<button class="stageVideoSwitch button" data-button-type="stagevideo" ',
+             'title="ハードウェアアクセラレーションのON/OFF"',
+             '>',
             'アクセラレーション: ',
             '<span class="modeStatus mode_off">OFF</span>',
             '<span class="modeStatus mode_on">ON</span>',
-          '</button>'
-      ].join('')).attr('title', 'ハードウェアアクセラレーションのON/OFF').click(function() { WatchController.toggleStageVideo(); });
-      var $toggleSetting = $([
-          '<button class="toggleSetting button">',
-          '</button>'
-      ].join('')).text('⛭設定').attr('title', '設定パネルを開閉します').click(function() { ConfigPanel.toggle();});
-      $fullScreenMenuContainer.append($fullScreenModeSwitch).append($toggleStageVideo).append($toggleSetting);
+          '</button>',
+          '<button class="toggleSetting button" data-button-type="setting">',
+          '⛭設定',
+          '</button>',
+          '<button class="button" data-button-type="prev" title="前の動画">≪</button>',
+          '<button class="button" data-button-type="next" title="次の動画">≫</button>'
+      ].join(''));
+
+      var onFullScreenMenuContainerClick = function(e) {
+        var type = $(e.target).attr('data-button-type');
+        if (type === 'playlist') {
+          togglePlaylist();
+        } else if (type === 'stagevideo') {
+          WatchController.toggleStageVideo();
+        } else if (type === 'setting') {
+          ConfigPanel.toggle();
+        } else if (type === 'prev') {
+          WatchController.prevVideo();
+        } else if (type === 'next') {
+          WatchController.nextVideo();
+        }
+      };
+
+      $fullScreenMenuContainer
+        .on('click', onFullScreenMenuContainerClick)
+        .append($fullScreenMenuButtons);
+
       $('#nicoplayerContainerInner').append($fullScreenMenuContainer);
 
 
@@ -13644,7 +13662,10 @@
           };
           window.setTimeout(function() {
             console.time('initialize Immediately');
-            WatchApp.ns.EmbeddedWatchData.run_(JSON.parse($('#configDataContainer').html()));
+            WatchApp.ns.EmbeddedWatchData.run_(
+              JSON.parse($('#configDataContainer').html()),
+              JSON.parse($('#watchAPIDataContainer').text())
+            );
             console.timeEnd('initialize Immediately');
           }, 0);
         }
