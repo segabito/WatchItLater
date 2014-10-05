@@ -7,7 +7,7 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.1.2
+// @version        1.2.0
 // ==/UserScript==
 
 // ver 1.1.2  仕様変更への暫定対応(後で調べてちゃんと直す)
@@ -112,7 +112,7 @@
         pointer-events: none;
       }
 
-      .storyboardContainer .boardList .board.lazyImage {
+      .storyboardContainer .boardList .board.lazyImage:not(.hasSub) {
         background-color: #ccc;
         cursor: wait;
       }
@@ -685,13 +685,12 @@
         }
       };
 
-      var onMessage = function(data, type) {
+      var onMessage = function(data, type) { // onThumbnailInfoLoadMessage
         if (type !== 'storyboard') { return; }
         //console.log('thumbnailInfo.onMessage: ', data, type);
 
         var url = data.url;
-        var xml = data.xml, $xml = $(xml), $storyboard = $xml.find('storyboard:first');
-        var storyboardId = $storyboard.attr('id') || '1';
+        var xml = data.xml, $xml = $(xml), $storyboard = $xml.find('storyboard');
 
         if ($storyboard.length < 1) {
           thumbnailInfo.dispatchAsync(
@@ -700,13 +699,35 @@
             );
           return;
         }
+
         var info = {
           status:   'ok',
           message:  '成功',
-          id:       storyboardId,
-          url:      data.url.replace('sb=1', 'sb=' + storyboardId),
+          url:      data.url,
           movieId:  $xml.find('movie').attr('id'),
           duration: $xml.find('duration').text(),
+          storyboard: []
+        };
+
+        for (var i = 0, len = $storyboard.length; i < len; i++) {
+          var sbInfo = parseStoryboard($($storyboard[i]), url);
+          info.storyboard.push(sbInfo);
+        }
+        info.storyboard.sort(function(a, b) {
+          var idA = parseInt(a.id.substr(1), 10), idB = parseInt(b.id.substr(1), 10);
+          return (idA < idB) ? 1 : -1;
+        });
+        console.log('%cstoryboard info', 'background: cyan', info);
+
+        cache[url] = info;
+        thumbnailInfo.dispatchAsync('onThumbnailInfoLoad', info);
+      };
+
+      var parseStoryboard = function($storyboard, url) {
+        var storyboardId = $storyboard.attr('id') || '1';
+        return {
+          id:       storyboardId,
+          url:      url.replace('sb=1', 'sb=' + storyboardId),
           thumbnail:{
             width:    $storyboard.find('thumbnail_width').text(),
             height:   $storyboard.find('thumbnail_height').text(),
@@ -719,9 +740,6 @@
             number: $storyboard.find('board_number').text()
           }
         };
-
-        cache[url] = info;
-        thumbnailInfo.dispatchAsync('onThumbnailInfoLoad', info);
       };
 
       var initialize = function() {
@@ -772,21 +790,23 @@
         update: function(info) {
           if (info.status !== 'ok') {
             window.WatchApp.mixin(info, {
-              id: 1,
-              url: '',
-              width: 1,
-              height: 1,
               duration: 1,
-              thumbnail: {
-                width: 1,
-                height: 1,
-                number: 1,
-                interval: 1
-              },
-              board: {
-                rows: 1,
-                cols: 1
-              }
+              url: '',
+              storyboard: [{
+                id: 1,
+                url: '',
+                thumbnail: {
+                  width: 1,
+                  height: 1,
+                  number: 1,
+                  interval: 1
+                },
+                board: {
+                  rows: 1,
+                  cols: 1,
+                  number: 1
+                }
+              }]
             });
           }
           this._info = info;
@@ -821,50 +841,54 @@
           return this._isEnabled;
         },
 
+        hasSubStoryboard: function() {
+          return this._info.storyboard.length > 1;
+        },
+
         getStatus:   function() { return this._info.status; },
         getMessage:  function() { return this._info.message; },
-        getUrl:      function() { return this._info.url; },
         getDuration: function() { return parseInt(this._info.duration, 10); },
 
-        getWidth:    function() { return parseInt(this._info.thumbnail.width, 10); },
-        getHeight:   function() { return parseInt(this._info.thumbnail.height, 10); },
-        getInterval: function() { return parseInt(this._info.thumbnail.interval, 10); },
-        getCount:    function() {
+        getUrl:      function(i) { return this._info.storyboard[i || 0].url; },
+        getWidth:    function(i) { return parseInt(this._info.storyboard[i || 0].thumbnail.width, 10); },
+        getHeight:   function(i) { return parseInt(this._info.storyboard[i || 0].thumbnail.height, 10); },
+        getInterval: function(i) { return parseInt(this._info.storyboard[i || 0].thumbnail.interval, 10); },
+        getCount:    function(i) {
           return Math.max(
             Math.ceil(this.getDuration() / Math.max(0.01, this.getInterval())),
-            parseInt(this._info.thumbnail.number, 10)
+            parseInt(this._info.storyboard[i || 0].thumbnail.number, 10)
           );
         },
-        getRows:   function() { return parseInt(this._info.board.rows, 10); },
-        getCols:   function() { return parseInt(this._info.board.cols, 10); },
-        getPageCount: function() { return parseInt(this._info.board.number, 10); },
-        getTotalRows: function() {
-          return Math.ceil(this.getCount() / this.getCols());
+        getRows:   function(i) { return parseInt(this._info.storyboard[i || 0].board.rows, 10); },
+        getCols:   function(i) { return parseInt(this._info.storyboard[i || 0].board.cols, 10); },
+        getPageCount: function(i) { return parseInt(this._info.storyboard[i || 0].board.number, 10); },
+        getTotalRows: function(i) {
+          return Math.ceil(this.getCount(i) / this.getCols(i));
         },
 
-        getPageWidth:    function() { return this.getWidth()  * this.getCols(); },
-        getPageHeight:   function() { return this.getHeight() * this.getRows(); },
-        getCountPerPage: function() { return this.getRows()   * this.getCols(); },
+        getPageWidth:    function(i) { return this.getWidth(i)  * this.getCols(i); },
+        getPageHeight:   function(i) { return this.getHeight(i) * this.getRows(i); },
+        getCountPerPage: function(i) { return this.getRows(i)   * this.getCols(i); },
 
         /**
          *  nページ目のURLを返す。 ゼロオリジン
          */
-        getPageUrl: function(page) {
-          page = Math.max(0, Math.min(this.getPageCount() - 1, page));
-          return this.getUrl() + '&board=' + (page + 1);
+        getPageUrl: function(page, storyboardIndex) {
+          page = Math.max(0, Math.min(this.getPageCount(storyboardIndex) - 1, page));
+          return this.getUrl(storyboardIndex) + '&board=' + (page + 1);
         },
 
         /**
          * vposに相当するサムネは何番目か？を返す
          */
-        getIndex: function(vpos) {
+        getIndex: function(vpos, storyboardIndex) {
           // msec -> sec
           var v = Math.floor(vpos / 1000);
           v = Math.max(0, Math.min(this.getDuration(), v));
 
           // サムネの総数 ÷ 秒数
           // Math.maxはゼロ除算対策
-          var n = this.getCount() / Math.max(1, this.getDuration());
+          var n = this.getCount(storyboardIndex) / Math.max(1, this.getDuration());
 
           return parseInt(Math.floor(v * n), 10);
         },
@@ -872,22 +896,22 @@
         /**
          * Indexのサムネイルは何番目のページにあるか？を返す
          */
-        getPageIndex: function(thumbnailIndex) {
-          var perPage   = this.getCountPerPage();
+        getPageIndex: function(thumbnailIndex, storyboardIndex) {
+          var perPage   = this.getCountPerPage(storyboardIndex);
           var pageIndex = parseInt(thumbnailIndex / perPage, 10);
-          return Math.max(0, Math.min(this.getPageCount(), pageIndex));
+          return Math.max(0, Math.min(this.getPageCount(storyboardIndex), pageIndex));
         },
 
         /**
          *  vposに相当するサムネは何ページの何番目にあるか？を返す
          */
-        getThumbnailPosition: function(vpos) {
-          var thumbnailIndex = this.getIndex(vpos);
+        getThumbnailPosition: function(vpos, storyboardIndex) {
+          var thumbnailIndex = this.getIndex(vpos, storyboardIndex);
           var pageIndex      = this.getPageIndex(thumbnailIndex);
 
-          var mod = thumbnailIndex % this.getCountPerPage();
+          var mod = thumbnailIndex % this.getCountPerPage(storyboardIndex);
           var row = Math.floor(mod / Math.max(1, this.getCols()));
-          var col = mod % this.getRows();
+          var col = mod % this.getRows(storyboardIndex);
 
           return {
             page: pageIndex,
@@ -900,9 +924,9 @@
         /**
          * nページ目のx, y座標をvposに変換して返す
          */
-        getPointVpos: function(x, y, page) {
-          var width  = Math.max(1, this.getWidth());
-          var height = Math.max(1, this.getHeight());
+        getPointVpos: function(x, y, page, storyboardIndex) {
+          var width  = Math.max(1, this.getWidth(storyboardIndex));
+          var height = Math.max(1, this.getHeight(storyboardIndex));
           var row = Math.floor(y / height);
           var col = Math.floor(x / width);
           var mod = x % width;
@@ -910,14 +934,14 @@
 
           // 何番目のサムネに相当するか？
           var point =
-            page * this.getCountPerPage() +
-            row  * this.getCols()         +
+            page * this.getCountPerPage(storyboardIndex) +
+            row  * this.getCols(storyboardIndex)         +
             col +
             (mod / width) // 小数点以下は、n番目の左端から何%あたりか
             ;
 
           // 全体の何%あたり？
-          var percent = point / Math.max(1, this.getCount());
+          var percent = point / Math.max(1, this.getCount(storyboardIndex));
           percent = Math.max(0, Math.min(100, percent));
 
           // vposは㍉秒単位なので1000倍
@@ -927,12 +951,35 @@
         /**
          * vposは何ページ目に当たるか？を返す
          */
-        getVposPage: function(vpos) {
-          var index = this._storyboard.getIndex(vpos);
-          var page  = this._storyboard.getPageIndex(index);
+        getVposPage: function(vpos, storyboardIndex) {
+          var index = this._storyboard.getIndex(vpos, storyboardIndex);
+          var page  = this._storyboard.getPageIndex(index, storyboardIndex);
 
           return page;
-        }
+        },
+
+        /**
+         * nページ目のCols, Rowsがsubではどこになるかを返す
+         */
+        getPointPageColAndRowForSub: function(page, row, col) {
+          var mainPageCount = this.getCountPerPage();
+          var subPageCount  = this.getCountPerPage(1);
+          var mainCols = this.getCols();
+          var subCols = this.getCols(1);
+
+          var mainIndex = mainPageCount * page + mainCols * row + col;
+          var subOffset = mainIndex % subPageCount;
+
+          var subPage = Math.floor(mainIndex / subPageCount);
+          var subRow = Math.floor(subOffset / subCols);
+          var subCol = subOffset % subCols;
+
+          return {
+            page: subPage,
+            row: subRow,
+            col: subCol
+          };
+        },
 
       });
 
@@ -1358,6 +1405,7 @@
           var storyboard = this._storyboard;
           var pages      = storyboard.getPageCount();
           var pageWidth  = storyboard.getPageWidth();
+          var width      = storyboard.getWidth();
           var height     = storyboard.getHeight();
           var rows       = storyboard.getRows();
 
@@ -1374,6 +1422,8 @@
               height: height
             });
 
+          var hasSubStoryboard = storyboard.hasSubStoryboard();
+
           for (var i = 0; i < pages; i++) {
             var src = storyboard.getPageUrl(i);
             for (var j = 0; j < rows; j++) {
@@ -1387,13 +1437,26 @@
                   .attr({
                     'data-src': src,
                     'data-page': i,
-                    'data-top': height * j + height / 2
+                    'data-top': height * j + height / 2,
+                    'data-backgroundPosition': '0 -' + height * j + 'px'
                   })
                   .append($borders.clone());
 
               if (i === 0) { // 1ページ目だけ遅延ロードしない
                 $img.css('background-image', 'url(' + src + ')');
               } else {
+                // subStoryboardへの手抜き対応
+                // subの一行あたりの行数＝mainの整数倍 という前提が崩れたら破綻する
+                if (hasSubStoryboard) {
+                  var offset = storyboard.getPointPageColAndRowForSub(i, j, 0);
+                  $img
+                    .addClass('hasSub')
+                    .css({
+                    'background-image': 'url(' + storyboard.getPageUrl(offset.page, 1) + ')',
+                    'background-position': '-' + width * offset.col + 'px -' + height * offset.row + 'px',
+                    'background-size': '200% auto'
+                  });
+                }
                 $img.addClass('lazyImage page-' + i);
               }
               $list.append($img);
@@ -1432,7 +1495,7 @@
           }
           return $div;
         },
-        _lazyLoadImage: function(pageNumber) {
+        _lazyLoadImage: function(pageNumber) { //return;
           var className = 'page-' + pageNumber;
 
           if (pageNumber < 1 || this._lazyImage[className]) {
@@ -1447,7 +1510,14 @@
           var load = $.proxy(function() {
             this._$inner.find('.' + className)
               .css('background-image', 'url(' + src + ')')
-              .removeClass('lazyImage ' + className);
+              .removeClass('lazyImage ' + className)
+              .each(function(idx, e) {
+                var $e = $(e);
+                $e.css({
+                  'background-position': $e.attr('data-backgroundPosition'),
+                  'background-size': '',
+                });
+              });
           }, this);
 
           window.setTimeout(load, 0);
