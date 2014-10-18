@@ -7,7 +7,7 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.2.0
+// @version        1.3.0
 // ==/UserScript==
 
 // ver 1.1.2  仕様変更への暫定対応(後で調べてちゃんと直す)
@@ -29,7 +29,8 @@
 (function() {
   var monkey = function() {
     var DEBUG = !true;
-    var $ = window.jQuery, _ = window._;
+    var require = window.require; // , define = window.define;
+    var $ = require('jquery'), _ = require('lodash'), WatchApp = require('WatchApp');
 
     var __css__ = (function() {/*
       .xDomainLoaderFrame {
@@ -358,13 +359,13 @@
     var EventDispatcher = (function() {
 
       function AsyncEventDispatcher() {
-        window.WatchApp.extend(
+        WatchApp.extend(
           this,
           AsyncEventDispatcher,
-          window.WatchApp.ns.event.EventDispatcher);
+          require('watchapp/event/EventDispatcher'));
       }
 
-      window.WatchApp.mixin(AsyncEventDispatcher.prototype, {
+      WatchApp.mixin(AsyncEventDispatcher.prototype, {
 //        addEventListener: function(name, func) {
 //          console.log('%caddEventListener: ', 'background: red; color: white;', name, func);
 //          if (!func) {
@@ -435,12 +436,16 @@
 
     var initializeWatchController = function() {
       window.NicoVideoStoryboard.external.watchController = (function() {
-        var root = window.WatchApp.ns;
-        var nicoPlayerConnector = root.init.PlayerInitializer.nicoPlayerConnector;
-        var watchInfoModel      = root.model.WatchInfoModel.getInstance();
-        var viewerInfoModel     = root.init.CommonModelInitializer.viewerInfoModel;
-        var playerAreaConnector = root.init.PlayerInitializer.playerAreaConnector;
-        var playlist            = root.init.PlaylistInitializer.playlist;
+        var PlayerInitializer = require('watchapp/init/PlayerInitializer');
+        var PlaylistInitializer = require('watchapp/init/PlaylistInitializer');
+        var CommonModelInitializer = require('watchapp/init/CommonModelInitializer');
+        var WatchInfoModel = require('watchapp/model/WatchInfoModel');
+
+        var nicoPlayerConnector = PlayerInitializer.nicoPlayerConnector;
+        var viewerInfoModel     = CommonModelInitializer.viewerInfoModel;
+        var playerAreaConnector = PlayerInitializer.playerAreaConnector;
+        var playlist            = PlaylistInitializer.playlist;
+        var watchInfoModel      = WatchInfoModel.getInstance();
         var externalNicoplayer;
 
         var watchController = new EventDispatcher();
@@ -481,7 +486,7 @@
           return watchInfoModel.id;
         };
 
-        var popupMarquee = root.init.PopupMarqueeInitializer.popupMarqueeViewController;
+        var popupMarquee = require('watchapp/init/PopupMarqueeInitializer').popupMarqueeViewController;
         var popup = {
           message: function(text) {
             popupMarquee.onData(
@@ -554,7 +559,7 @@
         };
 
 
-        window.WatchApp.mixin(watchController, {
+        WatchApp.mixin(watchController, {
           getVpos: getVpos,
           setVpos: setVpos,
 
@@ -634,7 +639,7 @@
         }
       };
 
-      window.WatchApp.mixin(getflv, {
+      WatchApp.mixin(getflv, {
         load: load
       });
 
@@ -764,7 +769,7 @@
       };
 
 
-      window.WatchApp.mixin(thumbnailInfo, {
+      WatchApp.mixin(thumbnailInfo, {
         load: load
       });
 
@@ -778,10 +783,10 @@
         this._isEnabled       = params.isEnabled;
         this._watchId         = params.watchId;
 
-        window.WatchApp.extend(this, StoryboardModel, EventDispatcher);
+        WatchApp.extend(this, StoryboardModel, EventDispatcher);
       }
 
-      window.WatchApp.mixin(StoryboardModel.prototype, {
+      WatchApp.mixin(StoryboardModel.prototype, {
         initialize: function(info) {
           console.log('%c initialize StoryboardModel', 'background: lightgreen;');
 
@@ -789,7 +794,7 @@
         },
         update: function(info) {
           if (info.status !== 'ok') {
-            window.WatchApp.mixin(info, {
+            WatchApp.mixin(info, {
               duration: 1,
               url: '',
               storyboard: [{
@@ -1046,7 +1051,7 @@
         this._lastHeight = -1;
       }
 
-      window.WatchApp.mixin(FullScreenModeView.prototype, {
+      WatchApp.mixin(FullScreenModeView.prototype, {
         initialize: function() {
           if (this._css) { return; }
 
@@ -1088,7 +1093,7 @@
         this.initialize();
       }
 
-      window.WatchApp.mixin(SetToEnableButtonView.prototype, {
+      WatchApp.mixin(SetToEnableButtonView.prototype, {
         initialize: function() {
           console.log('%c initialize SetToEnableButtonView', 'background: lightgreen;');
           this._$view = $([
@@ -1194,7 +1199,7 @@
         this.initialize(params);
       }
 
-      window.WatchApp.mixin(StoryboardView.prototype, {
+      WatchApp.mixin(StoryboardView.prototype, {
         initialize: function(params) {
           console.log('%c initialize StoryboardView', 'background: lightgreen;');
 
@@ -1525,7 +1530,7 @@
         },
         // のんびり遅延ロードしてるとcookieの期限が切れてしまうので、
         // 10分ぐらいで全部読みに行く
-        _lazyLoadAll: function(pageNumber) {
+        _lazyLoadAll: function() {
           console.log('%c_lazyLoadAll', 'background: cyan;');
           for (var i = 1, len = this._storyboard.getPageCount(); i < len; i++) {
             this._lazyLoadImage(i);
@@ -1660,7 +1665,7 @@
         this.initialize(params);
       }
 
-      window.WatchApp.mixin(StoryboardController.prototype, {
+      WatchApp.mixin(StoryboardController.prototype, {
         initialize: function(params) {
           console.log('%c initialize StoryboardController', 'background: lightgreen;');
 
@@ -1775,7 +1780,7 @@
     })();
 
 
-    window.WatchApp.mixin(window.NicoVideoStoryboard, {
+    WatchApp.mixin(window.NicoVideoStoryboard, {
       _addStyle: function(styles, id) {
         var elm = document.createElement('style');
         window.setTimeout(function() {
@@ -1946,8 +1951,8 @@
     //======================================
     //======================================
 
-    (function() {
-      var watchInfoModel = window.WatchApp.ns.model.WatchInfoModel.getInstance();
+    require(['watchapp/model/WatchInfoModel'], function(WatchInfoModel) {
+      var watchInfoModel = WatchInfoModel.getInstance();
       if (watchInfoModel.initialized) {
         console.log('%c initialize', 'background: lightgreen;');
         initializeWatchController();
@@ -1964,7 +1969,7 @@
         };
         watchInfoModel.addEventListener('reset', onReset);
       }
-    })();
+    });
 
   };
 
@@ -2076,12 +2081,14 @@
   if (host.indexOf('smile-') >= 0) {
     smileapi();
   } else {
-    var script = document.createElement('script');
-    script.id = 'NicoVideoStoryboard';
-    script.setAttribute('type', 'text/javascript');
-    script.setAttribute('charset', 'UTF-8');
-    script.appendChild(document.createTextNode("(" + monkey + ")()"));
-    document.body.appendChild(script);
+    window.require(['WatchApp'], function() {
+      var script = document.createElement('script');
+      script.id = 'NicoVideoStoryboard';
+      script.setAttribute('type', 'text/javascript');
+      script.setAttribute('charset', 'UTF-8');
+      script.appendChild(document.createTextNode("(" + monkey + ")()"));
+      document.body.appendChild(script);
+    });
   }
 
 })();
