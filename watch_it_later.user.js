@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.141018
+// @version        1.141029
 // ==/UserScript==
 
 
@@ -3124,7 +3124,7 @@
         onload: function(resp) {
           //console.log(116, resp.responseText);
           var result = resp.responseText;
-          if (result.match(/NicoAPI\.token *= *"([a-z0-9\-]+)";/)) {
+          if (result.match(/NicoAPI\.token *= *["']([a-z0-9\-]+)["'];/)) {
             console.log('NicoAPI.token=', token);
             token = RegExp.$1;
           } else {
@@ -13751,9 +13751,13 @@
         if (conf.initializeImmediately) {
           console.log('%cinitialize Immediately', 'background: lightgreen;');
           EmbeddedWatchData.run_ = EmbeddedWatchData.run;
-          EmbeddedWatchData.run = function() {
+          EmbeddedWatchData.run = _.debounce(function() {
             $('#nicoSpotAdAds >*:nth-child(2)').remove();
-          };
+            if (!window.ichiba) {
+              console.log('%cload ichiba', 'background: lightgreen;');
+              PrepareApp.loadScript('http://res.nimg.jp/js/watch/ichiba/ichiba_zero.js');
+            }
+          }, 1000);
           window.setTimeout(function() {
             console.time('initialize Immediately');
             EmbeddedWatchData.run_(
