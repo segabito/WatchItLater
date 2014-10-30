@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.141029
+// @version        1.141030
 // ==/UserScript==
 
 
@@ -1800,7 +1800,7 @@
       #outline.noIchiba  #nicoIchiba, #outline.noReview  #videoReview{
         display: none;
       }
-      #bottomContentTabContainer.noBottom .outer, #bottomContentTabContainer.noBottom #pageFooter {
+      #bottomContentTabContainer.noBottom .outer, #bottomContentTabContainer.noBottom #pageFooter, .noBottom #superBanner{
         display: none !important;
       }
       #bottomContentTabContainer.noBottom #outline {
@@ -8019,7 +8019,7 @@
           if (f) {
             $reviewPanel.append($videoReview);
           } else {
-            $('#playerBottomAd').after($videoReview);
+            $('#rectangleAd').after($videoReview);
           }
         },
         changeTab = function(selection) {
@@ -13348,13 +13348,6 @@
         }
       });
 
-      if (!w.Ads) {
-        // hostsに 0.0.0.0 ads.nicovideo.jp してるとスクリプトエラーがうるさいのでダミーを入れる
-        w.Ads = {
-          Advertisement: function() { return {set: function() {}}; }
-        };
-      }
-
       var overrideGenerateURL = function() {
         var WatchPageInitializer = require('watchapp/init/WatchPageInitializer');
         var wpc = WatchPageInitializer.watchPageController;
@@ -13726,8 +13719,11 @@
 
   if (window.WatchJsApi) {
     require(
-      ['WatchApp', 'watchapp/model/WatchInfoModel', 'EmbeddedWatchData'],
-      function(WatchApp, WatchInfoModel, EmbeddedWatchData) {
+      ['WatchApp', 'watchapp/model/WatchInfoModel'], function(WatchApp, WatchInfoModel) {
+      var EmbeddedWatchData = {run: function() {}};
+      if (require.defined('EmbeddedWatchData')) {
+        EmbeddedWatchData = require('EmbeddedWatchData');
+      }
 
       var watchInfoModel = WatchInfoModel.getInstance();
 
@@ -13753,10 +13749,6 @@
           EmbeddedWatchData.run_ = EmbeddedWatchData.run;
           EmbeddedWatchData.run = _.debounce(function() {
             $('#nicoSpotAdAds >*:nth-child(2)').remove();
-            if (!window.ichiba) {
-              console.log('%cload ichiba', 'background: lightgreen;');
-              PrepareApp.loadScript('http://res.nimg.jp/js/watch/ichiba/ichiba_zero.js');
-            }
           }, 1000);
           window.setTimeout(function() {
             console.time('initialize Immediately');
@@ -13983,6 +13975,27 @@
       inject.setAttribute('charset', 'UTF-8');
 
       if (location.pathname.indexOf('/watch/') === 0) {
+        setTimeout(function() {
+          // ブロックが発動しててもとりあえず動くように (Firefoxだけ？)
+          if (!window.Ads && !require.defined('Ads')) {
+            define('Ads', [], function() {
+              window.Ads = { Advertisement: function() { return {set: function() {}}; } };
+              return window.Ads;
+            });
+          }
+          if (!window.channel && !require.defined('channel')) {
+            define('channel', [], function() {
+              window.channel = {};
+              return window.channel;
+            });
+          }
+          if (!window.enquete && !require.defined('enquete')) {
+            define('enquete', [], function() {
+              window.enquete = { emitter: function() {} };
+              return window.enquete;
+            });
+          }
+        }, 0);
         inject.appendChild(document.createTextNode(
           'require(["WatchApp", "jquery", "lodash"], function() {' +
             'console.log("%crequire WatchApp", "background: lightgreen;");' +
