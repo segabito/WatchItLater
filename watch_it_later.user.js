@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.141030
+// @version        1.141105
 // ==/UserScript==
 
 
@@ -13719,12 +13719,7 @@
 
   if (window.WatchJsApi) {
     require(
-      ['WatchApp', 'watchapp/model/WatchInfoModel'], function(WatchApp, WatchInfoModel) {
-      var EmbeddedWatchData = {run: function() {}};
-      if (require.defined('EmbeddedWatchData')) {
-        EmbeddedWatchData = require('EmbeddedWatchData');
-      }
-
+      ['WatchApp', 'watchapp/model/WatchInfoModel', 'prepareapp/PlayerStartupObserver'], function(WatchApp, WatchInfoModel, PlayerStartupObserver) {
       var watchInfoModel = WatchInfoModel.getInstance();
 
       if (watchInfoModel.initialized) {
@@ -13746,16 +13741,14 @@
         watchInfoModel.addEventListener('reset', onReset);
         if (conf.initializeImmediately) {
           console.log('%cinitialize Immediately', 'background: lightgreen;');
-          EmbeddedWatchData.run_ = EmbeddedWatchData.run;
-          EmbeddedWatchData.run = _.debounce(function() {
-            $('#nicoSpotAdAds >*:nth-child(2)').remove();
-          }, 1000);
+
           window.setTimeout(function() {
+            if (PlayerStartupObserver._executed) {
+              return;
+            }
             console.time('initialize Immediately');
-            EmbeddedWatchData.run_(
-              JSON.parse($('#configDataContainer').html()),
-              JSON.parse($('#watchAPIDataContainer').text())
-            );
+            PlayerStartupObserver._executed = true;
+            PlayerStartupObserver._dispatch();
             console.timeEnd('initialize Immediately');
           }, 0);
         }
@@ -13979,7 +13972,7 @@
           // ブロックが発動しててもとりあえず動くように (Firefoxだけ？)
           if (!window.Ads && !require.defined('Ads')) {
             define('Ads', [], function() {
-              window.Ads = { Advertisement: function() { return {set: function() {}}; } };
+              window.Ads = { Advertisement: function() { return {set: function() {}}; }, SwitchView: function() {} };
               return window.Ads;
             });
           }
