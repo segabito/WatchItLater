@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.141105
+// @version        1.141112
 // ==/UserScript==
 
 
@@ -6707,7 +6707,15 @@
             var line = lines[i];
             if (line.indexOf('var Nico_RecommendationsParams') >= 0 &&
                 lines[i + 5] && lines[i + 5].indexOf('first_data') >= 0) {
-              data = JSON.parse(lines[i + 5].replace(/^.*?:/, ''));
+              try {
+                data = JSON.parse(lines[i + 5].replace(/^.*?:/, ''));
+              } catch (e) {
+                console.log('JSON parse error!', i, lines[i + 5]);
+                break;
+              }
+              if (data && data.items) {
+                data.videos = data.items;
+              }
               if (data && data.videos) {
                 found = true;
                 break;
@@ -6718,8 +6726,23 @@
             throw { message: '取得に失敗しました', status: 'fail'};
           }
 
+          var df = require('watchapp/util/DateFormat');
           for (i = 0, len = data.videos.length; i < len; i++) {
             var video = data.videos[i];
+
+            if (video.item_type !== 'video') { break; }
+            if (typeof video.first_retrieve === 'number') {
+              video.first_retrieve =
+                df.strftime('%Y-%m-%d %H:%M:%S', new Date(video.first_retrieve * 1000));
+            }
+            var tag = video.recommend_tag;
+            if (!tag &&
+                video.additional_info &&
+                video.additional_info.sherlock &&
+                video.additional_info.sherlock.tag) {
+              tag = video.additional_info.sherlock.tag;
+            }
+
             if (histories[video.id]) {
               delete histories[video.id];
             }
@@ -6733,7 +6756,7 @@
               thumbnail_url:  video.thumbnail_url,
               title:          video.title_short,
               _info: video,
-              description_short: '関連タグ: ' + video.recommend_tag
+              description_short: '関連タグ: ' + tag
             });
             histories[video.id] = item;
           }
@@ -9339,14 +9362,14 @@
               ;
           };
 
-          proto.detach_org = proto.detach;
+          proto.detach_org = proto.detach || function() {};
           proto.detach = function() {
             this.detach_org();
             watchingVideoView.detach();
             grepOptionView.detach();
           };
 
-          proto.onUpdate_org = proto.onUpdate;
+          proto.onUpdate_org = proto.onUpdate || function() {};
           proto.onUpdate = function() {
             this.onUpdate_org();
             updateCssClass(this._content);
@@ -9356,7 +9379,7 @@
             this._$content.find('.mylistSortOrder').before(grepOptionView.getView());
           };
 
-          proto.onError_org = proto.onError;
+          proto.onError_org = proto.onError || function() {};
           proto.onError = function() {
             this.onError_org();
             updateCssClass(this._content);
