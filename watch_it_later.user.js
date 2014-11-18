@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.141112
+// @version        1.141118
 // ==/UserScript==
 
 
@@ -2400,7 +2400,7 @@
 
       {title: '全画面モードの設定', className: 'fullScreen'},
       {title: '操作パネルとコメント入力欄を隠す', varName: 'controllerVisibilityInFull',
-        description: '全画面の時は少しでも動画を大きくしたい場合に便利',
+//        description: '全画面の時は少しでも動画を大きくしたい場合に便利',
         values: {'隠す': 'hidden', '隠さない': ''}},
       {title: '右下のマイリストメニュー', varName: 'hideMenuInFull',
         values: {'完全に消す': 'hideAll', '色だけ変える': '', '目立たなくする': 'hide'}},
@@ -2989,6 +2989,8 @@
         var text = tag.tag;
         var li  = document.createElement('li');
         li.className = 'popupTagItem';
+
+        text = text.replace(/&amp;/g, '&');
 
         // 大百科アイコン
         var dic = createDicIconDOM(tag, text);
@@ -8542,7 +8544,6 @@
           if (!toggleMenu) {
             return;
           }
-          console.log(toggleMenu);
           toggleMenu.detach();
         }
       };
@@ -9352,7 +9353,6 @@
 
       var
         overrideContentView = function(proto, watchingVideoView, grepOptionView) {
-          console.log('overrideContentView', proto.detach_org);
           var updateCssClass = function(content) {
             $('.videoExplorerBody')
               .toggleClass('dummyMylist',   content.getIsDummy())
@@ -9459,7 +9459,6 @@
 
       content.changeState_org = content.changeState;
       content.changeState = $.proxy(function(params, callback) {
-        console.log('deflist refresh! ', params, callback);
         if (!this.isActive()) {
           WatchController.clearDeflistCache();
         }
@@ -9685,8 +9684,8 @@
         scrollBarMargin = isWindows ? 16 : 0,
         rightAreaWidth = $('.videoExplorerBody').outerWidth(), // 592
         availableWidth = Math.max($(window).innerWidth() - rightAreaWidth, 300),
-        commentInputHeight = $('#playerContainer').hasClass('oldTypeCommentInput') ? 30 : 0,
-        controlPanelHeight = $('#playerContainer').hasClass('controll_panel') ? 46 : 0;
+        commentInputHeight = 30, //$('#playerContainer').hasClass('oldTypeCommentInput') ? 30 : 0,
+        controlPanelHeight = 46; //$('#playerContainer').hasClass('controll_panel') ? 46 : 0;
 
       var
         defPlayerWidth = 300, otherPluginsHeight = 0,
@@ -10139,7 +10138,7 @@
             return;
           }
           if (result.candidates) {
-            console.log(result.candidates);
+            //console.log(result.candidates);
             var candidates = result.candidates;
             var options = [];
             for (var i = candidates.length - 1; i >= 0; i--) {
@@ -10706,7 +10705,7 @@
 
       var hideIfNeed = function() {
         if (conf.controllerVisibilityInFull === 'hidden') {
-          PlayerInitializer.nicoPlayerConnector.playerConfig.set({oldTypeCommentInput: true, oldTypeControlPanel: false});
+//          PlayerInitializer.nicoPlayerConnector.playerConfig.set({oldTypeCommentInput: true, oldTypeControlPanel: false});
           $('body').addClass('hideCommentInput');
         } else {
           var $w = $(window), iw = $w.innerWidth(), ih = $w.innerHeight();
@@ -10715,12 +10714,12 @@
       };
 
       var restoreVisibility = function() {
-        if (lastPlayerConfig !== null) {
-          PlayerInitializer.nicoPlayerConnector.playerConfig.set(
-            {oldTypeCommentInput: !!lastPlayerConfig.oldTypeCommentInput, oldTypeControlPanel: !!lastPlayerConfig.oldTypeControlPanel}
-          );
-          $(window).resize();
-        }
+//        if (lastPlayerConfig !== null) {
+//          PlayerInitializer.nicoPlayerConnector.playerConfig.set(
+//            {oldTypeCommentInput: !!lastPlayerConfig.oldTypeCommentInput, oldTypeControlPanel: !!lastPlayerConfig.oldTypeControlPanel}
+//          );
+//          $(window).resize();
+//        }
         $('body').removeClass('hideCommentInput');
       };
 
@@ -10757,8 +10756,8 @@
         var mode = sc.mode;
         $('body').removeClass('w_fullScreenMenu');
         if (mode === 'browserFull' && lastScreenMode !== mode) {
-          lastPlayerConfig = PlayerInitializer.nicoPlayerConnector.playerConfig.get();
-          conf.setValue('lastControlPanelPosition', lastPlayerConfig.oldTypeControlPanel ? 'bottom' : 'over');
+//          lastPlayerConfig = PlayerInitializer.nicoPlayerConnector.playerConfig.get();
+//          conf.setValue('lastControlPanelPosition', lastPlayerConfig.oldTypeControlPanel ? 'bottom' : 'over');
 
           hideIfNeed();
           //if (conf.enableTrueBrowserFull) togglePlaylist(conf.enableTrueBrowserFull);
@@ -10862,10 +10861,10 @@
 
       if (conf.lastControlPanelPosition === 'bottom' || conf.lastControlPanelPosition === 'over') {
         EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
-          console.log('restore oldTypeControlPanel ? ', conf.lastControlPanelPosition === 'bottom');
-          PlayerInitializer.nicoPlayerConnector.playerConfig.set(
-            {oldTypeControlPanel: conf.lastControlPanelPosition === 'bottom'}
-          );
+//          console.log('restore oldTypeControlPanel ? ', conf.lastControlPanelPosition === 'bottom');
+//          PlayerInitializer.nicoPlayerConnector.playerConfig.set(
+//            {oldTypeControlPanel: conf.lastControlPanelPosition === 'bottom'}
+//          );
         });
       }
 
@@ -12885,7 +12884,6 @@
         vpos = Math.max(vpos, 0);
 
         if (vpos != currentVpos) {
-          console.log('seek video', vpos / 1000);
           WatchController.vpos(vpos);
         }
       };
@@ -12988,7 +12986,7 @@
       var __css__ = Util.here(function(){/*
         #nicoHeatMapContainer {
           position: absolute; z-index: 200;
-          bottom: 0px; left: 0;
+          {*bottom: 0px;*} left: 0;
           width: 672px;
           background: #000; height: 6px;
           overflow: hidden;
@@ -12997,7 +12995,7 @@
         .size_normal #nicoHeatMapContainer {
           width: 898px;
         }
-        .oldTypeCommentInput #nicoHeatMapContainer {
+        {*.oldTypeCommentInput*} #nicoHeatMapContainer {
           bottom: 29px;
           display: none;
         }
@@ -13027,7 +13025,7 @@
           display: block;
           width: 100%;
         }
-        .full_with_browser.w_fullScreenMenu .oldTypeCommentInput #nicoHeatMapContainer {
+        .full_with_browser.w_fullScreenMenu {*.oldTypeCommentInput*} #nicoHeatMapContainer {
           bottom: 29px;
           height: 6px;
         }
@@ -13035,7 +13033,7 @@
         body.full_with_browser.w_fullScreenMenu:fullscreen                 #playerContainer #nicoHeatMapContainer,
         .full_with_browser.w_fullScreenMenu.hideCommentInput                  #playerContainer #nicoHeatMapContainer {
           position: fixed !important;
-          bottom: 0;
+          {*bottom: 0;*}
         }
         body.full_with_browser.w_fullScreenMenu.fullWithPlaylist:fullscreen #playerContainer #nicoHeatMapContainer,
         .full_with_browser.w_fullScreenMenu.hideCommentInput.fullWithPlaylist #playerContainer #nicoHeatMapContainer {
