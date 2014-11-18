@@ -362,8 +362,7 @@
 //    var videoExplorerContentType = require('watchapp/components/videoexplorer/model/ContentType'),
 //    var WatchJsApi = w.WatchJsApi;
 //
-
-      var watchController = {
+      var screenMode = {
         changeScreenMode: function(mode) {
           WatchJsApi.player.changePlayerScreenMode(mode);
           setTimeout(function(){$(window).resize();}, 3000);
@@ -377,7 +376,9 @@
         },
         isFullScreen: function() {
           return $('body').hasClass('full_with_browser') || $('body').hasClass('full_with_monitor');
-        },
+        }
+      };
+      var videoexplorer = {
         showDeflist: function() {
           videoExplorerController.showDeflist();
         },
@@ -394,7 +395,9 @@
         closeSearch: function() {
           videoExplorer.changeState(false);
           videoExplorer.close();
-        },
+        }
+      };
+      var player = {
         commentVisibility: function(v) {
           if (v === 'toggle') {
             return this.commentVisibility(!this.commentVisibility());
@@ -460,7 +463,36 @@
         }
       };
 
-      return watchController;
+      var playlist = {
+      };
+
+      var popupMarqueeViewController =
+        require('watchapp/init/PopupMarqueeInitializer').popupMarqueeViewController;
+      var popup = {
+        show: function(text) {
+          text = text.replace(/[\n]/, '<br />');
+          popupMarqueeViewController.onData(
+            // Firefoxではflashの上に半透明要素を重ねられないのでとりあえず黒で塗りつぶす
+            '<span style="background: black;">' + text + '</span>'
+          );
+        },
+        alert: function(text) {
+          text = text.replace(/[\n]/, '<br />');
+          popupMarqueeViewController.onData(
+            '<span style="background: black; color: red;">' + text + '</span>'
+          );
+        },
+        hide: function() {
+          popupMarqueeViewController.stop();
+        }
+      };
+
+      return {
+        screenMode,
+        player,
+        playlist,
+        popup
+      };
     });
 
     require([
@@ -477,22 +509,24 @@
       var isButton0Down = false;
 
       var seekBy = function(v) {
-        var vpos = watchController.vpos() + v;
-        watchController.vpos(vpos);
+        var vpos = watchController.player.vpos() + v;
+        watchController.player.vpos(vpos);
       };
       var scrollBy = function(v) {
         var scrollTop = $(window).scrollTop() + v;
         $(window).scrollTop(scrollTop);
       };
+      // ボリューム上げる時は「ちょっと上げたいな」
+      // 下げる時は「うわっうるせぇ」なので下げるほうが速い
       var volumeUp = function() {
-        var v = watchController.volume(), r;
+        var v = watchController.player.volume(), r;
         v = Math.max(v, 1);
         r = (v < 5) ? 1.3 : 1.1;
-        v = watchController.volume(v * r);
+        v = watchController.player.volume(v * r);
       };
       var volumeDown = function() {
-        var v = watchController.volume();
-        v = watchController.volume(Math.floor(v / 1.2));
+        var v = watchController.player.volume();
+        v = watchController.player.volume(Math.floor(v / 1.2));
       };
 
       var onButtonDown = function(number, deviceIndex) {
@@ -511,29 +545,31 @@
             isButton0Down = false;
             break;
           case 1:
-            watchController.mute('toggle');
+            watchController.player.mute('toggle');
             break;
           case 2:
-            watchController.commentVisibility('toggle');
+            watchController.player.commentVisibility('toggle');
             break;
           case 3:
-            watchController.toggleFullScreen();
+            watchController.player.toggleFullScreen();
             break;
           case 4:
-            watchController.toggleSearch();
+            watchController.videoexplorer.toggleSearch();
             break;
           case 5:
             break;
           case 6:
-            watchController.prevVideo();
+            watchController.player.prevVideo();
             break;
           case 7:
-            watchController.nextVideo();
+            watchController.player.nextVideo();
             break;
           case 8:
-            watchController.togglePlay();
+            watchController.player.togglePlay();
             break;
-        }      };
+        }
+      };
+
       var onAxisChange = function(number , value, deviceIndex) {
         console.log('%conAxisChange: number=%s, value=%s, device=%s', 'background: lightblue;', number, value, deviceIndex);
         switch(number) {
