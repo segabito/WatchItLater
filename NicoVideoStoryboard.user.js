@@ -7,7 +7,7 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.3.0
+// @version        1.3.2
 // ==/UserScript==
 
 // ver 1.1.2  仕様変更への暫定対応(後で調べてちゃんと直す)
@@ -31,6 +31,8 @@
     var DEBUG = !true;
     var require = window.require; // , define = window.define;
     var $ = require('jquery'), _ = require('lodash'), WatchApp = require('WatchApp');
+    var inherit = require('cjs!inherit');
+    var emitter = require('cjs!emitter');
 
     var __css__ = (function() {/*
       .xDomainLoaderFrame {
@@ -359,20 +361,15 @@
     var EventDispatcher = (function() {
 
       function AsyncEventDispatcher() {
-        WatchApp.extend(
-          this,
-          AsyncEventDispatcher,
-          require('watchapp/event/EventDispatcher'));
       }
+      inherit(AsyncEventDispatcher, emitter);
 
-      WatchApp.mixin(AsyncEventDispatcher.prototype, {
-//        addEventListener: function(name, func) {
-//          console.log('%caddEventListener: ', 'background: red; color: white;', name, func);
-//          if (!func) {
-//            console.trace();
-//          }
-//          AsyncEventDispatcher.__super__.addEventListener.call(this, name, func);
-//        },
+      AsyncEventDispatcher.prototype.dispatchEvent = AsyncEventDispatcher.prototype.emit;
+      AsyncEventDispatcher.prototype.addEventListener = AsyncEventDispatcher.prototype.on;
+      AsyncEventDispatcher.prototype.removeEventListener = AsyncEventDispatcher.prototype.off;
+
+      _.assign(AsyncEventDispatcher.prototype, {
+
         dispatchAsync: function() {
           var args = arguments;
 
@@ -559,7 +556,7 @@
         };
 
 
-        WatchApp.mixin(watchController, {
+        _.assign(watchController, {
           getVpos: getVpos,
           setVpos: setVpos,
 
@@ -639,7 +636,7 @@
         }
       };
 
-      WatchApp.mixin(getflv, {
+      _.assign(getflv, {
         load: load
       });
 
@@ -769,7 +766,7 @@
       };
 
 
-      WatchApp.mixin(thumbnailInfo, {
+      _.assign(thumbnailInfo, {
         load: load
       });
 
@@ -786,7 +783,7 @@
         WatchApp.extend(this, StoryboardModel, EventDispatcher);
       }
 
-      WatchApp.mixin(StoryboardModel.prototype, {
+      _.assign(StoryboardModel.prototype, {
         initialize: function(info) {
           console.log('%c initialize StoryboardModel', 'background: lightgreen;');
 
@@ -794,7 +791,7 @@
         },
         update: function(info) {
           if (info.status !== 'ok') {
-            WatchApp.mixin(info, {
+            _.assign(info, {
               duration: 1,
               url: '',
               storyboard: [{
@@ -1051,7 +1048,7 @@
         this._lastHeight = -1;
       }
 
-      WatchApp.mixin(FullScreenModeView.prototype, {
+      _.assign(FullScreenModeView.prototype, {
         initialize: function() {
           if (this._css) { return; }
 
@@ -1093,7 +1090,7 @@
         this.initialize();
       }
 
-      WatchApp.mixin(SetToEnableButtonView.prototype, {
+      _.assign(SetToEnableButtonView.prototype, {
         initialize: function() {
           console.log('%c initialize SetToEnableButtonView', 'background: lightgreen;');
           this._$view = $([
@@ -1191,15 +1188,248 @@
       return SetToEnableButtonView;
     })();
 
+    var RequestAnimationFrame = function(callback, frameSkip) {
+      this.initialize(callback, frameSkip);
+    };
+    _.assign(RequestAnimationFrame.prototype, {
+      initialize: function(callback, frameSkip) {
+        this.requestAnimationFrame = _.bind((window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame), window);
+        this._frameSkip = Math.max(0, typeof frameSkip === 'number' ? frameSkip : 0);
+        this._frameCount = 0;
+        this._callback = callback;
+        this._enable = false;
+        this._onFrame = _.bind(this._onFrame, this);
+      },
+      _onFrame: function() {
+        if (this._enable) {
+          this._frameCount++;
+          try {
+            if (this._frameCount % (this._frameSkip + 1) === 0) {
+              this._callback();
+            }
+          } catch (e) {
+            console.log('%cException!', 'background: red;', e);
+          }
+          this.requestAnimationFrame(this._onFrame);
+        }
+      },
+      enable: function() {
+        if (this._enable) { return; }
+        this._enable = true;
+        this.requestAnimationFrame(this._onFrame);
+      },
+      disable: function() {
+        this._enable = false;
+      }
+    });
+
+
+    var StoryboardBlockList =
+    window.NicoVideoStoryboard.view.StoryboardBlockList = (function() {
+      var StoryboardBlock = function(option) {
+        this.initialize(option);
+      };
+      _.assign(StoryboardBlock.prototype, {
+        initialize: function(option) {
+          var height = option.boardHeight;
+
+          this._backgroundPosition = '0 -' + height * option.row + 'px';
+          this._src = option.src;
+          this._page = option.page;
+          this._isLoaded = false;
+
+          var $view = $('<div class="board"/>')
+            .css({
+              width: option.pageWidth,
+              height: height,
+              backgroundPosition: '0 -' + height * option.row + 'px'
+            })
+            .attr({
+              'data-src': option.src,
+              'data-page': option.page,
+              'data-top': height * option.row + height / 2,
+              'data-backgroundPosition': this._backgroundPosition
+            })
+            .append(option.$inner);
+
+           if (option.page === 0) {
+              this._isLoaded = true;
+              $view.css('background-image', 'url(' + option.src + ')');
+           } else {
+             // subStoryboardへの手抜き対応
+             // subの一行あたりの行数＝mainの整数倍 という前提が崩れたら破綻する
+             if (option.subOffset) {
+               var offset = option.subOffset;
+               this.hasSub = true;
+               $view
+                 .addClass('hasSub')
+                 .css({
+                 'background-image': 'url(' + option.subSrc  + ')',
+                 'background-position': '-' + option.width * offset.col + 'px -' + height * offset.row + 'px',
+                 'background-size': '200% auto'
+               });
+             }
+             $view.addClass('lazyImage page-' + option.page);
+           }
+           this._$view = $view;
+         },
+         loadImage: function() {
+           if (this._isLoaded) {
+             return;
+           }
+           var $view = this._$view;
+           var img = new Image();
+           img.onload = _.bind(function() {
+             $view
+             .css({
+               'background-image': 'url(' + this._src + ')',
+               'background-position': this._backgroundPosition,
+               'background-size': '',
+             })
+             .removeClass('lazyImage page-' + this._page);
+             $view = img = null;
+           }, this);
+           img.onerror = function() {
+             $view = img = null;
+           };
+           img.src = this._src;
+           this._isLoaded = true;
+         },
+         getPage: function() {
+           return this._page;
+         },
+         getView: function() {
+           return this._$view;
+         }
+      });
+      var StoryboardBlockBorder = function(width, height, cols) {
+        this.initialize(width, height, cols);
+      };
+      _.assign(StoryboardBlockBorder.prototype, {
+        initialize: function(width, height, cols) {
+          var $border = $('<div class="border"/>').css({
+            width: width,
+            height: height
+          });
+          var $div = $('<div />');
+          for (var i = 0; i < cols; i++) {
+            $div.append($border.clone());
+          }
+          this._$view = $div;
+        },
+        getView: function() {
+          return this._$view.clone();
+        }
+      });
+
+      var StoryboardBlockList = function(storyboard) {
+        this.initialize(storyboard);
+      };
+      _.assign(StoryboardBlockList.prototype, {
+        initialize: function(storyboard) {
+          if (storyboard) {
+            this.create(storyboard);
+          }
+        },
+        create: function(storyboard) {
+          var pages      = storyboard.getPageCount();
+          var pageWidth  = storyboard.getPageWidth();
+          var width      = storyboard.getWidth();
+          var height     = storyboard.getHeight();
+          var rows       = storyboard.getRows();
+          var cols       = storyboard.getCols();
+
+          var totalRows = storyboard.getTotalRows();
+          var rowCnt = 0;
+          this._$innerBorder =
+            new StoryboardBlockBorder(width, height, cols);
+          var $view = $('<div class="boardList"/>')
+            .css({
+              width: storyboard.getCount() * width,
+              paddingLeft: '50%',
+              paddingRight: '50%',
+              height: height
+            });
+          this._$view = $view;
+          this._blocks = [];
+          this._lazyLoaded = [];
+
+          var hasSubStoryboard = storyboard.hasSubStoryboard();
+          for (var i = 0; i < pages; i++) {
+            var src = storyboard.getPageUrl(i);
+            for (var j = 0; j < rows; j++) {
+              var option = {
+                width: width,
+                pageWidth: pageWidth,
+                boardHeight: height,
+                page: i,
+                row: j,
+                src: src
+              };
+              if (i > 0 && hasSubStoryboard) {
+                var offset = storyboard.getPointPageColAndRowForSub(i, j, 0);
+                option.subOffset = offset;
+                option.subSrc = storyboard.getPageUrl(offset.page, 1);
+              }
+              this.appendBlock(option);
+
+              rowCnt++;
+              if (rowCnt >= totalRows) {
+                break;
+              }
+            }
+          }
+
+          this._lazyLoadImageTimer =
+            window.setTimeout(_.bind(this._lazyLoadAll, this), 1000 * 60 * 10);
+        },
+        appendBlock: function(option) {
+          option.$inner = this._$innerBorder.getView();
+          var block = new StoryboardBlock(option);
+          this._blocks.push(block);
+          this._$view.append(block.getView());
+        },
+        loadImage: function(pageNumber) {
+          if (pageNumber < 1 || this._lazyLoaded[pageNumber]) {
+            return;
+          }
+          this._lazyLoaded[pageNumber] = true;
+          for (var i = 0, len = this._blocks.length; i < len; i++) {
+            var block = this._blocks[i];
+            if (block.getPage() <= pageNumber) {
+              block.loadImage();
+            }
+          }
+       },
+       _lazyLoadAll: function() {
+         console.log('%clazyLoadAll', 'background: cyan;');
+         for (var i = 1, len = this._blocks.length; i < len; i++) {
+           this._blocks[i].loadImage();
+         }
+       },
+       clear: function() {
+         this._$view.remove();
+         if (this._lazyLoadImageTimer) {
+           window.clearTimeout(this._lazyLoadImageTimer);
+         }
+       },
+       getView: function() {
+          return this._$view;
+       }
+      });
+
+      return StoryboardBlockList;
+    })();
+
+
     window.NicoVideoStoryboard.view.StoryboardView = (function() {
-      var TIMER_INTERVAL = 33;
       var VPOS_RATE = 10;
 
       function StoryboardView(params) {
         this.initialize(params);
       }
 
-      WatchApp.mixin(StoryboardView.prototype, {
+      _.assign(StoryboardView.prototype, {
         initialize: function(params) {
           console.log('%c initialize StoryboardView', 'background: lightgreen;');
 
@@ -1208,6 +1438,7 @@
           var sb  = this._storyboard = params.storyboard;
 
           this._isHover = false;
+          this._autoScroll = true;
           this._currentUrl = '';
           this._lazyImage = {};
           this._lastPage = -1;
@@ -1215,6 +1446,7 @@
           this._lastGetVpos = 0;
           this._timerCount = 0;
           this._scrollLeft = 0;
+          this._frameSkip = params.frameSkip || 1;
 
           this._enableButtonView =
             new window.NicoVideoStoryboard.view.SetToEnableButtonView({
@@ -1225,12 +1457,13 @@
 
           this._fullScreenModeView =
             new window.NicoVideoStoryboard.view.FullScreenModeView();
-
           evt.addEventListener('onWatchInfoReset', $.proxy(this._onWatchInfoReset, this));
 
           sb.addEventListener('update', $.proxy(this._onStoryboardUpdate, this));
           sb.addEventListener('reset',  $.proxy(this._onStoryboardReset,  this));
           sb.addEventListener('unload', $.proxy(this._onStoryboardUnload, this));
+
+          this._requestAnimationFrame = new RequestAnimationFrame(_.bind(this._onTimerInterval, this), this._frameSkip);
         },
         _initializeStoryboard: function() {
           this._initializeStoryboard = _.noop;
@@ -1381,6 +1614,19 @@
           }
         },
         /**
+         * 現在の動画の位置に即スクロール
+         */
+        scrollToVpos: function() {
+          vpos = this._watchController.getVpos();
+          this._onVposUpdate(vpos, true);
+        },
+        scrollToNext: function() {
+          this.scrollLeft(this._storyboard.getWidth());
+        },
+        scrollToPrev: function() {
+          this.scrollLeft(-this._storyboard.getWidth());
+        },
+        /**
          * 変数として持ってるscrollLeftを実際の値と同期
          */
         _syncScrollLeft: function() {
@@ -1407,133 +1653,24 @@
           }, 1000);
         },
         _updateSuccessFull: function() {
-          var storyboard = this._storyboard;
-          var pages      = storyboard.getPageCount();
-          var pageWidth  = storyboard.getPageWidth();
-          var width      = storyboard.getWidth();
-          var height     = storyboard.getHeight();
-          var rows       = storyboard.getRows();
 
-          var $borders =
-            this._createBorders(storyboard.getWidth(), storyboard.getHeight(), storyboard.getCols());
+          var list = new StoryboardBlockList(this._storyboard);
+          this._storyboardBlockList = list;
+          this._$inner.empty().append(list.getView()).append(this._$pointer);
 
-          var totalRows = storyboard.getTotalRows();
-          var rowCnt = 0;
-          var $list = $('<div class="boardList"/>')
-            .css({
-              width: storyboard.getCount() * storyboard.getWidth(),
-              paddingLeft: '50%',
-              paddingRight: '50%',
-              height: height
-            });
+          var $view = this._$view;
+          $view.removeClass('fail').addClass('success');
 
-          var hasSubStoryboard = storyboard.hasSubStoryboard();
+          this._fullScreenModeView.update($view);
 
-          for (var i = 0; i < pages; i++) {
-            var src = storyboard.getPageUrl(i);
-            for (var j = 0; j < rows; j++) {
-              var $img =
-                $('<div class="board"/>')
-                  .css({
-                    width: pageWidth,
-                    height: height,
-                    backgroundPosition: '0 -' + height * j + 'px'
-                  })
-                  .attr({
-                    'data-src': src,
-                    'data-page': i,
-                    'data-top': height * j + height / 2,
-                    'data-backgroundPosition': '0 -' + height * j + 'px'
-                  })
-                  .append($borders.clone());
-
-              if (i === 0) { // 1ページ目だけ遅延ロードしない
-                $img.css('background-image', 'url(' + src + ')');
-              } else {
-                // subStoryboardへの手抜き対応
-                // subの一行あたりの行数＝mainの整数倍 という前提が崩れたら破綻する
-                if (hasSubStoryboard) {
-                  var offset = storyboard.getPointPageColAndRowForSub(i, j, 0);
-                  $img
-                    .addClass('hasSub')
-                    .css({
-                    'background-image': 'url(' + storyboard.getPageUrl(offset.page, 1) + ')',
-                    'background-position': '-' + width * offset.col + 'px -' + height * offset.row + 'px',
-                    'background-size': '200% auto'
-                  });
-                }
-                $img.addClass('lazyImage page-' + i);
-              }
-              $list.append($img);
-              rowCnt++;
-              if (rowCnt >= totalRows) {
-                break;
-              }
-            }
-          }
-
-          this._$innerList = $list;
-
-          this._$inner.empty().append($list).append(this._$pointer);
-          this._$view.removeClass('fail').addClass('success');
-
-          this._fullScreenModeView.update(this._$view);
-
-          window.setTimeout($.proxy(function() {
-            this._$view.addClass('show');
-          }, this), 100);
-
-          this._lazyLoadImageTimer =
-            window.setTimeout($.proxy(this._lazyLoadAll, this), 1000 * 60 * 10);
+          window.setTimeout(function() { $view.addClass('show'); }, 100);
 
           this.scrollLeft(0);
           this.enableTimer();
         },
-        _createBorders: function(width, height, count) {
-          var $border = $('<div class="border"/>').css({
-            width: width,
-            height: height
-          });
-          var $div = $('<div />');
-          for (var i = 0; i < count; i++) {
-            $div.append($border.clone());
-          }
-          return $div;
-        },
         _lazyLoadImage: function(pageNumber) { //return;
-          var className = 'page-' + pageNumber;
-
-          if (pageNumber < 1 || this._lazyImage[className]) {
-            return;
-          }
-
-          var src = this._storyboard.getPageUrl(pageNumber);
-          this._lazyImage[className] = src;
-
-          //console.log('%c set lazyLoadImage', 'background: cyan;', 'page: ' + pageNumber, '  url: ' + src);
-
-          var load = $.proxy(function() {
-            this._$inner.find('.' + className)
-              .css('background-image', 'url(' + src + ')')
-              .removeClass('lazyImage ' + className)
-              .each(function(idx, e) {
-                var $e = $(e);
-                $e.css({
-                  'background-position': $e.attr('data-backgroundPosition'),
-                  'background-size': '',
-                });
-              });
-          }, this);
-
-          window.setTimeout(load, 0);
-          //window.setTimeout(load, 1000);
-        },
-        // のんびり遅延ロードしてるとcookieの期限が切れてしまうので、
-        // 10分ぐらいで全部読みに行く
-        _lazyLoadAll: function() {
-          console.log('%c_lazyLoadAll', 'background: cyan;');
-          for (var i = 1, len = this._storyboard.getPageCount(); i < len; i++) {
-            this._lazyLoadImage(i);
+          if (this._storyboardBlockList) {
+            this._storyboardBlockList.loadImage(pageNumber);
           }
         },
         _updateFail: function() {
@@ -1547,21 +1684,19 @@
           this.disableTimer();
         },
         _clearTimer: function() {
-          if (this._timer) {
-            window.clearInterval(this._timer);
-            this._timer = null;
-          }
+          this._requestAnimationFrame.disable();
         },
         enableTimer: function() {
           this._clearTimer();
           this._isHover = false;
-          this._timer = window.setInterval($.proxy(this._onTimerInterval, this), TIMER_INTERVAL);
+          this._requestAnimationFrame.enable();
         },
         disableTimer: function() {
           this._clearTimer();
         },
         _onTimerInterval: function() {
           if (this._isHover) { return; }
+          if (!this._autoScroll) { return; }
           if (!this._storyboard.isEnabled()) { return; }
 
           var div = VPOS_RATE;
@@ -1603,7 +1738,6 @@
           this._lastVpos = vpos;
 
           this.scrollLeft(isImmediately ? targetLeft : (currentLeft + Math.round(leftDiff)));
-
         },
         _onScroll: function() {
           var storyboard = this._storyboard;
@@ -1618,9 +1752,9 @@
           this._timerCount = 0;
           this._scrollLeft = 0;
           this._lazyImage = {};
-          if (this._lazyLoadImageTimer) {
-            window.clearTimeout(this._lazyLoadImageTimer);
-            this._lazyLoadImageTimer = null;
+          this._autoScroll = true;
+          if (this._storyboardBlockList) {
+            this._storyboardBlockList.clear();
           }
           if (this._$view) {
             $('body').removeClass('NicoVideoStoryboardOpen');
@@ -1665,7 +1799,7 @@
         this.initialize(params);
       }
 
-      WatchApp.mixin(StoryboardController.prototype, {
+      _.assign(StoryboardController.prototype, {
         initialize: function(params) {
           console.log('%c initialize StoryboardController', 'background: lightgreen;');
 
@@ -1717,7 +1851,8 @@
             this._storyboardView = new window.NicoVideoStoryboard.view.StoryboardView({
               watchController: this._watchController,
               eventDispatcher: this._eventDispatcher,
-              storyboard: this._storyboardModel
+              storyboard: this._storyboardModel,
+              frameSkip: this._config.get('frameSkip')
             });
           }
         },
@@ -1780,7 +1915,7 @@
     })();
 
 
-    WatchApp.mixin(window.NicoVideoStoryboard, {
+    _.assign(window.NicoVideoStoryboard, {
       _addStyle: function(styles, id) {
         var elm = document.createElement('style');
         window.setTimeout(function() {
@@ -1817,7 +1952,6 @@
           eventDispatcher:     this._eventDispatcher,
           config:              this.config
         });
-
         this._initializeEvent();
         this._initializeSettingPanel();
 
@@ -1825,7 +1959,6 @@
       },
       _initializeEvent: function() {
         console.log('%c initializeEvent NicoVideoStoryboard', 'background: lightgreen;');
-
         var eventDispatcher = this._eventDispatcher;
 
         this._watchController.addEventListener('onWatchInfoReset', function() {
@@ -1850,14 +1983,14 @@
           eventDispatcher.dispatchEvent('onThumbnailInfoLoad', info);
           this._onThumbnailInfoLoad(info);
        }, this));
-
       },
       _initializeUserConfig: function() {
         var prefix = 'NicoStoryboard_';
         var conf = {
           enabled: true,
           autoScroll: true,
-          demoMode: false
+          demoMode: false,
+          frameSkip: 3
         };
 
         this.config = {
@@ -1897,9 +2030,24 @@
         var __tpl__ = (function() {/*
           <div class="panelHeader">
           <h1 class="windowTitle">NicoVideoStoryboardの設定</h1>
+            <p>設定はリロード後に反映されます</p>
           <button class="close" title="閉じる">×</button>
           </div>
           <div class="panelInner">
+            <div class="item" data-setting-name="frameSkip" data-menu-type="radio">
+              <h3 class="itemTitle">フレームスキップ</h3>
+              <p>数字が小さいほど滑らかですが、重くなります</p>
+              <label><input type="radio" value="0" >0</label>
+              <label><input type="radio" value="1" >1</label>
+              <label><input type="radio" value="2" >2</label>
+              <label><input type="radio" value="3" >3</label>
+              <label><input type="radio" value="4" >4</label>
+              <label><input type="radio" value="5" >5</label>
+              <label><input type="radio" value="6" >6</label>
+              <label><input type="radio" value="7" >7</label>
+              <label><input type="radio" value="8" >8</label>
+              <label><input type="radio" value="9" >9</label>
+            </div>
             <div class="item" data-setting-name="demoMode" data-menu-type="radio">
               <h3 class="itemTitle">デモモード</h3>
               <p>連続再生時、サムネイルが無い動画をスキップします</p>
@@ -1970,7 +2118,6 @@
         watchInfoModel.addEventListener('reset', onReset);
       }
     });
-
   };
 
   // クロスドメインでのgetflv情報の通信用
@@ -2090,5 +2237,4 @@
       document.body.appendChild(script);
     });
   }
-
 })();
