@@ -136,7 +136,7 @@
                 this.emit('onAxisRelease', i);
                 this.emit('onAxisRelease', i);
               }
-              this._axis[i] = axis;
+              this._axes[i] = axis;
             }
           }
         },
@@ -247,7 +247,7 @@
           gamepad.on('onAxisChange',  onAxisChange);
           gamepad.on('onAxisRelease', onAxisRelease);
 
-          self.emit('onDeviceConnect', gamepad.getDeviceIndex());
+          self.emit('onDeviceConnect', gamepad.getDeviceIndex(), gamepad.getDeviceId());
 
           pollingTimer.changeInterval(30);
         }
@@ -281,7 +281,7 @@
         initializeGamepad();
       };
 
-      _.assign(NicoGamepad.prototype, {
+      _.assign(NicoGamepad, {
         getDeviceCount: function() { return primaryGamepad ? 1 : 0; },
       });
 
@@ -362,12 +362,12 @@
 //    var videoExplorerContentType = require('watchapp/components/videoexplorer/model/ContentType'),
 //    var WatchJsApi = w.WatchJsApi;
 //
-      var screenMode = {
+      var screen = {
         changeScreenMode: function(mode) {
           WatchJsApi.player.changePlayerScreenMode(mode);
           setTimeout(function(){$(window).resize();}, 3000);
         },
-        toggleFullScreen: function() {
+        toggleFull: function() {
           if (this.isFullScreen()) {
             this.changeScreenMode('notFull');
           } else {
@@ -488,10 +488,11 @@
       };
 
       return {
-        screenMode,
-        player,
-        playlist,
-        popup
+        videoexplorer: videoexplorer,
+        screen: screen,
+        player: player,
+        playlist: playlist,
+        popup: popup
       };
     });
 
@@ -551,7 +552,7 @@
             watchController.player.commentVisibility('toggle');
             break;
           case 3:
-            watchController.player.toggleFullScreen();
+            watchController.screen.toggleFull();
             break;
           case 4:
             watchController.videoexplorer.toggleSearch();
@@ -603,9 +604,22 @@
             break;
         }
       };
-      gamepad.on('onButtonDown', onButtonDown);
-      gamepad.on('onButtonUp',   onButtonUp);
-      gamepad.on('onAxisChange', onAxisChange);
+
+      var onDeviceConnect = function(deviceIndex, deviceId) {
+        onDeviceConnect = _.noop;
+
+        gamepad.on('onButtonDown', onButtonDown);
+        gamepad.on('onButtonUp',   onButtonUp);
+        gamepad.on('onAxisChange', onAxisChange);
+
+        watchController.popup.show('<span style="color:lightgreen;">ゲームパッド "' + deviceId + '" が検出されました</span>');
+      };
+
+      if (gamepad.getDeviceCount() > 0) {
+        onDeviceConnect();
+      } else {
+        gamepad.on('onDeviceConnect', onDeviceConnect);
+      }
     });
   };
 
