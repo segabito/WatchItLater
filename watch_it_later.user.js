@@ -149,6 +149,7 @@
       hideCommentPanelSocialButtons: false, // コメントパネル下のソーシャルボタンを隠す
       mylistPanelPosition: '',
       enableDescriptionThumbnail: true, // 説明文の動画リンクにサムネイルとタイトル表示
+      fullscreenMenuLevel: 0, // フルスクリーン時のメニュー表示
 
       enableLocalMylistCache: false,
 
@@ -189,7 +190,7 @@
 
       shortcutInvisibleInput:     {char: 'C', shift: false, ctrl: false,  alt: true, enable: true}, // 停止/再生
 
-      initializeImmediately: true, // 動画のロードを待たずに初期化する
+      initializeImmediately: !true, // 動画のロードを待たずに初期化する
 
       watchCounter: 0, // お前は今までに見た動画の数を覚えているのか？をカウントする
       forceEnableStageVideo: false,
@@ -335,7 +336,7 @@
         transform: scale(0.5); -webkit-transform: scale(0.5);
         z-index: -1;
       }
-      .mylistListPopup .icon:hover:after {
+       .mylistListPopup .icon:hover:after {
                 {*box-shadow: 2px 2px 2px #888;*}
         background: #fff;
         z-index: 100;
@@ -1715,10 +1716,13 @@
         font-size: 200%;
       }
       {* 真・browserFullモード *}
-      body.full_with_browser:fullscreen #nicoplayerContainerInner,
       body.full_with_browser.hideCommentInput #nicoplayerContainerInner {
         {* コメント入力欄は動画上表示にするのではなく、画面外に押し出す事によって見えなくする *}
         margin-top: -10px; margin-bottom: -30px !important;
+      }
+      body.full_with_browser.w_hideControlPanel #nicoplayerContainerInner,
+      body.full_with_browser.hideCommentInput.w_hideControlPanel #nicoplayerContainerInner {
+        margin-bottom: -76px !important;
       }
 
       {*body.full_with_browser:not(.w_fullScreenMenu) .mylistPopupPanel.fixed,*}
@@ -10703,23 +10707,7 @@
 
       var lastPlayerConfig = null, lastScreenMode = '';
 
-      var hideIfNeed = function() {
-        if (conf.controllerVisibilityInFull === 'hidden') {
-//          PlayerInitializer.nicoPlayerConnector.playerConfig.set({oldTypeCommentInput: true, oldTypeControlPanel: false});
-          $('body').addClass('hideCommentInput');
-        } else {
-          var $w = $(window), iw = $w.innerWidth(), ih = $w.innerHeight();
-          var controllerH = 46, inputH = 30;
-        }
-      };
-
       var restoreVisibility = function() {
-//        if (lastPlayerConfig !== null) {
-//          PlayerInitializer.nicoPlayerConnector.playerConfig.set(
-//            {oldTypeCommentInput: !!lastPlayerConfig.oldTypeCommentInput, oldTypeControlPanel: !!lastPlayerConfig.oldTypeControlPanel}
-//          );
-//          $(window).resize();
-//        }
         $('body').removeClass('hideCommentInput');
       };
 
@@ -10756,14 +10744,11 @@
         var mode = sc.mode;
         $('body').removeClass('w_fullScreenMenu');
         if (mode === 'browserFull' && lastScreenMode !== mode) {
-//          lastPlayerConfig = PlayerInitializer.nicoPlayerConnector.playerConfig.get();
-//          conf.setValue('lastControlPanelPosition', lastPlayerConfig.oldTypeControlPanel ? 'bottom' : 'over');
 
-          hideIfNeed();
-          //if (conf.enableTrueBrowserFull) togglePlaylist(conf.enableTrueBrowserFull);
+          updateFullscreenMenu();
+          $('body').toggleClass('hideCommentInput', conf.controllerVisibilityInFull === 'hidden');
         } else
         if (lastScreenMode === 'browserFull' && mode !== 'browserFull') {
-          conf.setValue('lastControlPanelPosition', '');
           $('#playerContainerSlideArea').css({height: ''}); // wall bug fix
           restoreVisibility();
           toggleMonitorFull(false);
@@ -10771,10 +10756,34 @@
         lastScreenMode = mode;
       });
 
-      $(window).on('beforeunload.watchItLater', function(e) {
-        conf.setValue('lastControlPanelPosition', '');
-        restoreVisibility();
-      });
+      var onFullscreenWheel = _.debounce(function(direction) {
+        var fullscreenMenuLevel = conf.fullscreenMenuLevel || 0;
+        if (direction === 'up') {
+          fullscreenMenuLevel--;
+        } else {
+          fullscreenMenuLevel++;
+        }
+        fullscreenMenuLevel = Math.max(-1, Math.min(1, fullscreenMenuLevel));
+
+        conf.setValue('fullscreenMenuLevel', fullscreenMenuLevel);
+        updateFullscreenMenu(fullscreenMenuLevel);
+      }, 500);
+      EventDispatcher.addEventListener('onFullscreenWheel', onFullscreenWheel);
+
+      var updateFullscreenMenu = function(fullscreenMenuLevel) {
+        fullscreenMenuLevel =
+          (typeof fullscreenMenuLevel === 'number') ?
+            fullscreenMenuLevel : conf.getValue('fullscreenMenuLevel');
+
+        var $body = $('body');
+        if (fullscreenMenuLevel === 0) {
+          $body.removeClass('w_fullScreenMenu').removeClass('w_hideControlPanel');
+        } else if (fullscreenMenuLevel < 0) {
+          $body.removeClass('w_fullScreenMenu').addClass('w_hideControlPanel');
+        } else if (fullscreenMenuLevel > 0) {
+          $body.addClass('w_fullScreenMenu').removeClass('w_hideControlPanel');
+        }
+      };
 
       var wheelCounter = 0, wheelTimer = null;
       EventDispatcher.addEventListener('onWheelNoButton', function(e, delta) {
@@ -10783,14 +10792,13 @@
           !WatchController.isFullScreen()) return;
         if (wheelTimer) {
           wheelCounter += delta;
-       } else {
+        } else {
           wheelCounter = 0;
           wheelTimer = setTimeout(function() {//
             wheelTimer = null;
             if (Math.abs(wheelCounter) > 3) {
-              EventDispatcher
-                .dispatch('onToggleFullScreenMenu',
-                  $('body').toggleClass('w_fullScreenMenu', wheelCounter < 0).hasClass('w_fullScreenMenu')
+              EventDispatcher.dispatch('onFullscreenWheel',
+                wheelCounter < 0 ? 'down' : 'up'
               );
               AnchorHoverPopup.hidePopup();
             }
@@ -10805,9 +10813,8 @@
           clearTimeout(wheelTimer);
           wheelTimer = null;
         }
-        EventDispatcher
-          .dispatch('onToggleFullScreenMenu',
-            $('body').toggleClass('w_fullScreenMenu', e.direction === 'down').hasClass('w_fullScreenMenu')
+        EventDispatcher.dispatch('onFullscreenWheel',
+          e.direction === 'down' ? 'down' : 'up'
         );
         AnchorHoverPopup.hidePopup();
       });
@@ -10857,16 +10864,6 @@
         .append($fullScreenMenuButtons);
 
       $('#nicoplayerContainerInner').append($fullScreenMenuContainer);
-
-
-      if (conf.lastControlPanelPosition === 'bottom' || conf.lastControlPanelPosition === 'over') {
-        EventDispatcher.addEventListener('onFirstVideoInitialized', function() {
-//          console.log('restore oldTypeControlPanel ? ', conf.lastControlPanelPosition === 'bottom');
-//          PlayerInitializer.nicoPlayerConnector.playerConfig.set(
-//            {oldTypeControlPanel: conf.lastControlPanelPosition === 'bottom'}
-//          );
-        });
-      }
 
     } // end initScreenMode()
 
@@ -13033,7 +13030,6 @@
         body.full_with_browser.w_fullScreenMenu:fullscreen                 #playerContainer #nicoHeatMapContainer,
         .full_with_browser.w_fullScreenMenu.hideCommentInput                  #playerContainer #nicoHeatMapContainer {
           position: fixed !important;
-          {*bottom: 0;*}
         }
         body.full_with_browser.w_fullScreenMenu.fullWithPlaylist:fullscreen #playerContainer #nicoHeatMapContainer,
         .full_with_browser.w_fullScreenMenu.hideCommentInput.fullWithPlaylist #playerContainer #nicoHeatMapContainer {
