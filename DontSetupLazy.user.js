@@ -3,7 +3,7 @@
 // @namespace   https://github.com/segabito/
 // @description 動画のロードを待たずに初期化する
 // @include     http://www.nicovideo.jp/watch/*
-// @version     0.4
+// @version     0.5
 // @grant       none
 // ==/UserScript==
 
@@ -21,8 +21,8 @@
             return;
           }
           console.time('initialize Immediately');
-          pso._executed = true;
           pso._dispatch();
+          pso._executed = true;
           console.timeEnd('initialize Immediately');
         }, 0);
       }

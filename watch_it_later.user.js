@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.141120
+// @version        1.141121
 // ==/UserScript==
 
 
@@ -190,7 +190,7 @@
 
       shortcutInvisibleInput:     {char: 'C', shift: false, ctrl: false,  alt: true, enable: true}, // 停止/再生
 
-      initializeImmediately: !true, // 動画のロードを待たずに初期化する
+      initializeImmediately: true, // 動画のロードを待たずに初期化する
 
       watchCounter: 0, // お前は今までに見た動画の数を覚えているのか？をカウントする
       forceEnableStageVideo: false,
@@ -13764,8 +13764,8 @@
               return;
             }
             console.time('initialize Immediately');
-            PlayerStartupObserver._executed = true;
             PlayerStartupObserver._dispatch();
+            PlayerStartupObserver._executed = true;
             console.timeEnd('initialize Immediately');
           }, 0);
         }
