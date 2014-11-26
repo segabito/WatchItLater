@@ -21,7 +21,6 @@
       console.log('%cアンケートおことわりします %s', 'background: lightgreen;', timeoutCounter);
       enquete.openNotification = enquete.insertNotification = enquete.openEnqueteDirectly = enquete.notifyLater;
       enquete.getRemainingMilliSecond = function() { return 0; };
-      enquete.openEnqueteDirectly = enquete.notifyLater;
       enquete.notifyLater();
 
       window.clearInterval(timer);
