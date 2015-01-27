@@ -30,8 +30,8 @@
         var watchInfoModel = WatchApp.ns.model.WatchInfoModel.getInstance();
         watchInfoModel.addEventListener('reset', function() {
           var watchId = watchInfoModel.id;
-          parent.location.replace(baseUrl + '#!' + watchId);
-          //parent.window.history.replaceState('', '', '/watch/' + watchId);
+          //parent.location.replace(baseUrl + '#!' + watchId);
+          parent.window.history.replaceState('', '', '/watch/' + watchId);
         });
         parent.window.addEventListener('beforeunload', function() {
           top.window.history.replaceState('', '', 'http://www.nicovideo.jp/watch/' + watchInfoModel.id);

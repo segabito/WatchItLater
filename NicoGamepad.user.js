@@ -43,6 +43,38 @@
       };
     });
 
+    define('nicogamepad/commandDefinition', [], function() {
+      return {
+        'player.togglePlay': {
+          code: 'player.togglePlay',
+          repeat: false,
+          description: '再生/一時停止',
+          ext: null
+        },
+
+        'player.toggleMute': {
+          code: 'player.mute',
+          params: ['toggle'],
+          description: 'ミュート'
+        },
+        'player.toggleComment': {
+          code: 'player.commentVisibility',
+          params: ['toggle'],
+          description: 'コメント表示'
+        },
+
+        'screen.toggleFull': {
+          code: 'screen.toggleFull',
+          description: 'フルスクリーン切換'
+        },
+        'videoexplorer.toggleSearch': {
+          code: 'videoexplorer.toggleSearch',
+          description: '検索オープン'
+        }
+      };
+    });
+
+
     define('nicogamepad/PollingTimer', ['lodash'], function(_) {
       var id = 0;
       var PollingTimer = function(callback, interval) {
@@ -207,7 +239,7 @@
         }
 
         if (isConnected) {
-          console.log('%cgamepad conneced id:"%s"', 'background: lightblue;', e.gamepad.id);
+          console.log('%cgamepad connected id:"%s"', 'background: lightblue;', e.gamepad.id);
           detectGamepad();
         } else {
           NicoGamepad.emit('onDeviceDisconnect', primaryGamepad.getDeviceIndex());
@@ -282,7 +314,7 @@
       };
 
       _.assign(NicoGamepad, {
-        getDeviceCount: function() { return primaryGamepad ? 1 : 0; },
+        getDeviceCount: function() { return primaryGamepad ? 1 : 0; }
       });
 
       initialize();
@@ -345,7 +377,7 @@
       ['jquery',
        'lodash',
        'watchapp/init/VideoExplorerInitializer',
-       'watchapp/init/PlayerInitializer',
+       'watchapp/init/PlayerInitializer'
       ],
       function($, _) {
 //    var  WatchApp = require('WatchApp'),
@@ -447,7 +479,7 @@
         volume: function(v) {
           var exp = window.document.getElementById('external_nicoplayer');
 
-          if (typeof v === 'string' && v.match(/^[+-]\d+$/)) {
+          if (typeof v === 'string' && v.match(/^[+\-]\d+$/)) {
             this.volume(this.volume() + v * 1);
           } else
           if (typeof v === 'number' || (typeof v === 'string' && v.match(/^\d+$/))) {
@@ -496,15 +528,101 @@
       };
     });
 
+    define('nicogamepad/model/State', [], function() {
+      var watchController = require('nicogamepad/watchController');
+
+      function State() {
+      }
+
+      _.assign(State.prototype, {
+        call: function() {
+        },
+        onButtonDown: function(button, deviceIndex) {
+        },
+        onButtonUp: function(button, deviceIndex) {
+        },
+        onAxisChange: function() {
+        }
+      });
+
+      return State;
+    });
+    define('nicogamepad/model/NormalPlayerState',
+      ['nicogamepad/model/State'],
+      function(State) {
+
+      var NormalPlayerState = function(commandExecutor) {
+        this._commandExecutor = commandExecutor;
+      };
+
+      inherit(NormalPlayerState, State);
+      _.assign(State.prototype, {
+      });
+
+      return NormalPlayerState;
+    });
+
+    define('nicogamepad/model/commandExecutor',
+      ['nicogamepad/watchController', 'nicogamepad/commandDefinition'],
+      function(watchController, commandDefinition) {
+
+        function commandExecutor() {
+        }
+
+        var exec = function(command) {
+          var definition = watchDefinition[command];
+          var code = definition.code;
+          var params = definition.params || [];
+          if (typeof code === 'function') {
+            return code();
+          }
+
+          try {
+            var func = getFunction(code, params);
+            return func(params);
+          } catch(e) {
+            console.log('%ccommand execute error!', 'background: red;', e);
+            console.trace();
+            return void 0; // undefined
+          }
+        };
+
+        var getFunction = function(command, params) {
+          var split = command.split('.');
+          var func = split.pop();
+          var component = watchController;
+
+          for (var i = 0, len = split.length; i < len; i++) {
+            component = component[split[i]];
+            if (!component) {
+              console.log('%cunknown component?', 'background: red;', command);
+              return;
+            }
+          }
+
+          return function() {
+            return component[func].apply(component, params);
+          };
+        };
+
+        _.assign(commandExecutor, {
+          exec: exec
+        });
+
+        return commandExecutor;
+    });
+
     require([
         'nicogamepad/gamepad',
         'nicogamepad/SettingPanel',
-        'nicogamepad/watchController'
+        'nicogamepad/watchController',
+        'nicogamepad/model/commandExecutor'
       ],
       function(
         gamepad,
         SettingPanel,
-        watchController
+        watchController,
+        commandExecutor
       )
     {
       var isButton0Down = false;
@@ -566,6 +684,8 @@
             watchController.player.nextVideo();
             break;
           case 8:
+          case 9:
+          case 10:
             watchController.player.togglePlay();
             break;
         }
@@ -607,7 +727,6 @@
 
       var onDeviceConnect = function(deviceIndex, deviceId) {
         onDeviceConnect = _.noop;
-
         gamepad.on('onButtonDown', onButtonDown);
         gamepad.on('onButtonUp',   onButtonUp);
         gamepad.on('onAxisChange', onAxisChange);

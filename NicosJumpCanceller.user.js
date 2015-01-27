@@ -3,7 +3,7 @@
 // @namespace   https://github.com/segabito/
 // @description 「＠ジャンプ」を無効化
 // @include     http://www.nicovideo.jp/watch/*
-// @version     1.0.3
+// @version     1.0.4
 // @grant none
 // ==/UserScript==
 

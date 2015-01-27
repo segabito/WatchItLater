@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.141121
+// @version        1.150128
 // ==/UserScript==
 
 
@@ -78,6 +78,7 @@
     })();
     var $ = require.defined('jquery') ? w.require('jquery') : w.jQuery;
     var _ = require.defined('lodash') ? w.require('lodash') : w._;
+    var advice = require.defined('advice') ? w.require('advice') : {after: function() {}, before: function() {}};
     var jQuery = $;
     var WatchApp   = require.defined('WatchApp')   ? require('WatchApp')   : w.WatchApp;
     var PlayerApp  = require.defined('PlayerApp')  ? require('PlayerApp')  : w.PlayerApp;
@@ -2184,6 +2185,13 @@
       .area-JP                  #playerTabContainer.w_noSocial               .playerTabContent {
         bottom: 4px;
       }
+      .area-JP .panel_ads_shown #playerTabContainer.w_noSocial.has_panel_ads .player-panel-tabs .player-tab-content {
+        bottom: 80px;
+      }
+      .area-JP                  #playerTabContainer.w_noSocial               .player-panel-tabs .player-tab-content {
+        bottom: 4px;
+      }
+
       #playerTabContainer.w_noSocial .playerTabAds {
         bottom: 0;
       }
@@ -2430,9 +2438,9 @@
       {title: '「ニコる」をなくす', varName: 'noNicoru',
         description: '画面上から見えなくなります。\nまた、コメントパネルの処理が軽くなります',
         values: {'なくす': true, 'なくさない': false}},
-      {title: 'コメントパネルのマウスオーバー処理をなくす', varName: 'removeCommentPanelHoverEvent', reload: true,
-        description: 'マウスオーバー時のちらちらした物がなくなり、表示が軽くなります',
-        values: {'なくす': true, 'なくさない': false}},
+//      {title: 'コメントパネルのマウスオーバー処理をなくす', varName: 'removeCommentPanelHoverEvent', reload: true,
+//        description: 'マウスオーバー時のちらちらした物がなくなり、表示が軽くなります',
+//        values: {'なくす': true, 'なくさない': false}},
       {title: 'タグの自動更新を無効化', varName: 'disableTagReload',
         values: {'する': true, 'しない': false}},
       {title: '横スクロールバーを出なくする', varName: 'disableHorizontalScroll',
@@ -4145,7 +4153,7 @@
     };
 
 
-    EventDispatcher.addEventListener('onMyMylistLoad', function(mylistId, list) {
+    EventDispatcher.addEventListener('myMylistLoad', function(mylistId, list) {
       setCache(mylistId, list || []);
     });
     EventDispatcher.addEventListener('onMylistItemAdded',  function(mylistId, watchId) {
@@ -7749,7 +7757,7 @@
 
     var isFirst = true;
     function onVideoInitialized() {
-      var TagInitializer = require('watchapp/init/TagInitializer');
+      //var TagInitializer = require('watchapp/init/TagInitializer');
       AnchorHoverPopup.hidePopup().updateNow();
       WatchCounter.add();
 
@@ -7992,21 +8000,21 @@
         if (conf.enableSharedNgSetting) { $div.show(); }
       });
 
-      if (conf.removeCommentPanelHoverEvent) {
-        $("#commentDefault").find(".commentTableContainerInner")               .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
-        $('#playerCommentPanel .section .commentTable .commentTableContainer') .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
-        PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
-          .off('contextmenu')
-          .on('contextmenu', '.cell',
-            $.proxy(Util.Closure.commentPanelContextMenu(), PlayerInitializer.commentPanelViewController.commentContent)
-          );
-      }
-      EventDispatcher.addEventListener('onVideoChangeStatusUpdated', function(isChanging) {
-        if (isChanging) {
-          PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
-            .find('.cell').off();
-        }
-      });
+//      if (conf.removeCommentPanelHoverEvent) {
+//        $("#commentDefault").find(".commentTableContainerInner")               .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
+//        $('#playerCommentPanel .section .commentTable .commentTableContainer') .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
+//        PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
+//          .off('contextmenu')
+//          .on('contextmenu', '.cell',
+//            $.proxy(Util.Closure.commentPanelContextMenu(), PlayerInitializer.commentPanelViewController.commentContent)
+//          );
+//      }
+//      EventDispatcher.addEventListener('onVideoChangeStatusUpdated', function(isChanging) {
+//        if (isChanging) {
+//          PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
+//            .find('.cell').off();
+//        }
+//      });
     } // end initRightPanel
 
     function initRightPanelHorizontalTab($, conf, w) {
@@ -8063,9 +8071,9 @@
             toggleReview(true);
           } else
           if (selection === 'w_comment') {
-            setTimeout(function() {
-              PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
-            }, 500);
+//            setTimeout(function() {
+//              PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
+//            }, 500);
           }
           return changeTab;
         },
@@ -8410,7 +8418,9 @@
     } //
 
 
-    var VideoExplorerToggleMenu = function(title, titleLink) {
+    var VideoExplorerToggleMenu;
+    WatchItLater.videoExplorerMenu = {};
+    WatchItLater.videoExplorerMenu.ToggleMenu = VideoExplorerToggleMenu = function(title, titleLink) {
       this.initializeBaseDom(title, titleLink);
     };
     WatchApp.mixin(VideoExplorerToggleMenu.prototype, {
@@ -8476,12 +8486,12 @@
       add$listItem: function($item) {
         this._$list.append($item);
       },
-      addItem: function(name, title, attr) {
+      addItem: function(name, title, attr, iconType) {
         var
           $a = $('<a/>')
            .attr(attr)
            .text(title),
-          $li = $('<li/>').addClass(iconType);
+          $li = $('<li/>').addClass(iconType || '');
         $li.append($a);
         this._$list.append($li);
         return $a;
@@ -8506,7 +8516,6 @@
       }
     });
 
-    WatchItLater.videoExplorerMenu = {};
     WatchItLater.videoExplorerMenu.favMylists = (function() {
       var toggleMenu;
 
@@ -9137,6 +9146,7 @@
 
         var filter = this.getFilter();
         if (err === null && result.list && result.list.length) {
+          EventDispatcher.dispatch('mylistDataLoad', this.getMylistId(), result);
           if (!result.rawList) result.rawList = result.list.concat();
           if (filter) {
             var list = [];
@@ -9159,7 +9169,7 @@
         this._rawList = result.rawList || [];
         this.onLoad_org(err, result);
         if (this.getIsMine()) {
-          EventDispatcher.dispatch('onMyMylistLoad', this.getMylistId(), {
+          EventDispatcher.dispatch('myMylistLoad', this.getMylistId(), {
             name: this.getName(),
             items: result.rawList
           });
@@ -9176,10 +9186,19 @@
         return false;
       }, content);
 
+      var MylistLoadHookEvent = function(params) {
+        this.params = params;
+        this.data = null;
+      };
+      MylistLoadHookEvent.prototype.cancel = function(data) {
+        this.data = data;
+      };
+
       loader.load_org = loader.load;
       loader.load = $.proxy(function(params, callback) {
         var isOwnerNicorepo = false, isRanking = false;
         var id = params.id;
+
         if (typeof id === 'string' && id.indexOf('repo-owner-') === 0) {
           id = NicorepoVideo.REPO_OWNER;
         }
@@ -9189,82 +9208,92 @@
           result.isRanking       = isRanking;
           callback(err, result);
         };
-        if (id < 0) {
-          var timeoutTimer = null;
-          var onload = function(result) {
-            window.clearTimeout(timeoutTimer);
-            // 投稿者ニコレポが0件で、投稿動画一覧を公開していたらそっちを開くタイマーをセット
-            if (result.list.length < 1 &&
-              parseInt(id, 10) === NicorepoVideo.REPO_OWNER &&
-              WatchController.isVideoPublic()) {
-              window.setTimeout(function() {
-                WatchController.openVideoOwnersVideo();
-              }, 500);
-            }
-            applyFilter(null, result);
-          };
-          var onerror = function(result) {
-            window.clearTimeout(timeoutTimer);
-            callback('error', result);
-          };
-          timeoutTimer = window.setTimeout(function() {
-            onload = onerror = window._.noop;
-            onerror({message: '通信がタイムアウトしました:' + id, status: 'fail'});
-          }, 30 * 1000);
 
-           // マイリストIDに負の数字(通常ないはず)が来たら乗っ取るサイン
-           // そもそもマイリストIDはstringのようなので数字にこだわる必要なかったかも
-           //
-          try {
-            if (typeof VideoRanking.getGenreName(id) === 'string') {
-              isRanking = true;
-              VideoRanking.load(null, {id: id}).then(onload, onerror);
-              return;
-            }
-            // TODO: マジックナンバーを
-            switch (parseInt(id, 10)) {
-              case -1:
-                VideoWatchHistory.load(onload);
-                break;
-              case -2:
-                VideoRecommendations.load(onload);
-                break;
-              case -3:
-                ChannelVideoList.loadOwnerVideo(null).then(onload, onerror);
-                break;
-              case NicorepoVideo.REPO_ALL:
-                NicorepoVideo.loadAll()   .then(onload, onerror);
-                break;
-              case NicorepoVideo.REPO_USER:
-                NicorepoVideo.loadUser()  .then(onload, onerror);
-                break;
-              case NicorepoVideo.REPO_CHCOM:
-                NicorepoVideo.loadChCom() .then(onload, onerror);
-                break;
-              case NicorepoVideo.REPO_MYLIST:
-                NicorepoVideo.loadMylist().then(onload, onerror);
-                break;
-              case NicorepoVideo.REPO_OWNER:
-                isOwnerNicorepo = true;
-                NicorepoVideo.loadOwner() .then(onload, onerror);
-                break;
-              default:
-                throw {message: '未定義のIDです:' + id, status: 'fail'};
-            }
-          } catch(e) {
-            // TODO: ここのエラーをちゃんと投げる
-            if (e.message && e.status) {
-              onerror({
-                status: e.status,
-                message: e.message
-            });
-            } else {
-             console.log(e); console.trace();
-             onerror({message: 'エラーが発生しました:' + id, status: 'fail'});
-            }
-          }
-        } else {
+        // 外部スクリプトがダミーマイリストを流し込みたい場合はこのイベントをフック
+        var hook = new MylistLoadHookEvent(params);
+        EventDispatcher.dispatch('beforeMylistLoad', hook);
+
+        if (hook.data) {
+          applyFilter(null, hook.data);
+          return;
+        } else
+        if (id >= 0) {
           this.load_org(params, applyFilter);
+          return;
+        }
+
+        var timeoutTimer = null;
+        var onload = function(result) {
+          window.clearTimeout(timeoutTimer);
+          // 投稿者ニコレポが0件で、投稿動画一覧を公開していたらそっちを開くタイマーをセット
+          if (result.list.length < 1 &&
+            parseInt(id, 10) === NicorepoVideo.REPO_OWNER &&
+            WatchController.isVideoPublic()) {
+            window.setTimeout(function() {
+              WatchController.openVideoOwnersVideo();
+            }, 500);
+          }
+          applyFilter(null, result);
+        };
+        var onerror = function(result) {
+          window.clearTimeout(timeoutTimer);
+          callback('error', result);
+        };
+        timeoutTimer = window.setTimeout(function() {
+          onload = onerror = window._.noop;
+          onerror({message: '通信がタイムアウトしました:' + id, status: 'fail'});
+        }, 30 * 1000);
+
+         // マイリストIDに負の数字(通常ないはず)が来たら乗っ取るサイン
+         // そもそもマイリストIDはstringのようなので数字にこだわる必要なかったかも
+         //
+        try {
+          if (typeof VideoRanking.getGenreName(id) === 'string') {
+            isRanking = true;
+            VideoRanking.load(null, {id: id}).then(onload, onerror);
+            return;
+          }
+          // TODO: マジックナンバーを
+          switch (parseInt(id, 10)) {
+            case -1:
+              VideoWatchHistory.load(onload);
+              break;
+            case -2:
+              VideoRecommendations.load(onload);
+              break;
+            case -3:
+              ChannelVideoList.loadOwnerVideo(null).then(onload, onerror);
+              break;
+            case NicorepoVideo.REPO_ALL:
+              NicorepoVideo.loadAll()   .then(onload, onerror);
+              break;
+            case NicorepoVideo.REPO_USER:
+              NicorepoVideo.loadUser()  .then(onload, onerror);
+              break;
+            case NicorepoVideo.REPO_CHCOM:
+              NicorepoVideo.loadChCom() .then(onload, onerror);
+              break;
+            case NicorepoVideo.REPO_MYLIST:
+              NicorepoVideo.loadMylist().then(onload, onerror);
+              break;
+            case NicorepoVideo.REPO_OWNER:
+              isOwnerNicorepo = true;
+              NicorepoVideo.loadOwner() .then(onload, onerror);
+              break;
+            default:
+              throw {message: '未定義のIDです:' + id, status: 'fail'};
+          }
+        } catch(e) {
+          // TODO: ここのエラーをちゃんと投げる
+          if (e.message && e.status) {
+            onerror({
+              status: e.status,
+              message: e.message
+          });
+          } else {
+           console.log(e); console.trace();
+           onerror({message: 'エラーが発生しました:' + id, status: 'fail'});
+          }
         }
       }, loader);
 
@@ -10270,7 +10299,9 @@
       controller._refreshMenu_org = controller._refreshMenu;
       controller._refreshMenu = $.proxy(function() {
         detachMenuItems();
+        EventDispatcher.dispatch('beforeRefreshVideoExplorerMenu');
         this._refreshMenu_org();
+        EventDispatcher.dispatch('afterRefreshVideoExplorerMenu');
         attachMenuItems();
       }, controller);
       controller.showDeflist_org         = controller.showDeflist;
@@ -10329,7 +10360,7 @@
       EventDispatcher.addEventListener('onVideoExplorerOpened', function(content) {
         setTimeout(function() {
           if (conf.videoExplorerHack) {
-            PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
+//            PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
             playerConnector.updatePlayerConfig({playerViewSize: ''}); // ノーマル画面モード
           }
         }, 100);
@@ -10411,9 +10442,9 @@
         AnchorHoverPopup.hidePopup();
         $('#playerTabWrapper').toggleClass('w_active');
         $toggleCommentPanel.toggleClass('w_active', $('#playerTabWrapper').hasClass('w_active'));
-        setTimeout(function() {
-          PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
-        }, 1000);
+//        setTimeout(function() {
+//          PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
+//        }, 1000);
       }).on('mouseover', function() {
         AnchorHoverPopup.hidePopup();
       });
@@ -10733,7 +10764,7 @@
         var shield = $('<div id="fullScreenMenuContainer" />');
         shield.click(function(e) {
           e.stopPropagation();
-          togglePlaylist();
+          togglePlaylist()
         });
         $('#external_nicoplayer').after(shield);
         shield = null;
@@ -11540,10 +11571,22 @@
       var VideoExplorerInitializer = require('watchapp/init/VideoExplorerInitializer');
       var watchInfoModel    = require('watchapp/model/WatchInfoModel').getInstance();
       var pac = PlayerInitializer.playerAreaConnector;
+      var npc = PlayerInitializer.nicoPlayerConnector;
 
-      pac.addEventListener("onVideoInitialized", onVideoInitialized);
-      pac.addEventListener("onVideoEnded",       onVideoEnded);
-      pac.addEventListener("onVideoStopped",     onVideoStopped);
+//      pac.addEventListener("onVideoInitialized", onVideoInitialized);
+//      pac.addEventListener("onVideoEnded",       onVideoEnded);
+//      pac.addEventListener("onVideoStopped",     onVideoStopped);
+//      npc.onCommentListInitialized_org = npc.onCommentListInitialized;
+//      npc.onCommentListInitialized = function() {
+//        npc.onCommentListInitialized_org();
+//        EventDispatcher.dispatch('onCommentListInitialized');
+//      };
+      advice.after(npc, 'onCommentListInitialized', function() {
+        EventDispatcher.dispatch('onCommentListInitialized');
+      });
+      advice.after(npc, 'onVideoInitialized', onVideoInitialized);
+      advice.after(npc, 'onVideoEnded',   onVideoEnded);
+      advice.after(npc, 'onVideoStopped', onVideoStopped);
       // pac.addEventListener('onSystemMessageFatalErrorSended', onSystemMessageFatalErrorSended);
       // WatchInitializer.watchModel.addEventListener('error', function() {console.log(arguments);});
 
@@ -12972,11 +13015,10 @@
     } //
 
     function initHeatMap($, conf, w) {
+      console.log('initHeatMap');
       if (!conf.enableHeatMap) return;
-      //if (!w.Worker) return;
-      //
-      // TODO: Web Workers
       var PlayerInitializer = require('watchapp/init/PlayerInitializer');
+      var npc = PlayerInitializer.nicoPlayerConnector;
       var canvasWidth = 100, canvasHeight = 12;
       var comments = [], duration = 0, canvas = null, context = null;
       var commentReady = false, videoReady = false, updated = false, palette = [];
@@ -13029,7 +13071,7 @@
 
         body.full_with_browser.w_fullScreenMenu:fullscreen                 #playerContainer #nicoHeatMapContainer,
         .full_with_browser.w_fullScreenMenu.hideCommentInput                  #playerContainer #nicoHeatMapContainer {
-          position: fixed !important;
+          position: fixed !important;gtgt
         }
         body.full_with_browser.w_fullScreenMenu.fullWithPlaylist:fullscreen #playerContainer #nicoHeatMapContainer,
         .full_with_browser.w_fullScreenMenu.hideCommentInput.fullWithPlaylist #playerContainer #nicoHeatMapContainer {
@@ -13040,16 +13082,23 @@
 
       */});
       addStyle(__css__, 'NicoHeatMapCss');
+      var pv = require('watchapp/init/PlayerInitializer').rightSidePanelViewController.getPlayerPanelTabsView();
+      var cpv = pv._commentPanelView;
+      cpv.showNicoru = function() {};
+      cpv.showTooltip = function() {};
 
-      PlayerInitializer.playerAreaConnector.addEventListener('onCommentListInitialized', function() {
+      //advice.after(npc, 'onCommentListInitialized', $.proxy(onCommentListInitialized, this));
+      EventDispatcher.addEventListener('onCommentListInitialized', function() {
         w.setTimeout(function() {
           commentReady = true;
           update();
-        }, 1000);
+        }, 5000);
       });
       EventDispatcher.addEventListener('onVideoInitialized', function() {
-        videoReady = true;
-        update();
+        w.setTimeout(function() {
+          videoReady = true;
+          update();
+        }, 5000);
       });
       EventDispatcher.addEventListener('onVideoChangeStatusUpdated', function() {
         commentReady = videoReady = updated = false;
@@ -13057,12 +13106,14 @@
       });
 
       var update = function() {
+        console.log('%cupdate!!!', 'background: red; color: white;', commentReady, videoReady, updated);
         if (!commentReady || !videoReady || updated) return;
         updated = true;
         initCanvas();
         getComments();
         getDuration();
         if (comments.length < 1 || duration < 1) {
+          console.log('%ccomment empty', 'background: red; color: white;', comments, duration);
           return;
         }
         getHeatMap(function(map) {
@@ -13077,18 +13128,9 @@
       };
 
       var getComments = function() {
-        comments = [];
-
-        var list = PlayerInitializer.commentPanelViewController.commentLists;
-        for (var i = 0; i < list.length; i++) {
-          if (list[i].listName === 'commentlist:main' && list[i].comments.length > 0) {
-            comments = list[i].comments;
-            break;
-          }
-          var ct = list[i].comments;
-          comments = (comments.length < ct.length) ? ct : comments;
-        }
-        list = null;
+        var pt = PlayerInitializer.rightSidePanelViewController.getPlayerPanelTabsView();
+        var cv = pt._commentPanelView;
+        comments = cv.getComments().getData();
       };
       var getDuration = function() {
         var exp = document.getElementById('external_nicoplayer');//$('#external_nicoplayer')[0];
@@ -13359,11 +13401,11 @@
         WatchController.scrollTop(0, 400);
       });
 
-      PlayerInitializer.commentPanelViewController.commentPanelContentModel.addEventListener('change', function(name) {
-        if (name === 'log_comment') {
-          $('.logDateSelect .logTime input')[0].setAttribute('type', 'time');
-        }
-      });
+//      PlayerInitializer.commentPanelViewController.commentPanelContentModel.addEventListener('change', function(name) {
+//        if (name === 'log_comment') {
+//          $('.logDateSelect .logTime input')[0].setAttribute('type', 'time');
+//        }
+//      });
 
       var overrideGenerateURL = function() {
         var WatchPageInitializer = require('watchapp/init/WatchPageInitializer');
@@ -13403,6 +13445,11 @@
         }
         return require('playerapp/player/Nicoplayer').getInstance().getCommentNicoruCount(name, num);
       };
+      if (conf.noNicoru) {
+         var cpv = require('playerPanel/view/CommentPanelView');
+         cpv.prototype.showNicoru = function() {};
+         //cpv.prototype.showTooltip = function() {};
+      }
 
       var playerConfig = PlayerInitializer.nicoPlayerConnector.playerConfig;
       if (conf.autoPlayIfWindowActive === 'yes') {
@@ -13693,12 +13740,14 @@
     initTouch();
     initEvents();
 
-    initSearchContent($, conf, w);
-    initUserVideoContent($, conf, w);
-    initMylistContent($, conf, w);
-    initUploadedVideoContent($, conf, w);
-    initDeflistContent($, conf, w);
-    initVideoExplorer($, conf, w);
+    window.setTimeout(function() {
+      initSearchContent($, conf, w);
+      initUserVideoContent($, conf, w);
+      initMylistContent($, conf, w);
+      initUploadedVideoContent($, conf, w);
+      initDeflistContent($, conf, w);
+      initVideoExplorer($, conf, w);
+    }, 3000);
 
     initRightPanel($, conf, w);
     initLeftPanel($, conf, w);
@@ -13726,12 +13775,16 @@
     initOther();
 //    window.console.profileEnd('init WatchItLater');
     window.console.timeEnd('init WatchItLater');
+//    console.log('%cWatchItLater initialized!', 'background: lightgreen;');
+
 
     onWindowResizeEnd();
 
     if (conf.debugMode) {
       initTest(WatchItLater.test);
     }
+
+    define('WatchItLater', [], function() { return WatchItLater; });
   };
 
   if (window.WatchJsApi) {
@@ -13758,8 +13811,15 @@
         watchInfoModel.addEventListener('reset', onReset);
         if (conf.initializeImmediately) {
           console.log('%cinitialize Immediately', 'background: lightgreen;');
-
-          window.setTimeout(function() {
+          //if (require.defined('playerPanel/view/ngPanel/NGGridProvider')) {
+          //  var ngg = require('playerPanel/view/ngPanel/NGGridProvider');
+          //  ngg.prototype._getList = function() {
+          //    return this._list || [];
+          //  };
+          //}
+          //var Nicoplayer = PlayerApp.ns.player.Nicoplayer;
+          var startup = function() {
+            startup = function() {};
             if (PlayerStartupObserver._executed) {
               return;
             }
@@ -13767,7 +13827,9 @@
             PlayerStartupObserver._dispatch();
             PlayerStartupObserver._executed = true;
             console.timeEnd('initialize Immediately');
-          }, 0);
+          };
+//          Nicoplayer.onCommentListInitialized(function() { startup(); });
+          window.setTimeout(startup, 0);
         }
       }
     });
