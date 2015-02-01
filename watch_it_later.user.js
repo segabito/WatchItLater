@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150128
+// @version        1.150129
 // ==/UserScript==
 
 
@@ -5775,23 +5775,6 @@
         return function() {
           WatchController.showLargeThumbnail(url);
         };
-      },
-      commentPanelContextMenu: function() {
-        return function(a) {
-          a.preventDefault(); a.stopPropagation();
-          var c = this.commentListModel.getComment(this.parseResNo(jQuery(a.currentTarget)));
-          var WatchApp = null, WatchController = null;
-          if (c) {
-            var
-              $d   = this.CommentContextMenu.$contextMenuContainer,
-              $e   = jQuery("#playerCommentPanel"),
-              left = this.$commentTableHeaderOuter.position().left,
-              top  = a.pageY - $e.offset().top,
-              f   = Math.min($e.offset().top + $e.outerHeight(), jQuery(window).scrollTop() + jQuery(window).outerHeight());
-            if (f < a.pageY + $d.outerHeight()) top -= a.pageY + $d.outerHeight() - f;
-            this.CommentContextMenu.show(c, left, top);
-          }
-        };
       }
     };
     var Deferred = {
@@ -8000,21 +7983,6 @@
         if (conf.enableSharedNgSetting) { $div.show(); }
       });
 
-//      if (conf.removeCommentPanelHoverEvent) {
-//        $("#commentDefault").find(".commentTableContainerInner")               .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
-//        $('#playerCommentPanel .section .commentTable .commentTableContainer') .off('mouseover').off('mouseenter').off('mouseleave').off('mouseout');
-//        PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
-//          .off('contextmenu')
-//          .on('contextmenu', '.cell',
-//            $.proxy(Util.Closure.commentPanelContextMenu(), PlayerInitializer.commentPanelViewController.commentContent)
-//          );
-//      }
-//      EventDispatcher.addEventListener('onVideoChangeStatusUpdated', function(isChanging) {
-//        if (isChanging) {
-//          PlayerInitializer.commentPanelViewController.commentContent.$commentTableContainer
-//            .find('.cell').off();
-//        }
-//      });
     } // end initRightPanel
 
     function initRightPanelHorizontalTab($, conf, w) {
@@ -8071,9 +8039,11 @@
             toggleReview(true);
           } else
           if (selection === 'w_comment') {
-//            setTimeout(function() {
-//              PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
-//            }, 500);
+            setTimeout(function() {
+              var pv = require('watchapp/init/PlayerInitializer').rightSidePanelViewController.getPlayerPanelTabsView();
+              var cpv = pv._commentPanelView;
+              cpv.resize();
+            }, 500);
           }
           return changeTab;
         },
@@ -10360,7 +10330,9 @@
       EventDispatcher.addEventListener('onVideoExplorerOpened', function(content) {
         setTimeout(function() {
           if (conf.videoExplorerHack) {
-//            PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
+              var pv = require('watchapp/init/PlayerInitializer').rightSidePanelViewController.getPlayerPanelTabsView();
+              var cpv = pv._commentPanelView;
+              cpv.resize();
             playerConnector.updatePlayerConfig({playerViewSize: ''}); // ノーマル画面モード
           }
         }, 100);
@@ -10442,9 +10414,11 @@
         AnchorHoverPopup.hidePopup();
         $('#playerTabWrapper').toggleClass('w_active');
         $toggleCommentPanel.toggleClass('w_active', $('#playerTabWrapper').hasClass('w_active'));
-//        setTimeout(function() {
-//          PlayerInitializer.commentPanelViewController.contentManager.activeContent().refresh();
-//        }, 1000);
+        setTimeout(function() {
+              var pv = require('watchapp/init/PlayerInitializer').rightSidePanelViewController.getPlayerPanelTabsView();
+              var cpv = pv._commentPanelView;
+              cpv.resize();
+        }, 1000);
       }).on('mouseover', function() {
         AnchorHoverPopup.hidePopup();
       });
@@ -13015,7 +12989,6 @@
     } //
 
     function initHeatMap($, conf, w) {
-      console.log('initHeatMap');
       if (!conf.enableHeatMap) return;
       var PlayerInitializer = require('watchapp/init/PlayerInitializer');
       var npc = PlayerInitializer.nicoPlayerConnector;
@@ -13106,14 +13079,12 @@
       });
 
       var update = function() {
-        console.log('%cupdate!!!', 'background: red; color: white;', commentReady, videoReady, updated);
         if (!commentReady || !videoReady || updated) return;
         updated = true;
         initCanvas();
         getComments();
         getDuration();
         if (comments.length < 1 || duration < 1) {
-          console.log('%ccomment empty', 'background: red; color: white;', comments, duration);
           return;
         }
         getHeatMap(function(map) {
@@ -13400,12 +13371,6 @@
       $('#videoHeaderMenu .searchText input').attr({'accesskey': '@'}).on('focus', function() {
         WatchController.scrollTop(0, 400);
       });
-
-//      PlayerInitializer.commentPanelViewController.commentPanelContentModel.addEventListener('change', function(name) {
-//        if (name === 'log_comment') {
-//          $('.logDateSelect .logTime input')[0].setAttribute('type', 'time');
-//        }
-//      });
 
       var overrideGenerateURL = function() {
         var WatchPageInitializer = require('watchapp/init/WatchPageInitializer');
