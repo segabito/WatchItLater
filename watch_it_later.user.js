@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150129
+// @version        1.150204
 // ==/UserScript==
 
 
@@ -13705,14 +13705,12 @@
     initTouch();
     initEvents();
 
-    window.setTimeout(function() {
-      initSearchContent($, conf, w);
-      initUserVideoContent($, conf, w);
-      initMylistContent($, conf, w);
-      initUploadedVideoContent($, conf, w);
-      initDeflistContent($, conf, w);
-      initVideoExplorer($, conf, w);
-    }, 3000);
+    initSearchContent($, conf, w);
+    initUserVideoContent($, conf, w);
+    initMylistContent($, conf, w);
+    initUploadedVideoContent($, conf, w);
+    initDeflistContent($, conf, w);
+    initVideoExplorer($, conf, w);
 
     initRightPanel($, conf, w);
     initLeftPanel($, conf, w);
