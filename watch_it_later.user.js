@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150204
+// @version        1.150205
 // ==/UserScript==
 
 
@@ -6830,14 +6830,14 @@
         resCnt    = '-',
         mylistCnt = '-',
         postedAt  = DateFormat.strftime('%Y-%m-%d %H:%M:%S', new Date($item.find('.log-footer-date time').attr('datetime'))),
-        thumbnail = $item.find('.log-target-thumbnail .video').attr('data-src'),
+        thumbnail = $item.find('.log-target-thumbnail .video').attr('data-original'),
         description_short = $.trim($item.find('.log-body').text()).replace(/(しました|されました)。/g, ''),
         $owner = $item.find('.author-user, .author-community'),
         ownerPage  = $owner.attr('href'),
         ownerMatch = ownerReg.exec(ownerPage),
         ownerName  = $owner.text(),
         ownerId    = (ownerMatch !== null && ownerMatch.length >= 3) ? ownerMatch[2] : null,
-        ownerIcon  = $item.find('.log-author img').attr('data-src'),
+        ownerIcon  = $item.find('.log-author img').attr('data-original'),
         mylistComment = $item.find('.log-content .log-subdetails').text().trim()
         ;
 
