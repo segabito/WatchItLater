@@ -7,7 +7,7 @@
 // @match          http://*.nicovideo.jp/smile*
 // @grant          none
 // @author         segabito macmoto
-// @version        1.3.2
+// @version        1.3.5
 // ==/UserScript==
 
 // ver 1.1.2  仕様変更への暫定対応(後で調べてちゃんと直す)
@@ -624,6 +624,12 @@
 
       var load = function(watchId) {
         initialize();
+        var pim = require('watchapp/init/PlayerInitializer').playerInitializeModel;
+        if (pim && pim.flashVars && pim.flashVars.flvInfo) {
+          console.log('%cflashVars.flvInfo exist', 'background: lightgreen;');
+          getflv.dispatchAsync('onGetflvLoad', parseInfo(unescape(pim.flashVars.flvInfo)));
+          return;
+        }
         var url = BASE_URL + watchId;
         //console.log('getflv: ', url);
 
@@ -1381,7 +1387,7 @@
           }
 
           this._lazyLoadImageTimer =
-            window.setTimeout(_.bind(this._lazyLoadAll, this), 1000 * 60 * 10);
+            window.setTimeout(_.bind(this._lazyLoadAll, this), 1000 * 60 * 4);
         },
         appendBlock: function(option) {
           option.$inner = this._$innerBorder.getView();
