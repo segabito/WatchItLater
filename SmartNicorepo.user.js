@@ -5,7 +5,7 @@
 // @include     http://www.nicovideo.jp/my/*
 // @include     http://www.nicovideo.jp/user/*
 // @include     http://www.nicovideo.jp/my/fav/user
-// @version     2.1
+// @version     2.1.1
 // @grant       none
 // ==/UserScript==
 
@@ -352,7 +352,7 @@
 
           }, this));
        },
-       initializeAutoPageRize() {
+       initializeAutoPageRize: function() {
          var config = this.config;
          var $button = $('<button class="togglePagerize">自動読込</button>');
          var timer = null;
@@ -360,7 +360,7 @@
          var onButtonClick = function(e) {
            toggle();
            updateView();
-         }
+         };
          var toggle = $.proxy(function() {
            this._isAutoPagerizeEnable = !this._isAutoPagerizeEnable;
            config.set('autoPagerize', this._isAutoPagerizeEnable);
