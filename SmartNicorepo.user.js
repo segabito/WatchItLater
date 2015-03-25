@@ -5,7 +5,7 @@
 // @include     http://www.nicovideo.jp/my/*
 // @include     http://www.nicovideo.jp/user/*
 // @include     http://www.nicovideo.jp/my/fav/user
-// @version     2.0.2
+// @version     2.1
 // @grant       none
 // ==/UserScript==
 
@@ -67,6 +67,25 @@
         content: ': OFF';
       }
       .show-upload-only .toggleUpload:after {
+        content: ': ON';
+      }
+
+      .togglePagerize {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        color: #888;
+        font-weight: bolder;
+        cursor: pointer;
+        border: 2px solid #666;
+      }
+      .togglePagerize.enable {
+        color: red;
+      }
+      .togglePagerize:after {
+        content: ': OFF';
+      }
+      .togglePagerize.enable:after {
         content: ': ON';
       }
 
@@ -224,23 +243,52 @@
        model: {},
        util: {},
        initialize: function() {
+         this.initializeUserConfig();
          if (location.pathname === '/my/fav/user') {
            this.initializeFavUser();
          } else {
            this.initializeNicorepo();
+           this.initializeAutoPageRize();
          }
+       },
+       initializeUserConfig: function() {
+         var prefix = 'SmartNicorepo_';
+         var conf = {
+            showUploadOnly: false,
+            autoPagerize: true
+         };
+
+         this.config = {
+           get: function(key) {
+             try {
+               if (window.localStorage.hasOwnProperty(prefix + key)) {
+                 return JSON.parse(window.localStorage.getItem(prefix + key));
+               }
+               return conf[key];
+             } catch (e) {
+               return conf[key];
+             }
+           },
+           set: function(key, value) {
+             //console.log('%cupdate config {"%s": "%s"}', 'background: cyan', key, value);
+             window.localStorage.setItem(prefix + key, JSON.stringify(value));
+           }
+         };
        },
        initializeNicorepo: function() {
          addStyle(__nicorepocss__, 'nicorepoCss');
-         $('#nicorepo')
-           .toggleClass('show-upload-only')
-           .dblclick(function() { $('#nicorepo').toggleClass('show-upload-only'); });
 
-         var $button = $('<button class="toggleUpload">投稿だけ表示</button>').click(
-           function() {
-             $('#nicorepo').toggleClass('show-upload-only');
-           }
-         );
+         var config = this.config;
+         var toggle = $.proxy(function() {
+           $nicorepo.toggleClass('show-upload-only');
+           config.set('showUploadOnly', $nicorepo.hasClass('show-upload-only'));
+         }, this);
+
+         var $nicorepo = $('#nicorepo').dblclick(toggle);
+         var $button = $('<button class="toggleUpload">投稿だけ表示</button>').click(toggle);
+
+         $nicorepo.toggleClass('show-upload-only', config.get('showUploadOnly'));
+
 
          $('.timeline>*:first').before($button);
          $('.timeline>*:last').before($button.clone(true).addClass('bottom'));
@@ -303,6 +351,72 @@
             this.loadNicorepo(userId, $outer).then(clearBusy, clearBusy);
 
           }, this));
+       },
+       initializeAutoPageRize() {
+         var config = this.config;
+         var $button = $('<button class="togglePagerize">自動読込</button>');
+         var timer = null;
+
+         var onButtonClick = function(e) {
+           toggle();
+           updateView();
+         }
+         var toggle = $.proxy(function() {
+           this._isAutoPagerizeEnable = !this._isAutoPagerizeEnable;
+           config.set('autoPagerize', this._isAutoPagerizeEnable);
+           if (this._isAutoPagerizeEnable) {
+             bind();
+           } else {
+             unbind();
+           }
+         }, this);
+         var updateView = $.proxy(function() {
+           $button.toggleClass('enable', this._isAutoPagerizeEnable);
+         }, this);
+         var onWindowScroll = _.debounce($.proxy(this._onWindowScroll, this), 100);
+         var bind = $.proxy(function() {
+           $(window).on('scroll', onWindowScroll);
+           timer = window.setInterval($.proxy(this._autoPagerize, this), 1000);
+         }, this);
+         var unbind = $.proxy(function() {
+           $(window).off('scroll', onWindowScroll);
+           window.clearInterval(timer);
+         }, this);
+
+
+         $button.click(onButtonClick);
+         $('body').append($button);
+
+         this._isAutoPagerizeEnable = config.get('autoPagerize');
+         if (this._isAutoPagerizeEnable) { bind(); }
+
+         updateView();
+
+       },
+       _onWindowScroll: function() {
+         this._autoPagerize();
+       },
+       _autoPagerize: function() {
+         if (!this._isAutoPagerizeEnable) { return; }
+
+         // TODO: キャッシュする
+         var $nextPage = $('.next-page');
+         var $window = $(window);
+
+         var isLoading = function() {
+           return $nextPage.hasClass('loading');
+         };
+
+         var isScrollIn = function() {
+            var bottom =
+              $window.scrollTop() + $window.innerHeight() - $nextPage.offset().top;
+            return bottom > 100;
+         };
+
+         if (isScrollIn() && !isLoading()) {
+           this._$nextPage = null;
+           $nextPage.find('.next-page-link').click();
+         }
        },
        loadNicorepo: function(userId, $container) {
          // http://www.nicovideo.jp/user/[userId]/top?innerPage=1

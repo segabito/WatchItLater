@@ -3,6 +3,7 @@
 // @namespace   NICOVIDEO
 // @description 広告ブロックやタイムアウトが発生しててもとりあえず動くようになる(かも)
 // @include     http://www.nicovideo.jp/watch/*
+// @include     http://*.nicovideo.jp/watch/*
 // @version     1.0.7
 // @grant       none
 // @run-at      document-start
