@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150205
+// @version        1.150406
 // ==/UserScript==
 
 
@@ -6422,7 +6422,7 @@
       if (typeof word !== 'string' || word.length <= 0) {
         throw new Error('wordが設定されてない！');
       }
-      var url        = this._base_url + 'suggestion/complete',
+      var url        = this._base_url + 'suggestion/complete/' + encodeURIComponent(word),
           cache_key  = JSON.stringify({url: url, word: word}),
           cache_time = 60 * 1000 * 1,
           cache      = Util.Cache.get(cache_key);
@@ -6432,8 +6432,8 @@
       }
       $.ajax({
         url: url,
-        type: 'POST',
-        data: word,
+//        type: 'GET',
+//        data: word,
         timeout: 30000,
         complete: function(result) {
           if (result.status !== 200) {
@@ -10436,7 +10436,6 @@
           setTimeout(function() {
             if (WatchController.isSearchMode()) {
               playerConnector.updatePlayerConfig({playerViewSize: 'small'});
-              WindowUtil.shake();
             }
           }, 1000);
         }
@@ -10756,7 +10755,7 @@
         if (lastScreenMode === 'browserFull' && mode !== 'browserFull') {
           $('#playerContainerSlideArea').css({height: ''}); // wall bug fix
           restoreVisibility();
-          toggleMonitorFull(false);
+          toggleMonitorFull(false)
         }
         lastScreenMode = mode;
       });
@@ -10970,7 +10969,7 @@
             items = playlist.currentItems,
             list = [],
             current = 0,
-            len = conf.debugMode ? Math.min(600, items.length) : Math.min(300, items.length);
+            len = conf.debugMode ? Math.min(900, items.length) : Math.min(600, items.length);
 
           for (var i = 0; i < len; i++) {
             var item = items[i];
@@ -13187,10 +13186,6 @@
      *  ・クリックでマイページに飛ぶのをやめて、クリックで消えるようにする
      *  ・マウスオーバーしてる間は引っ込まない
      *  ・消えるまでの時間を4秒に固定
-     *
-     *
-     *  このパッチでも直らない問題
-     *  ・自分が動画投稿やレビューをしたという情報がなぜか自分にも通知される
      *
      */
     function initPopupMarquee() {
