@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150406
+// @version        1.150430
 // ==/UserScript==
 
 
@@ -327,7 +327,7 @@
         background-color: #ff9;
         transform: scale(2); -webkit-transform: scale(2);
       }
-      .mylistListPopup .icon:after {
+      .mylistListPopup .icon::after {
         content: '開く';
         position: absolute;
         bottom: 0px;
@@ -337,7 +337,7 @@
         transform: scale(0.5); -webkit-transform: scale(0.5);
         z-index: -1;
       }
-       .mylistListPopup .icon:hover:after {
+       .mylistListPopup .icon:hover::after {
                 {*box-shadow: 2px 2px 2px #888;*}
         background: #fff;
         z-index: 100;
@@ -366,16 +366,16 @@
         color: #000;
         background-color: #ff9;
       }
-      .mylistListPopup .name:after {
+      .mylistListPopup .name::after {
         content: ' に登録';
         font-size: 75%;
         color: #fff;
       }
-      .mylistListPopup .name.exist:after {
+      .mylistListPopup .name.exist::after {
         content: ' に登録済';
         color: #933;
       }
-      .mylistListPopup .name:hover:after {
+      .mylistListPopup .name:hover::after {
         color: #666;
       }
 
@@ -766,8 +766,8 @@
       #fullScreenToggleContainer .blink, #videoCounter .blink {
         color: #000;
       }
-      .videoCountDiff:before      {content: '+';}
-      .videoCountDiff.down:before {content: ''; }
+      .videoCountDiff::before      {content: '+';}
+      .videoCountDiff.down::before {content: ''; }
       #popupMarquee .videoCountDiff {display: none;}
       .sidePanel .sideVideoInfo .videoDescription{
         overflow-x: hidden; text-align: left;
@@ -876,7 +876,7 @@
         background: none;
       }
 
-      .sideVideoInfo.isFavorite .userName:after, .sideVideoInfo.isFavorite.isChannel .videoOwnerInfoContainer .channelName:after{
+      .sideVideoInfo.isFavorite .userName::after, .sideVideoInfo.isFavorite.isChannel .videoOwnerInfoContainer .channelName::after{
         content: ' ★ '; color: gold; text-shadow: 1px 1px 1px black;
       }
 
@@ -1078,7 +1078,7 @@
       .videoDetailToggleButton:hover {
         text-decoration: underline;
       }
-      .videoDetailToggleButton:hover:after {
+      .videoDetailToggleButton:hover::after {
         content: '▼';
         position: absolute;
         width: 32px;
@@ -1090,7 +1090,7 @@
         color: #888;
         font-size: 80%;
       }
-      .infoActive .videoDetailToggleButton:hover:after {
+      .infoActive .videoDetailToggleButton:hover::after {
         content: '▲';
       }
 
@@ -1107,10 +1107,10 @@
       #playlist.w_show{
         {*max-height: 180px;*}
       }
-      .playlistToggle:after {
+      .playlistToggle::after {
         content: "▼";
       }
-      .playlistToggle.w_show:after {
+      .playlistToggle.w_show::after {
         content: "▲";
       }
 
@@ -1223,7 +1223,7 @@
       #watchItLaterConfigPanel.removeLeftPanel_true .leftPanelJack  {
         color: #ccc; text-shadow: -1px -1px 0 #888;
       }
-      #watchItLaterConfigPanel .reload .title:after {
+      #watchItLaterConfigPanel .reload .title::after {
         content: ' (※)'; font-size: 80%; color: #900;
       }
       #watchItLaterConfigPanel .debugOnly {
@@ -1241,12 +1241,12 @@
         border-width: 20px 12px 12px 12px;
         transition: border-width 0.2s ease-in-out     ; -webkit-transition: border-width 0.2s ease-in-out     ;
       }
-      #watchItLaterConfigPanel .section:hover:after {
+      #watchItLaterConfigPanel .section:hover::after {
         content: '▼';
         position: absolute; top: 0px; right: 10px; font-size: 150%;
         transition: transform 0.2s ease-in-out 0.4s; -webkit-transition: -webkit-transform 0.2s ease-in-out 0.4s;
       }
-      #watchItLaterConfigPanel .open .section:after {
+      #watchItLaterConfigPanel .open .section::after {
         content: '▼';
         position: absolute; top: 0px; right: 10px; font-size: 150%;
         transform: rotate(180deg); -webkit-transform: rotate(180deg);
@@ -1276,10 +1276,10 @@
       #watchItLaterConfigPanel .shortcutSetting .enable {
         cursor: pointer; margin: auto 10px;
       }
-      #watchItLaterConfigPanel .shortcutSetting        .enable:before {
+      #watchItLaterConfigPanel .shortcutSetting        .enable::before {
         content: '○ ';
       }
-      #watchItLaterConfigPanel .shortcutSetting.enable .enable:before {
+      #watchItLaterConfigPanel .shortcutSetting.enable .enable::before {
         content: '㋹ '; color: blue;
       }
       #watchItLaterConfigPanel .shortcutSetting      .ctrl, #watchItLaterConfigPanel .shortcutSetting     .alt, #watchItLaterConfigPanel .shortcutSetting       .shift {
@@ -1331,10 +1331,10 @@
       .videoExplorerMenu .toggleVideoExplorerMenu a {
         color: black; display: block;
       }
-      .videoExplorerMenu .toggleVideoExplorerMenu a:after {
+      .videoExplorerMenu .toggleVideoExplorerMenu a::after {
         content: "▼"; position: absolute; background: none; top: 0px; right: 10px; color: #ccc;
       }
-      .videoExplorerMenu .toggleVideoExplorerMenu.open a:after {
+      .videoExplorerMenu .toggleVideoExplorerMenu.open a::after {
         content: "▲";
       }
 
@@ -1387,7 +1387,7 @@
       .videoExplorerMenu.w_touch .slideMenu ul li a{
         line-height: 300%; font-size: 120%; color: black;
       }
-        .videoExplorerMenu .slideMenu ul li a:before{
+        .videoExplorerMenu .slideMenu ul li a::before{
           background: url("http://uni.res.nimg.jp/img/zero_my/icon_folder_default.png") no-repeat scroll 0 0 transparent;
           display: inline-block;
           height: 14px;
@@ -1396,25 +1396,25 @@
           width: 18px;
           content: ""
         }
-        .videoExplorerMenu .slideMenu ul li          a.defMylist:before{ background-position: 0 -253px;}
-        .videoExplorerMenu .slideMenu ul li.folder0  a:before{ background-position: 0 0;}
-        .videoExplorerMenu .slideMenu ul li.folder1  a:before{ background-position: 0 -23px;}
-        .videoExplorerMenu .slideMenu ul li.folder2  a:before{ background-position: 0 -46px;}
-        .videoExplorerMenu .slideMenu ul li.folder3  a:before{ background-position: 0 -69px;}
-        .videoExplorerMenu .slideMenu ul li.folder4  a:before{ background-position: 0 -92px;}
-        .videoExplorerMenu .slideMenu ul li.folder5  a:before{ background-position: 0 -115px;}
-        .videoExplorerMenu .slideMenu ul li.folder6  a:before{ background-position: 0 -138px;}
-        .videoExplorerMenu .slideMenu ul li.folder7  a:before{ background-position: 0 -161px;}
-        .videoExplorerMenu .slideMenu ul li.folder8  a:before{ background-position: 0 -184px;}
-        .videoExplorerMenu .slideMenu ul li.folder9  a:before{ background-position: 0 -207px;}
+        .videoExplorerMenu .slideMenu ul li          a.defMylist::before{ background-position: 0 -253px;}
+        .videoExplorerMenu .slideMenu ul li.folder0  a::before{ background-position: 0 0;}
+        .videoExplorerMenu .slideMenu ul li.folder1  a::before{ background-position: 0 -23px;}
+        .videoExplorerMenu .slideMenu ul li.folder2  a::before{ background-position: 0 -46px;}
+        .videoExplorerMenu .slideMenu ul li.folder3  a::before{ background-position: 0 -69px;}
+        .videoExplorerMenu .slideMenu ul li.folder4  a::before{ background-position: 0 -92px;}
+        .videoExplorerMenu .slideMenu ul li.folder5  a::before{ background-position: 0 -115px;}
+        .videoExplorerMenu .slideMenu ul li.folder6  a::before{ background-position: 0 -138px;}
+        .videoExplorerMenu .slideMenu ul li.folder7  a::before{ background-position: 0 -161px;}
+        .videoExplorerMenu .slideMenu ul li.folder8  a::before{ background-position: 0 -184px;}
+        .videoExplorerMenu .slideMenu ul li.folder9  a::before{ background-position: 0 -207px;}
 
-        .videoExplorerMenu .slideMenu ul li.g_ent2 a:before     {  background-position: 0 -23px;}
-        .videoExplorerMenu .slideMenu ul li.g_life2 a:before    {  background-position: 0 -46px;}
-        .videoExplorerMenu .slideMenu ul li.g_politics a:before {  background-position: 0 -69px;}
-        .videoExplorerMenu .slideMenu ul li.g_tech a:before     {  background-position: 0 -92px;}
-        .videoExplorerMenu .slideMenu ul li.g_culture2 a:before {  background-position: 0 -115px;}
-        .videoExplorerMenu .slideMenu ul li.g_other a:before    {  background-position: 0 -138px;}
-        .videoExplorerMenu .slideMenu ul li.r18 a:before        {  background-position: 0 -207px;}
+        .videoExplorerMenu .slideMenu ul li.g_ent2 a::before     {  background-position: 0 -23px;}
+        .videoExplorerMenu .slideMenu ul li.g_life2 a::before    {  background-position: 0 -46px;}
+        .videoExplorerMenu .slideMenu ul li.g_politics a::before {  background-position: 0 -69px;}
+        .videoExplorerMenu .slideMenu ul li.g_tech a::before     {  background-position: 0 -92px;}
+        .videoExplorerMenu .slideMenu ul li.g_culture2 a::before {  background-position: 0 -115px;}
+        .videoExplorerMenu .slideMenu ul li.g_other a::before    {  background-position: 0 -138px;}
+        .videoExplorerMenu .slideMenu ul li.r18 a::before        {  background-position: 0 -207px;}
         .videoExplorerMenu .slideMenu ul li.all        a.all,
         .videoExplorerMenu .slideMenu ul li.g_ent2     a.g_ent2,
         .videoExplorerMenu .slideMenu ul li.g_life2    a.g_life2,
@@ -1426,7 +1426,7 @@
         { font-weight: bolder; border-top: 1px dotted #ccc; }
 
 
-      .videoExplorerMenu .slideMenu ul li a:after{
+      .videoExplorerMenu .slideMenu ul li a::after{
         background: none !important;
       }
       .videoExplorerMenu .slideMenu ul li a:hover{
@@ -1603,7 +1603,7 @@
         font-size: 85%; color: #666; display: none;
         color: #400; border: 1px solid #ccc; padding: 0 4px 0px; line-height: 130%; border-radius: 4px;
       }
-      .column1 .itemMylistComment:before {
+      .column1 .itemMylistComment::before {
         content: 'マイリストコメント ';
         background: #ccc; border-radius: 0 0 8px 0; display: inline-block; margin: 0 4px 4px -4px; padding: 2px;
         min-width: 100px;
@@ -1611,10 +1611,10 @@
       .log-user-video-review .column1 .itemMylistComment {
         color: #004;
       }
-      .log-user-video-review .column1 .itemMylistComment:before {
+      .log-user-video-review .column1 .itemMylistComment::before {
         content: 'レビュー ';
       }
-      .column1 .itemMylistComment:after {
+      .column1 .itemMylistComment::after {
         content: '';
       }
       .column1 .itemMylistComment pre {
@@ -1680,7 +1680,7 @@
       #playlist .generationMessage:hover {
         text-decoration: underline;
       }
-      #playlist .generationMessage:after {
+      #playlist .generationMessage::after {
         content: "▼";
       }
 
@@ -2015,7 +2015,7 @@
       }
 
       #footer.noBottom #foot_inner { padding: 0; }
-      #footer.noBottom a:nth-of-type(3):after, #footer.noBottom a:nth-of-type(6):after  {
+      #footer.noBottom a:nth-of-type(3)::after, #footer.noBottom a:nth-of-type(6)::after  {
         content: ' | '; color: white;
       }
       #footer.noBottom br { display: none; }
@@ -6238,7 +6238,8 @@
     sortTable: {f: 'start_time', v: 'view_counter', r: 'comment_counter', m: 'mylist_counter', l: 'length_seconds',
       '_hot':     '_hot',    // 人気が高い順
       '_explore': '_explore', // 新着優先
-      '_popular': '_popular' // 並び順指定なし
+      '_popular': '_popular', // 並び順指定なし
+      '_id': 'id'
     },
     initialize: function(params) {
       this._search = params.search;
@@ -6289,6 +6290,11 @@
 
           query.order = 'desc';
         })();
+      }
+
+      if (query.sort_by === 'id') {
+        query.sort_by = 'start_time';
+        query.order = 'asc';
       }
 
       if (typeof params.userId === 'string' && params.userId.match(/^\d+$/)) {
@@ -6398,6 +6404,19 @@
               is_middle_thumbnail: item.is_middle_thumbnail
   //            channel_id:        item.channel_id,
   //            main_community_id: item.main_community_id
+            });
+          }
+          if (params.sort === '_id') {
+            searchResult.list = searchResult.list.sort(function(a, b){return a.id > b.id ? 1 : -1;});
+          }
+          // 投稿日時順ソートの時、投稿日時が同一だったら動画IDでソートする(公式銀魂のための対応)
+          if (params.sort === 'f') {
+            var aid = params.order === 'a' ? 1 : -1;
+            searchResult.list = searchResult.list.sort(function(a, b){
+              if (a.first_retrieve !== b.first_retrieve) {
+                return 0;
+              }
+              return a.id > b.id ? aid : -aid;
             });
           }
         };
@@ -9290,8 +9309,8 @@
         #videoExplorer .watchingVideo .title {
           font-weight: bolder;
         }
-        #videoExplorer .watchingVideo .title:before { content: ''; }
-        #videoExplorer .watchingVideo .title:after  { content: ' '; }
+        #videoExplorer .watchingVideo .title::before { content: ''; }
+        #videoExplorer .watchingVideo .title::after  { content: ' '; }
 
         #videoExplorer                        .watchingVideo .contains     { display: none;   }
         #videoExplorer .containsWatchingVideo .watchingVideo .contains     { display: inline; }
@@ -9878,7 +9897,7 @@
           display: block;line-height: 26px; {*color: #CC0000;*}
         }
 
-        #searchResultNavigation > ul > li a:after, #content.w_adjusted #videoExplorerExpand a#closeSearchResultExplorer:after {
+        #searchResultNavigation > ul > li a::after, #content.w_adjusted #videoExplorerExpand a#closeSearchResultExplorer::after {
           top: 8px;
         }
 
@@ -10065,7 +10084,7 @@
           border: 0px;
         }
         body.videoExplorer .w_adjusted #playerAlignmentArea .toggleCommentPanel { display: block; }
-        #playerAlignmentArea .toggleCommentPanel:before {
+        #playerAlignmentArea .toggleCommentPanel::before {
           content: '￪ ';
         }
         #playerAlignmentArea .toggleCommentPanel:hover {
@@ -10086,7 +10105,7 @@
           {*box-shadow: 2px 2px 2px #888;*}
           right: -418px;
         }
-        #playerAlignmentArea .toggleCommentPanel.w_active:before {
+        #playerAlignmentArea .toggleCommentPanel.w_active::before {
           content: '← ';
         }
 
@@ -11006,7 +11025,7 @@
               view_counter:   wm.viewCount,
               num_res:        wm.commentCount,
               thumbnail_url:  wm.thumbnail,
-              first_retriee:  wm.postedAt
+              first_retrieve: wm.postedAt
             });
           }
 
@@ -11800,6 +11819,7 @@
              '<option value="sort=_hot&amp;order=d""    class="sugoiOption">人気が高い順</option>',
              '<option value="sort=_popular&amp;order=d" class="sugoiOption">並び順指定なし</option>',
              '<option value="sort=_explore&amp;order=d" class="sugoiOption">新着優先</option>',
+//             '<option value="sort=_id&amp;order=d" class="sugoiOption">動画ID順</option>',
              '</optgroup>'
          ].join(''));
       VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.searchContentTemplate').html($template.html());
@@ -12069,7 +12089,7 @@
       _searchSortOrder._flush_org = _searchSortOrder._flush;
       _searchSortOrder._flush = $.proxy(function() {
         var sort = this._sort[SearchType.KEYWORD];
-        if (sort === '_hot' || sort === '_popular' || sort === '_explore') { // 新検索にしかないパラメータは保存しない
+        if (sort === '_hot' || sort === '_popular'  || sort === '_explore' || sort === '_id') { // 新検索にしかないパラメータは保存しない
           return;
         }
         this._flush_org();
@@ -12134,7 +12154,7 @@
           proto.getSort_org  = proto.getSort;
           proto.getSort = function() {
             var sort = conf.searchSortType;
-            if ((sort === '_hot' || sort === '_popular' || sort === '_explore') && content.getLastSearchEngineType() !== 'sugoi') {
+            if ((sort === '_hot' || sort === '_popular'  || sort === '_explore' || sort === '_id') && content.getLastSearchEngineType() !== 'sugoi') {
               // 通常検索で新検索にしかないソート順だったらデフォルトのnを返す
               return 'n';
             }
