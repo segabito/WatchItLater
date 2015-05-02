@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150430
+// @version        1.150502
 // ==/UserScript==
 
 
@@ -152,7 +152,7 @@
       enableDescriptionThumbnail: true, // 説明文の動画リンクにサムネイルとタイトル表示
       fullscreenMenuLevel: 0, // フルスクリーン時のメニュー表示
 
-      enableLocalMylistCache: false,
+      enableLocalMylistCache: true,
 
       rankingCategory_g_ent2_Close:     true,
       rankingCategory_g_life2_Close:    true,
@@ -196,7 +196,7 @@
       watchCounter: 0, // お前は今までに見た動画の数を覚えているのか？をカウントする
       forceEnableStageVideo: false,
       forceExpandStageVideo: false,
-      enableAutoPlaybackContinue: false, // 一定時間操作しなかくても自動再生を続行
+      enableAutoPlaybackContinue: false, // 一定時間操作しなくても自動再生を続行
       lastLeftTab: 'videoInfo',
       lastRightTab: 'w_videoInfo',
       lastRightTabInExplorer: 'comment',
@@ -4835,7 +4835,7 @@
           ids.push(id);
         }
       });
-      ids = window._.unique(ids);
+      ids = window._.uniq(ids);
       if (ids.length < 1) {
         window.setTimeout(function() { def.resolve(result); }, 0);
         return def;
@@ -5069,7 +5069,7 @@
           $(typeof watchId !== 'string' ? watchId : [watchId]).each(function(i, id) {
             ids.push(id);
           });
-          ids = window._.unique(ids);
+          ids = window._.uniq(ids);
           if (ids.length < 1) {
             window.setTimeout(function() { def.resolve({}); }, 0);
             return;
@@ -6032,14 +6032,29 @@
         asc:   function(a, b) { return (a[sortKey]   > b[sortKey]  ) ? 1 : -1; },
         desc:  function(a, b) { return (a[sortKey]   < b[sortKey]  ) ? 1 : -1; },
         iasc:  function(a, b) { return (a[sortKey]*1 > b[sortKey]*1) ? 1 : -1; },
-        idesc: function(a, b) { return (a[sortKey]*1 < b[sortKey]*1) ? 1 : -1; }
+        idesc: function(a, b) { return (a[sortKey]*1 < b[sortKey]*1) ? 1 : -1; },
+        // sortKeyが同一だった場合は動画IDでソートする(銀魂など、一部公式チャンネル動画向けの対応)
+        ascid: function(a, b) {
+          if (a[sortKey] !== b[sortKey]) {
+            return (a[sortKey]*1 > b[sortKey]*1) ? 1 : -1;
+          } else {
+            return a.id > b.id ? 1 : -1;
+          }
+        },
+        descid: function(a, b) {
+          if (a[sortKey] !== b[sortKey]) {
+            return (a[sortKey]*1 < b[sortKey]*1) ? 1 : -1;
+          } else {
+            return a.id < b.id ? 1 : -1;
+          }
+        },
       };
       // 偶数がascで奇数がdescかと思ったら特に統一されてなかった
       if (
         sortKey === 'first_retrieve'   ||
         sortKey === 'thread_update_time'
       ) {
-        order = (sortId % 2 === 1) ? 'asc' : 'desc';
+        order = (sortId % 2 === 1) ? 'ascid' : 'descid';
       } else
       // 数値系は偶数がdesc
       if (sortKey === 'view_counter'   ||
@@ -6050,7 +6065,7 @@
         order = (sortId % 2 === 1) ? 'iasc' : 'idesc';
       }
       this.sort = this.rawData.sort = sortId.toString();
-      this.rawData.list.sort(compare[order]);
+      this.rawData.list = window._.uniq(this.rawData.list.sort(compare[order]), 'id');
       this.items = this.rawData.list.slice(0, 32);
       this.list  = this.rawData.list.slice(0);
     }
@@ -6596,9 +6611,9 @@
       return def.promise();
     }
   };
-  WatchItLater.VideoInfoLoader = new VideoInfoLoader({});
+  window.WatchItLater.VideoInfoLoader = new VideoInfoLoader({});
 
-  var RelatedVideo = function() { this.initialize.apply(this, arguments); }
+  var RelatedVideo = function() { this.initialize.apply(this, arguments); };
   RelatedVideo.prototype = {
     initialize: function(params) {
     },
@@ -6617,7 +6632,7 @@
       return def.promise();
     }
   };
-  WatchItLater.RelatedVideo = new RelatedVideo({});
+  window.WatchItLater.RelatedVideo = new RelatedVideo({});
 
   /**
    *  動画視聴履歴をマイリストAPIと互換のある形式で返すことで、ダミーマイリストとして表示してしまう作戦
@@ -6627,7 +6642,7 @@
       var $, myNick, myId, url;
       try{
           $ = w.$; url = '/my/history';
-          myNick = WatchController.getMyNick(); myId = WatchController.getMyUserId();
+          myNick = window.WatchController.getMyNick(); myId = window.WatchController.getMyUserId();
       } catch (e) {
         console.log(e);
         throw { message: 'エラーが発生しました', status: 'fail'};
@@ -7389,7 +7404,7 @@
   var ChannelVideoList = (function(w, Util){
     if (!window.PlayerApp) return {};
     var
-      CACHE_TIME = 1000 * 60 * 1, MAX_PAGE = 3,
+      CACHE_TIME = 1000 * 60 * 10, MAX_PAGE = 3,
       getPipe = function(baseUrl, result, page) {
         return function(hasPage) {
           var def = new $.Deferred();
@@ -7428,7 +7443,7 @@
           id = params.id.toString().replace(/^ch/, '');
           ownerName = params.ownerName;
           url = 'http://ch.nicovideo.jp/channel/ch'+ id + '/video';
-          myId = WatchController.getMyUserId();
+          myId = window.WatchController.getMyUserId();
         } catch (e) {
           console.log(e);
           throw { message: 'エラーが発生しました', status: 'fail'};
@@ -7439,13 +7454,14 @@
           if (typeof callback === 'function') {
             setTimeout(function() { callback(cacheData); } , 0);
           }
-          return def.resolve(cacheData);
+          setTimeout(function() {  def.resolve(cacheData); } , 0);
+          return def.promise();
         }
 
 
         var result = new DummyMylist({
           id: 'ch' + id,
-          sort: '1',
+          sort: '6',
           name: ownerName + 'の動画',
           user_id: myId,
           user_name: 'ニコニコ動画'
@@ -7486,15 +7502,16 @@
         return hasNextPage;
       },
       loadOwnerVideo = function(callback) {
-        if (!WatchController.isChannelVideo()) {
+        if (!window.WatchController.isChannelVideo()) {
           throw {message: 'チャンネル情報の取得に失敗しました', status: 'fail'};
         }
         var params = {
-          id: WatchController.getOwnerId(),
-          ownerName: WatchController.getOwnerName()
+          id: window.WatchController.getOwnerId(),
+          ownerName: window.WatchController.getOwnerName()
         };
         var def = new $.Deferred();
         load(callback, params).then(function(result) {
+            result.sortItem(params.sort || 6, true);
             if (typeof callback === 'function') callback(result);
             def.resolve(result);
           }, function() {
@@ -7507,7 +7524,7 @@
       load: load,
       loadOwnerVideo: loadOwnerVideo
     };
-    WatchItLater.ChannelVideo = self;
+    window.WatchItLater.ChannelVideo = self;
     return self;
   })(w, Util);
 
@@ -13448,6 +13465,35 @@
           playerConfig.set({autoPlay: false});
         });
       }
+
+      var initializeMylistSortV2 = function() {
+        var VideoListSortUtil = require('watchapp/util/VideoListSortUtil');
+        VideoListSortUtil.sort_org = VideoListSortUtil.sort;
+        VideoListSortUtil.sort = function(items, type, isSlice) {
+          items = VideoListSortUtil.sort_org(items, type, isSlice);
+
+          var sortParam = VideoListSortUtil._SORT_TYPE_TO_SORT_PARAM[type];
+          var key = sortParam[0];
+          var asc = sortParam[2];
+
+          // ニコニコ動画のシステムでは銀魂や遊戯王など、大量の動画が同時に公開された場合に話数順にソートできない。
+          // そこで、「キーが同じだったら動画ID順にする」という処理を追加する。
+          //
+          // 動画IDの桁数が変わったりnm,sm,soが混在していると期待通りにならないが、今よりはだいぶマシ
+          var ad = asc ? 1 : -1;
+          var sort = function(a, b) {
+            if (a[key] !== b[key]) {
+              return 0;
+            } else {
+              return a.id > b.id ? ad : -ad;
+            }
+          };
+          items = items.sort(sort);
+          return _.uniq(items, 'id');
+        };
+      };
+      initializeMylistSortV2();
+
 
       if (conf.debugMode) {
         require('watchapp/init/PopupMarqueeInitializer').popupMarqueeViewController.itemList.addEventListener('popup', function(body) {
