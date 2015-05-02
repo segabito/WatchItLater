@@ -5,7 +5,7 @@
 // @include     http://www.nicovideo.jp/my/*
 // @include     http://www.nicovideo.jp/user/*
 // @include     http://www.nicovideo.jp/my/fav/user
-// @version     2.1.1
+// @version     2.1.2
 // @grant       none
 // ==/UserScript==
 
@@ -449,7 +449,7 @@
             var $img = $logBody.find('img'), $log = $logBody.find('.log');
             $img.each(function() {
               var $this = $(this), $parent = $this.parent();
-              var lazyImg = $this.attr('data-src');
+              var lazyImg = $this.attr('data-original');
               if (lazyImg) {
                 var $imageContainer = $('<div class="imageContainer"/>');
                 $imageContainer.css('background-image', 'url(' + lazyImg + ')');
