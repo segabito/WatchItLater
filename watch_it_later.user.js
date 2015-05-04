@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150502
+// @version        1.150504
 // ==/UserScript==
 
 
@@ -13468,26 +13468,39 @@
 
       var initializeMylistSortV2 = function() {
         var VideoListSortUtil = require('watchapp/util/VideoListSortUtil');
+        var ArrayUtil = require('watchapp/util/ArrayUtil');
         VideoListSortUtil.sort_org = VideoListSortUtil.sort;
         VideoListSortUtil.sort = function(items, type, isSlice) {
-          items = VideoListSortUtil.sort_org(items, type, isSlice);
+          if (type !== '6' && type !== '7') {
+            return items = VideoListSortUtil.sort_org(items, type, isSlice);
+          }
 
-          var sortParam = VideoListSortUtil._SORT_TYPE_TO_SORT_PARAM[type];
+          var sortParam = VideoListSortUtil._getSortParam(type);
           var key = sortParam[0];
+          var pat = sortParam[1];
           var asc = sortParam[2];
 
           // ニコニコ動画のシステムでは銀魂や遊戯王など、大量の動画が同時に公開された場合に話数順にソートできない。
           // そこで、「キーが同じだったら動画ID順にする」という処理を追加する。
           //
           // 動画IDの桁数が変わったりnm,sm,soが混在していると期待通りにならないが、今よりはだいぶマシ
+
           var ad = asc ? 1 : -1;
+          var compNum = function(a, b) { return a[key] > b[key] ? ad : -ad; };
+          var compStr = function(a, b) { return a[key] > b[key] ? ad : -ad; };
+          var compDate = function(a, b) { return toUTC(a[key]) > toUTC(b[key]) ? ad : -ad; };
+          var toUTC = function(dateStr) { return Date.parse(dateStr.replace(/-/g, '/')); };
+
+          var compareFunc = [null, compNum, compStr, compDate][pat];
           var sort = function(a, b) {
             if (a[key] !== b[key]) {
-              return 0;
+              return compareFunc(a, b);
             } else {
+              //console.log('%csort!', 'background: cyan;', ad, key, a[key], b[key], a.id, b.id);
               return a.id > b.id ? ad : -ad;
             }
           };
+
           items = items.sort(sort);
           return _.uniq(items, 'id');
         };
