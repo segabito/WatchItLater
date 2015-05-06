@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150504
+// @version        1.150506
 // ==/UserScript==
 
 
@@ -6429,7 +6429,7 @@
             var aid = params.order === 'a' ? 1 : -1;
             searchResult.list = searchResult.list.sort(function(a, b){
               if (a.first_retrieve !== b.first_retrieve) {
-                return 0;
+                return a.first_retrieve > b.first_retrieve ? aid : -aid;
               }
               return a.id > b.id ? aid : -aid;
             });
