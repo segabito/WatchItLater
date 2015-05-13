@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150506
+// @version        1.150512
 // ==/UserScript==
 
 
@@ -2229,9 +2229,16 @@
         top: auto;
         bottom: 48px;
       }
-      {* body #videoHeader #videoMenuWrapper .defmylistButton, body #videoHeader #videoMenuWrapper .mylistButton {
-        display: none !important;
-      } *}
+      {* 開閉時に変なスクロールしてしまう奴 *}
+      #videoHeader.menuOpened #editorMenu {
+        margin-top: 12px !important;
+      }
+      #editorMenu.hidden {
+        display: none;
+      }
+      body #videoHeader.menuOpened #videoHeaderDetail {
+        margin-top: 0 !important;
+      }
       body #videoHeader #videoMenuTopList{
         position: relative;
         width: auto;
