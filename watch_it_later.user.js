@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150512
+// @version        1.150524
 // ==/UserScript==
 
 
@@ -2230,14 +2230,8 @@
         bottom: 48px;
       }
       {* 開閉時に変なスクロールしてしまう奴 *}
-      #videoHeader.menuOpened #editorMenu {
-        margin-top: 12px !important;
-      }
-      #editorMenu.hidden {
-        display: none;
-      }
-      body #videoHeader.menuOpened #videoHeaderDetail {
-        margin-top: 0 !important;
+      #videoHeader .tvChanMenuHeightController {
+        display: none !important;
       }
       body #videoHeader #videoMenuTopList{
         position: relative;
@@ -2258,12 +2252,12 @@
         pointer-events: none !important;
       }
       {* テレビちゃんメニューのスライド殺す *}
-      body #videoHeader.menuOpened #videoMenuWrapper {
+      {*body #videoHeader.menuOpened #videoMenuWrapper {
         margin-bottom: 0;
       }
       body #videoHeader.menuOpened #videoHeaderDetail {
         margin-top: 8px;
-      }
+      }*}
 
 
       .largeThumbnailPopup, .largeThumbnailPopup div{
