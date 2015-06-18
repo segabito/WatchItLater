@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150524
+// @version        1.150619
 // ==/UserScript==
 
 
@@ -1691,16 +1691,11 @@
       #yukkuriPanel.mylistPanelLeft {
         bottom: 24px;
       }
-      body.w_noNicoru .nicoru-button{
-        left: -9999; display: none !important;
-      }
-      body.w_noNicoru .menuOpened #videoMenuTopList li.videoMenuListNicoru .nicoru-button{
-        display: block !important;
-      }
-      body.w_noNicoru #videoTagContainer .tagInner #videoHeaderTagList li {
+      body #videoTagContainer .tagInner #videoHeaderTagList li {
         margin: 0 18px 4px 0;
       }
-      body.w_noNicoru #videoTagContainer .tagInner #videoHeaderTagList li .tagControlContainer, body.w_noNicoru #videoTagContainer .tagInner #videoHeaderTagList li .tagControlEditContainer {
+      body #videoTagContainer .tagInner #videoHeaderTagList li .tagControlContainer,
+      body #videoTagContainer .tagInner #videoHeaderTagList li .tagControlEditContainer {
         padding: 1px 0;
       }
 
@@ -1838,7 +1833,12 @@
         z-index: 1000;
       }
       #content.w_compact .videoHeaderTitle {
+        display: inline-block;
+        width: 100%;
+        overflow: hidden;
         letter-spacing: -1px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       #content.w_compact .videoDetailExpand .arrow {
         position: absolute; top: 8px; right: -24px;
@@ -1867,6 +1867,9 @@
       #content.w_compact        #topVideoInfo .videoDescription.description {
         background: #fff; margin: 10px 0 0;padding: 4px ;width: 1000px;{* base - 8 *} {*font-size: 90%;*}
       }
+      .size_normal #videoHeaderDetail {
+        margin: 2px 0;
+      }
       .size_normal #videoHeaderDetail h2 {
         max-width: 898px;
       }
@@ -1883,12 +1886,15 @@
       }
       body:not(.full_with_browser).size_normal                     #content.w_compact.w_wide #videoTagContainer {
         width: 1263px; {* base + 255 *}
+        margin-top: 0;
       }
       body:not(.full_with_browser)                                 #content.w_compact.w_wide #videoTagContainer {
         width: 1040px; {* base +  32 *}
+        margin-top: 0;
       }
       body:not(.full_with_browser)                                 #content.w_compact        #videoTagContainer {
         width: 948px;  {* base -  60 *}
+        margin-top: 0;
       }
       body:not(.full_with_browser)                                 #content.w_compact #videoHeader,              #foot_inner {
         width: 1008px; {* base +  48 *}
@@ -2242,23 +2248,12 @@
         width: 60px;
         min-height: 72px;
       }
-      body #videoMenuTopList li.videoMenuListNicoru {
-        float: right;
-        min-height: 72px;
-      }
+
       body #videoHeader.isAdult .videoMenuToggle, body #videoHeader.noAudioDownload .downloadButton {
         display: inline-block;
         opacity: 0.5;
         pointer-events: none !important;
       }
-      {* テレビちゃんメニューのスライド殺す *}
-      {*body #videoHeader.menuOpened #videoMenuWrapper {
-        margin-bottom: 0;
-      }
-      body #videoHeader.menuOpened #videoHeaderDetail {
-        margin-top: 8px;
-      }*}
-
 
       .largeThumbnailPopup, .largeThumbnailPopup div{
         background-color: #000;
@@ -2433,15 +2428,6 @@
       {title: '動画情報の空きスペースを詰める', varName: 'compactVideoInfo',
         description: '原宿ぐらいの密度になります。ちょっと窮屈かも',
         values: {'詰める': true, '詰めない': false}},
-//      {title: '背景のグラデーションをなくす', varName: 'flatDesignMode',
-//        description: '軽い表示になります',
-//        values: {'なくす': 'on', 'なくさない': ''}},
-      {title: '「ニコる」をなくす', varName: 'noNicoru',
-        description: '画面上から見えなくなります。\nまた、コメントパネルの処理が軽くなります',
-        values: {'なくす': true, 'なくさない': false}},
-//      {title: 'コメントパネルのマウスオーバー処理をなくす', varName: 'removeCommentPanelHoverEvent', reload: true,
-//        description: 'マウスオーバー時のちらちらした物がなくなり、表示が軽くなります',
-//        values: {'なくす': true, 'なくさない': false}},
       {title: 'タグの自動更新を無効化', varName: 'disableTagReload',
         values: {'する': true, 'しない': false}},
       {title: '横スクロールバーを出なくする', varName: 'disableHorizontalScroll',
@@ -8378,7 +8364,6 @@
           $inner.find('#watch' + i + '_mq').attr('id', null).addClass('ichibaMarquee');
         }
       }
-      $inner.find('.nicoru').remove();
 
       var $footer = $('<div class="ichibaPanelFooter"></div>');
 
@@ -9662,6 +9647,8 @@
       setTimeout(function() {
         var PlaylistInitializer = require('watchapp/init/PlaylistInitializer');
         PlaylistInitializer.playlistView.resetView();
+
+        $(window).resize();
       }, 1000);
     }
 
@@ -13094,8 +13081,7 @@
       addStyle(__css__, 'NicoHeatMapCss');
       var pv = require('watchapp/init/PlayerInitializer').rightSidePanelViewController.getPlayerPanelTabsView();
       var cpv = pv._commentPanelView;
-      cpv.showNicoru = function() {};
-      cpv.showTooltip = function() {};
+      //cpv.showTooltip = function() {};
 
       //advice.after(npc, 'onCommentListInitialized', $.proxy(onCommentListInitialized, this));
       EventDispatcher.addEventListener('onCommentListInitialized', function() {
@@ -13367,9 +13353,6 @@
         if (name === 'enableYukkuriPlayButton') {
           newValue ? Yukkuri.show() : Yukkuri.hide();
         } else
-        if (name === 'noNicoru') {
-          $('body').toggleClass('w_noNicoru', newValue);
-        } else
         if (name === 'playerBgStyle') {
           $('#content')
             .toggleClass('w_flat_gray',  newValue === 'gray')
@@ -13387,8 +13370,6 @@
       });
 
       if (conf.enableMylistDeleteButton) $('.videoExplorerBody').addClass('enableMylistDeleteButton');
-
-      if (conf.noNicoru) $('body').addClass('w_noNicoru');
 
       if (conf.playerBgStyle !== '') $('#content').addClass('w_flat_' + conf.playerBgStyle);
 
@@ -13437,18 +13418,6 @@
       overrrideWindowUtil();
 
       // ニコる数を取得するためにコメントパネルがめちゃくちゃ重くなってるのを改善
-      PlayerInitializer.nicoPlayerConnector.getCommentNicoruCount = function(name, num) {
-        if (conf.noNicoru) {
-          return 0;
-        }
-        return require('playerapp/player/Nicoplayer').getInstance().getCommentNicoruCount(name, num);
-      };
-      if (conf.noNicoru) {
-         var cpv = require('playerPanel/view/CommentPanelView');
-         cpv.prototype.showNicoru = function() {};
-         //cpv.prototype.showTooltip = function() {};
-      }
-
       var playerConfig = PlayerInitializer.nicoPlayerConnector.playerConfig;
       if (conf.autoPlayIfWindowActive === 'yes') {
         playerConfig.set({autoPlay: false});
@@ -13516,7 +13485,6 @@
         console.log(JSON.parse($('#watchAPIDataContainer').text()));
 
         //WindowUtil.shake = function() { console.log('%cshake', 'background: lightgreen;');};
-        //NicoPlayerConnector.getCommentNicoruCount_org = NicoPlayerConnector.getCommentNicoruCount;
       }
     }
 
