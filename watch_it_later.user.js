@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150619
+// @version        1.150703
 // ==/UserScript==
 
 
@@ -4867,8 +4867,9 @@
       var def = new $.Deferred();
       currentPromise = def;
       deferredList[sessionId] = def;
-      if (isChrome) {
+      if (isChrome || true) {
         // 基本的に i.nicovideo.jpのほうが高機能だが、Chrome + Tampermonkeyからは使えないため回避策
+        // ver 150703 iPhone用のAPIが使えなくなったのでFirefoxでもこっちを叩く
         window.WatchItLater.loader.ceAPIClient.videoArray(ids, 'xml').then(
           function(xml) { onXmlLoad(sessionId, xml); },
           function()    { onXmlFail(sessionId); }
