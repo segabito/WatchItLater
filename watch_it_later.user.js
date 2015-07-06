@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150703
+// @version        1.150707
 // ==/UserScript==
 
 
@@ -1599,9 +1599,60 @@
       .videoExplorerBody .videoExplorerContent .contentItemList.column4 .item {
         height: 220px;
       }
+
+      .column1 .mylistCommentEdit {
+      }
+      .column1 .mylistCommentEdit.updating {
+        opacity: 0.5;
+      }
+      .column1 .mylistCommentEdit.updating * {
+        cursor: pointer;
+      }
+
+      .column1 .mylistCommentEdit .startEditButton {
+        display: none;
+      }
+
+      .isMine .column1 .mylistCommentEdit .startEditButton {
+        position: absolute;
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        vertical-align: middle;
+        background: url(http://uni.res.nimg.jp/img/zero_my/icon_write.png) no-repeat;
+        cursor: pointer;
+      }
+      .isMine .column1 .mylistCommentEdit.edit .startEditButton {
+        display: none;
+      }
+
+      .column1 .mylistCommentEdit      .mylistCommentInput {
+        display: none;
+      }
+
+      .isMine .column1 .mylistCommentEdit.edit .mylistCommentInput {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+        border: inset 1px #ccc;
+        margin: 4px auto;
+        border-radius: 4px;
+      }
+
+      .isMine .column1 .mylistCommentEdit.edit .itemMylistComment {
+        display: none !important;
+      }
+
       .column1 .itemMylistComment {
         font-size: 85%; color: #666; display: none;
         color: #400; border: 1px solid #ccc; padding: 0 4px 0px; line-height: 130%; border-radius: 4px;
+      }
+      .isMine .column1 .itemMylistComment {
+        display: block !important;
+      }
+
+      .isMine .column1 .itemMylistComment::before {
+        padding: 2px 2px 2px 20px;
       }
       .column1 .itemMylistComment::before {
         content: 'マイリストコメント ';
@@ -10502,13 +10553,23 @@
             '<button class="deleteFromMyMylist" onclick="WatchItLater.onDeleteFromMyMylistClick(this);">マイリスト外す</button>' +
             '</div>', $menu = $(menu);
 
+          var mylistCommentEditTemplate = [
+            '<p class="descriptionShort"/>',
+            '<div class="mylistCommentEdit">',
+              '<span class="startEditButton" title="マイリストコメントを編集"></span>',
+              '<input type="text" class="mylistCommentInput" placeholder="マイリストコメント">',
+              '<p class="itemMylistComment mylistComment"><pre /></p>',
+            '</div>',
+          ''].join('');
+
           var $template = $('<div/>').html(VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html());
           $template.find('.column1 .thumbnailContainer').append($menu).end()
             .find('.column4 .balloon').before($menu.clone()).end()
             .find('.column4 .balloon').remove().end()
             .find('.messageContainer').remove().end()
             .find('.lastResBody')
-              .before($('<p class="descriptionShort"/><p class="itemMylistComment mylistComment"/>')).end()
+//              .before($('<p class="descriptionShort"/><p class="itemMylistComment mylistComment"/>')).end()
+              .before($(mylistCommentEditTemplate)).end()
             .find('.noImage').remove().end()
               .find('.createdTime').after($('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>'));
             VideoExplorerInitializer.videoExplorerView._contentListView._$view.find('.videoItemTemplate').html($template.html());
@@ -10556,6 +10617,103 @@
       var ItemView = require('watchapp/components/videoexplorer/view/content/item/AbstractVideoContentItemView');
       ItemView.prototype._setView_org = ItemView.prototype._setView;
 
+      ItemView.prototype._startMylistCommentEdit = function() {
+        var $edit = this._$item.find('.mylistCommentEdit');
+        if ($edit.hasClass('edit') || $edit.hasClass('updating')) {
+          return;
+        }
+        $edit.addClass('edit');
+        var $input = this._$item.find('.mylistCommentInput').off();
+        var onSubmit = $.proxy(this._onMylistCommentEditSubmit, this);
+        var onKey = $.proxy(function(e) {
+          switch (e.keyCode) {
+            case 13: //ENTER
+              this._onMylistCommentEditSubmit();
+              break;
+            case 27: //ESC
+              this._onMylistCommentEditCancel();
+              break;
+            default:
+              return;
+          }
+          e.stopPropagation();
+        }, this);
+
+        $input
+          .val(this._item._mylistComment)
+          .on('blur', onSubmit)
+          .on('keydown', onKey)
+          .focus();
+      };
+
+      ItemView.prototype._onMylistCommentEditSubmit = function() {
+        this._endMylistCommentEdit();
+      };
+
+      ItemView.prototype._onMylistCommentEditCancel = function() {
+        var $input = this._$item.find('.mylistCommentInput');
+        $input.val(this._item._mylistComment);
+        this._endMylistCommentEdit();
+      };
+
+      ItemView.prototype._endMylistCommentEdit = function() {
+        var item = this._item, $item = this._$item;
+        var $edit = $item.find('.mylistCommentEdit').removeClass('edit');
+        var $input = $item.find('.mylistCommentInput').off();
+        var newComment = $input.val();
+        if (newComment !== item._mylistComment) {
+          var VideoExplorerInitializer = require('watchapp/init/VideoExplorerInitializer');
+          var ContentType = require('watchapp/components/videoexplorer/model/ContentType');
+          var contentList = VideoExplorerInitializer.videoExplorer.getContentList();
+          var ac   = contentList.getActiveContent();
+          var type = contentList.getActiveContentType();
+
+          var watchId = item.getId();
+          var groupId = ac.getMylistId ? ac.getMylistId() : 'deflist';
+
+          $edit.addClass('updating');
+          var onUpdate = function(result) {
+            console.log(
+              '%cmylistComment changed!!! watchId: %s groupId: %s comment: 「%s」',
+              'background: cyan;',
+              watchId,
+              groupId,
+              newComment,
+              result
+            );
+
+            result = result.toLowerCase();
+            if (result === 'ok') {
+              var $newComment = $('<pre/>').text(newComment);
+              $item.find('.mylistComment').empty().append($newComment);
+              item._mylistComment = newComment;
+            } else {
+              console.log('update fail!!! 「%s」「%s」', result, 'ok', result === 'ok');
+              Popup.alert('マイリストコメントの編集に失敗 result: ' + result);
+            }
+
+            $edit.removeClass('updating');
+            if (type === ContentType.MYLIST_VIDEO) {
+              WatchController.clearMylistCache(groupId);
+            } else {
+              WatchController.clearDeflistCache();
+            }
+          };
+
+          // TODO: clear cache
+          if (type === ContentType.MYLIST_VIDEO) {
+            if (!ac.getIsMine()) { return; }
+            Mylist.updateMylistItem(watchId, groupId, onUpdate, newComment);
+          } else
+          if (type === ContentType.DEFLIST_VIDEO) {
+            Mylist.updateDefListItem(watchId, onUpdate, newComment);
+          }
+
+        }
+      };
+
+
+
       ItemView.prototype.update_org = ItemView.prototype.update;
       ItemView.prototype.update = function() {
         // 動画情報表示をゴリゴリいじる場所
@@ -10566,8 +10724,15 @@
         if (item._mylistComment) { // マイリストコメント
           $item.find('.mylistComment').css({display: 'block'});
         } else {
-          $item.find('.mylistComment').remove();
+          //$item.find('.mylistComment').remove();
         }
+
+        // マイリストコメント編集
+        var startEdit =
+          this._startMylistCommentEditProxy ?
+            this._startMylistCommentEditProxy : $.proxy(this._startMylistCommentEdit, this);
+        this._startMylistCommentEditProxy = startEdit;
+        $item.find('.startEditButton').on('click', startEdit);
 
         var lastResBody = item.getLastResBody();
         if (lastResBody.length > 0) {
