@@ -21,7 +21,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150707
+// @version        1.150708b
 // ==/UserScript==
 
 
@@ -1614,10 +1614,11 @@
       }
 
       .isMine .column1 .mylistCommentEdit .startEditButton {
-        position: absolute;
         display: inline-block;
         width: 16px;
         height: 16px;
+        margin: 4px 8px;
+        float: right;
         vertical-align: middle;
         background: url(http://uni.res.nimg.jp/img/zero_my/icon_write.png) no-repeat;
         cursor: pointer;
@@ -1639,36 +1640,36 @@
         border-radius: 4px;
       }
 
-      .isMine .column1 .mylistCommentEdit.edit .itemMylistComment {
+      .isMine .column1 .mylistCommentEdit.edit .mylistComment {
         display: none !important;
       }
 
-      .column1 .itemMylistComment {
+      .column1 .mylistComment {
         font-size: 85%; color: #666; display: none;
         color: #400; border: 1px solid #ccc; padding: 0 4px 0px; line-height: 130%; border-radius: 4px;
       }
-      .isMine .column1 .itemMylistComment {
+      .isMine .column1 .mylistComment {
         display: block !important;
       }
 
-      .isMine .column1 .itemMylistComment::before {
-        padding: 2px 2px 2px 20px;
+      .isMine .column1 .mylistComment {
+        padding-right: 20px;
       }
-      .column1 .itemMylistComment::before {
+      .column1 .mylistComment::before {
         content: 'マイリストコメント ';
         background: #ccc; border-radius: 0 0 8px 0; display: inline-block; margin: 0 4px 4px -4px; padding: 2px;
         min-width: 100px;
       }
-      .log-user-video-review .column1 .itemMylistComment {
+      .log-user-video-review .column1 .mylistComment {
         color: #004;
       }
-      .log-user-video-review .column1 .itemMylistComment::before {
+      .log-user-video-review .column1 .mylistComment::before {
         content: 'レビュー ';
       }
-      .column1 .itemMylistComment::after {
+      .column1 .mylistComment::after {
         content: '';
       }
-      .column1 .itemMylistComment pre {
+      .column1 .mylistComment pre {
         font-family: inherit;
         display: inline;
         white-space: pre-wrap;
@@ -3136,7 +3137,7 @@
   var Mylist = window.WatchItLater.mylist = (function(){
     var mylistlist = [];
     var initialized = false;
-    var defListItems = [], mylistItems = {};
+    var deflistItems = [], mylistItems = {};
     var host = location.host.replace(/^([\w\d]+)\./, 'www.');
     var token = '';//
 
@@ -3239,7 +3240,7 @@
           }
         }
       });
-      this.reloadDefList();
+      this.reloadDeflist();
     };
 
     pt.loadMylistList = function(callback) {
@@ -3258,7 +3259,7 @@
       return false;
     };
 
-    pt.reloadDefList = function(callback) {
+    pt.reloadDeflist = function(callback) {
       var url = 'http://' + host + '/api/deflist/list';
       GM_xmlhttpRequest({
         url: url,
@@ -3272,8 +3273,8 @@
           if (!resp.responseText) return;
           var result = JSON.parse(resp.responseText);
           if (result.status === "ok" && result.mylistitem) {
-            defListItems = result.mylistitem;
-            if (typeof callback === "function") callback(defListItems);
+            deflistItems = result.mylistitem;
+            if (typeof callback === "function") callback(deflistItems);
           }
         }
       });
@@ -3310,8 +3311,8 @@
     pt.findDeflistByWatchId = function(watchId) {
 //      if (/^[0-9]+$/.test(watchId)) return watchId; // スレッドIDが来た
 
-      for (var i = 0, len = defListItems.length; i < len; i++) {
-        var item = defListItems[i], wid = item.item_data.watch_id;
+      for (var i = 0, len = deflistItems.length; i < len; i++) {
+        var item = deflistItems[i], wid = item.item_data.watch_id;
         if (wid == watchId) return item;
       }
       return null;
@@ -3332,7 +3333,7 @@
     // http://uni.res.nimg.jp/js/nicoapi.js
     // http://d.hatena.ne.jp/lolloo-htn/20110115/1295105845
     // http://d.hatena.ne.jp/aTaGo/20100811/1281552243
-    pt.deleteDefListItem = function(watchId, callback) {
+    pt.deleteDeflistItem = function(watchId, callback) {
       var item = this.findDeflistByWatchId(watchId);
       if (!item) return false;
       var item_id = item.item_id;
@@ -3347,7 +3348,7 @@
           var result = JSON.parse(resp.responseText);
           if (typeof callback === "function") callback(result.status, result);
           if (jQuery) {
-            defListItems = jQuery.grep(defListItems, function(item) {
+            deflistItems = jQuery.grep(deflistItems, function(item) {
               return item.item_data.watch_id !== watchId;
             });
           }
@@ -3358,7 +3359,7 @@
       return true;
     };
 
-    pt.addDefListItem = function(watchId, callback, description) {
+    pt.addDeflistItem = function(watchId, callback, description) {
       var url = 'http://' + host + '/api/deflist/add';
 
       // 例えば、とりマイの300番目に登録済みだった場合に「登録済みです」と言われても探すのがダルいし、
@@ -3383,8 +3384,8 @@
         };
         GM_xmlhttpRequest(req);
       };
-      // とりあえずマイリストにある場合はdeleteDefListItem()のcallbackで追加、ない場合は即時追加
-      if (!this.deleteDefListItem(watchId, _add)) {
+      // とりあえずマイリストにある場合はdeleteDeflistItem()のcallbackで追加、ない場合は即時追加
+      if (!this.deleteDeflistItem(watchId, _add)) {
         replaced = false;
         _add();
         dispatchEvent('defMylistUpdate');
@@ -3425,7 +3426,43 @@
         GM_xmlhttpRequest(req);
       };
       // 普通のマイリストに入れたら、とりあえずマイリストからは削除(≒移動)
-      if (!this.deleteDefListItem(watchId, _add)) _add();
+      if (!this.deleteDeflistItem(watchId, _add)) _add();
+    };
+
+    pt.updateDeflistItem = function(watchId, callback, description) {
+      var self = this;
+      var item = self.findDeflistByWatchId(watchId);
+      if (!item) {
+        Popup.alert('マイリスト中に該当する動画がみつかりませんでした');
+        return;
+      }
+      var
+        itemId = item.item_id,
+        url = 'http://' + host + '/api/deflist/update',
+        data = ['item_id=', itemId,
+                '&item_type=', 0, // video=0 seiga=5
+                '&description=', (typeof description === 'string') ? encodeURIComponent(description) : '',
+                '&token=', token
+        ].join(''),
+        req = {
+          method: 'POST',
+          data: data,
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          url: url,
+          onload: function(resp) {
+            var result = JSON.parse(resp.responseText);
+            if (result.status === 'ok') {
+              if (typeof callback === "function") callback(result.status, result);
+              dispatchEvent('deflistUpdate', {action: 'update', watchId: watchId});
+              EventDispatcher.dispatch('onDeflistItemUpdated', watchId);
+            }
+          },
+          error: function() {
+            Popup.alert('ネットワークエラー');
+          }
+        };
+
+      GM_xmlhttpRequest(req);
     };
 
     pt.updateMylistItem = function(watchId, groupId, callback, description) {
@@ -3533,8 +3570,8 @@
       var isWatchPage = (window.PlayerApp) ? true : false;
 
       var addDeflist = function(watchId, description) {
-        self.addDefListItem(watchId, function(status, result, replaced) {
-          self.reloadDefList();
+        self.addDeflistItem(watchId, function(status, result, replaced) {
+          self.reloadDeflist();
           if (status !== 'ok') {
             Popup.alert('とりあえずマイリストへの登録に失敗: ' + result.error.description);
           } else {
@@ -3548,7 +3585,7 @@
       };
       var addMylist = function(watchId, mylistId, mylistName, description) {
         self.addMylistItem(watchId, mylistId, function(status, result) {
-          self.reloadDefList();
+          self.reloadDeflist();
           if (status === 'ok') {
             Popup.show( '<a href="/my/mylist/#/' + mylistId + '">' + mylistName + '</a>に登録しました');
           } else {
@@ -3734,8 +3771,8 @@
 
           setButtonStyleUpdating(btn);
 
-          self.deleteDefListItem(_watchId, function(status, result) {
-            self.reloadDefList();
+          self.deleteDeflistItem(_watchId, function(status, result) {
+            self.reloadDeflist();
             btn.style.display = 'none';
             if (status !== "ok") {
               Popup.alert('とりあえずマイリストから削除に失敗: ' + result.error.description);
@@ -5449,8 +5486,8 @@
       addDefMylist: function(description) {
         var watchId = watchInfoModel.id;
         setTimeout(function() {
-          Mylist.addDefListItem(watchId, function(status, result, replaced) {
-            Mylist.reloadDefList();
+          Mylist.addDeflistItem(watchId, function(status, result, replaced) {
+            Mylist.reloadDeflist();
             if (status !== "ok") {
               Popup.alert('とりあえずマイリストの登録に失敗: ' + result.error.description);
             } else {
@@ -8860,7 +8897,7 @@
         var watchId = WatchController.getWatchId();
         this._setIsUpdating();
         if (this._type === 'deflist') {
-          this._mylistController.addDefListItem(watchId,              $.proxy(this._onMylistUpdate, this));
+          this._mylistController.addDeflistItem(watchId,              $.proxy(this._onMylistUpdate, this));
         } else {
           var mylistId = this._content.getMylistId();
           this._mylistController.addMylistItem (watchId, mylistId,    $.proxy(this._onMylistUpdate, this));
@@ -8870,7 +8907,7 @@
         var watchId = WatchController.getWatchId();
         this._setIsUpdating();
         if (this._type === 'deflist') {
-          this._mylistController.deleteDefListItem(watchId,           $.proxy(this._onMylistUpdate, this));
+          this._mylistController.deleteDeflistItem(watchId,           $.proxy(this._onMylistUpdate, this));
         } else {
           var mylistId = this._content.getMylistId();
           this._mylistController.deleteMylistItem (watchId, mylistId, $.proxy(this._onMylistUpdate, this));
@@ -10557,8 +10594,8 @@
             '<p class="descriptionShort"/>',
             '<div class="mylistCommentEdit">',
               '<span class="startEditButton" title="マイリストコメントを編集"></span>',
-              '<input type="text" class="mylistCommentInput" placeholder="マイリストコメント">',
-              '<p class="itemMylistComment mylistComment"><pre /></p>',
+              '<textarea class="mylistCommentInput" placeholder="マイリストコメント (改行はShift+ENTER)" />',
+              '<p class="mylistComment"><pre /></p>',
             '</div>',
           ''].join('');
 
@@ -10568,7 +10605,6 @@
             .find('.column4 .balloon').remove().end()
             .find('.messageContainer').remove().end()
             .find('.lastResBody')
-//              .before($('<p class="descriptionShort"/><p class="itemMylistComment mylistComment"/>')).end()
               .before($(mylistCommentEditTemplate)).end()
             .find('.noImage').remove().end()
               .find('.createdTime').after($('<div class="nicorepoOwnerIconContainer"><a target="_blank"><img /></a></div>'));
@@ -10600,7 +10636,7 @@
             Mylist.deleteMylistItem(watchId, ac.getMylistId(), onUpdate, 0);
           } else
           if (type === ContentType.DEFLIST_VIDEO) {
-            Mylist.deleteDefListItem(watchId, onUpdate, 0);
+            Mylist.deleteDeflistItem(watchId, onUpdate, 0);
           }
         },
         onShowLargeThumbnailClick = function (elm) {
@@ -10628,6 +10664,7 @@
         var onKey = $.proxy(function(e) {
           switch (e.keyCode) {
             case 13: //ENTER
+              if (e.shiftKey) { return; }
               this._onMylistCommentEditSubmit();
               break;
             case 27: //ESC
@@ -10706,7 +10743,7 @@
             Mylist.updateMylistItem(watchId, groupId, onUpdate, newComment);
           } else
           if (type === ContentType.DEFLIST_VIDEO) {
-            Mylist.updateDefListItem(watchId, onUpdate, newComment);
+            Mylist.updateDeflistItem(watchId, onUpdate, newComment);
           }
 
         }
@@ -13060,7 +13097,7 @@
          var num = parseInt(n, 36);
          var description = d || '';
          if (num === 0) {
-           Mylist.addDefListItem(WatchController.getWatchId(),                     onMylistUpdate, description);
+           Mylist.addDeflistItem(WatchController.getWatchId(),                     onMylistUpdate, description);
          } else
          if (mylistList[num]) {
            Mylist.addMylistItem (WatchController.getWatchId(), mylistList[num].id, onMylistUpdate, description);
