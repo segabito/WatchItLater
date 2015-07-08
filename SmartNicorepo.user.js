@@ -5,7 +5,7 @@
 // @include     http://www.nicovideo.jp/my/*
 // @include     http://www.nicovideo.jp/user/*
 // @include     http://www.nicovideo.jp/my/fav/user
-// @version     2.1.2
+// @version     2.1.3
 // @grant       none
 // ==/UserScript==
 
@@ -330,7 +330,7 @@
             };
           };
 
-          $('#favUser .showNicorepo').on('click', $.proxy(function(e) {
+          $('#favUser .showNicorepo').off().on('click', $.proxy(function(e) {
             if (e.button !== 0 || e.metaKey || e.shiftKey || e.altKey || e.ctrlKey) {
               return;
             }
