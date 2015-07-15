@@ -6,6 +6,7 @@
 // @include        http://i.nicovideo.jp/*
 // @include        http://ch.nicovideo.jp/*
 // @include        http://ext.nicovideo.jp/thumb/*
+// @include        http://api.ce.nicovideo.jp/api/v1/system.unixtime?
 // @exclude        http://ads*.nicovideo.jp/*
 // @exclude        http://live*.nicovideo.jp/*
 // @exclude        http://dic.nicovideo.jp/*
@@ -21,7 +22,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150708b
+// @version        1.150712
 // ==/UserScript==
 
 
@@ -10964,7 +10965,7 @@
         var shield = $('<div id="fullScreenMenuContainer" />');
         shield.click(function(e) {
           e.stopPropagation();
-          togglePlaylist()
+          togglePlaylist();
         });
         $('#external_nicoplayer').after(shield);
         shield = null;
@@ -10982,7 +10983,7 @@
         if (lastScreenMode === 'browserFull' && mode !== 'browserFull') {
           $('#playerContainerSlideArea').css({height: ''}); // wall bug fix
           restoreVisibility();
-          toggleMonitorFull(false)
+          toggleMonitorFull(false);
         }
         lastScreenMode = mode;
       });
