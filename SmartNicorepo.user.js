@@ -5,7 +5,8 @@
 // @include     http://www.nicovideo.jp/my/*
 // @include     http://www.nicovideo.jp/user/*
 // @include     http://www.nicovideo.jp/my/fav/user
-// @version     2.1.3
+// @include     http://www.nicovideo.jp/mylist/*
+// @version     2.2.0
 // @grant       none
 // ==/UserScript==
 
@@ -239,6 +240,153 @@
       }
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
 
+    var __large_thumbnail_css__ = (function() {/*
+
+       .largeThumbnailLink {
+         display: inline-block;
+       }
+
+       .largeThumbnailLink::after {
+         position: fixed;
+         bottom: -400px;
+         left: 24px;
+         opacity: 0;
+         transition:
+           bottom     0.5s ease 0.5s,
+           z-index    0.5s ease,
+           box-shadow 0.5s ease 0.5s,
+           opacity    0.5s ease 0.5s;
+         z-index: 100000;
+       }
+
+       #PAGEBODY .largeThumbnailLink::after {
+         left: auto;
+         right: 24px;
+       }
+
+       .largeThumbnailLink:hover::after {
+         position: fixed;
+         bottom: 24px;
+         opacity: 1;
+         box-shadow: 4px 4px 4px #333;
+         transition:
+           bottom     0.2s ease,
+           z-index    0.2s ease,
+           box-shadow 0.2s ease,
+           opacity    0.2s ease;
+         z-index: 100100;
+       }
+    */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
+
+
+    var initializeLargeThumbnail = function(type, container, selector) {
+      console.log('%cinitializeLargeThumbnail: type=%s', 'background: lightgreen;', type);
+      addStyle(__large_thumbnail_css__);
+
+      // 大サムネが存在する最初の動画ID。 ソースはちゆ12歳
+      // ※この数字以降でもごく稀に例外はある。
+      var threthold = 16371888;
+      var hasLargeThumbnail = function(videoId) { // return true;
+        var cid = videoId.substr(0, 2);
+        if (cid !== 'sm') { return false; }
+
+        var fid = videoId.substr(2) * 1;
+        if (fid < threthold) { return false; }
+
+        return true;
+      };
+
+      var onLoadImageError = function() {
+        console.log('%c large thumbnail load error!', 'background: red;', this);
+        this.src = this.src.replace('.L', '');
+        $(this)
+          .removeClass('largeThumbnail')
+          .closest('a')
+          .removeClass('largeThumbnailLink');
+      };
+
+      var updatedItems = [];
+      var each = function(i, v) {
+        try{
+          //console.log(i, v); //return;
+          var href = v.href;
+          if (typeof href !== 'string' || href.toString().indexOf('/watch/sm') < 0) {
+            return;
+          }
+
+          var videoId = href.replace(/^.+(sm\d+).*$/, '$1');
+
+          if (!hasLargeThumbnail(videoId)) {
+            return;
+          }
+
+          var $this = $(v);
+          var $thumbnail = $this.find('img');
+          var src = $thumbnail.attr('src');
+          var org = $thumbnail.attr('data-original');
+          var attr = org ? 'data-original' : 'src';
+          src = org ? org : src;
+
+          //console.log('', attr, src, org);
+
+          if (src && src.indexOf('.L') < 0 && src.indexOf('/smile?i=') > 0) {
+            var url = src + '.L';
+            $thumbnail
+              .on('error', onLoadImageError)
+              .addClass('largeThumbnail ' + videoId)
+              .attr(attr, url);
+
+            $this.addClass('largeThumbnailLink ' + videoId);
+            updatedItems.push([videoId, url]);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+
+      var cssAdded = {};
+      var updateCss = function(items) {
+        if (items.length < 1) { return; }
+        var css = [];
+        for (var i = 0, len = items.length; i < len; i++) {
+          var videoId = items[i][0], src = items[i][1];
+          if (cssAdded[videoId]) {
+            continue;
+          }
+          cssAdded[videoId] = true;
+          css.push([
+            '.largeThumbnailLink.', videoId, '::after {',
+            '  content: url(', src, ');',
+            '}',
+          ''].join(''));
+        }
+        if (css.length > 0) {
+          addStyle(css.join(''));
+        }
+      };
+
+      var timer;
+      var update = function() {
+        if (timer) {
+          clearTimeout(timer);
+        }
+
+        timer = setTimeout(function() {
+          console.log('%cupdate large thumbnail', 'background: lightgreen;');
+          updatedItems = [];
+          $(selector).each(each);
+          updateCss(updatedItems);
+          timer = null;
+        }, 500);
+      };
+
+      update();
+
+      $(container).on('DOMNodeInserted', update);
+    };
+
+
+
      window.SmartNicorepo = {
        model: {},
        util: {},
@@ -353,6 +501,7 @@
           }, this));
        },
        initializeAutoPageRize: function() {
+         if (!window._) { return; }
          var config = this.config;
          var $button = $('<button class="togglePagerize">自動読込</button>');
          var timer = null;
@@ -581,7 +730,32 @@
        }
      };
 
-     window.SmartNicorepo.initialize();
+
+     window.Nico.onReady(function() {
+       console.log('%cNico.onReady', 'background: lightgreen;');
+       if (location.pathname.indexOf('/my/top') === 0) {
+         initializeLargeThumbnail('nicorepo', '.nicorepo', '.log-target-thumbnail a:not(.largeThumbnail)');
+       } else
+       if (location.pathname.indexOf('/my/mylist') === 0) {
+         initializeLargeThumbnail('mylist', '#mylist', '.thumbContainer a:not(.largeThumbnail)');
+       } else
+       if (location.pathname.indexOf('/my/video') === 0) {
+         initializeLargeThumbnail('video', '#video', '.thumbContainer a:not(.largeThumbnail)');
+       } else
+       if (location.pathname.indexOf('/mylist') === 0) {
+         initializeLargeThumbnail('openMylist', '#PAGEBODY', '.SYS_box_item a:not(.watch):not(.largeThumbnail):visible');
+       } else
+       if (location.pathname.match(/\/user\/\d+\/video/)) {
+         initializeLargeThumbnail('video', '#video', '.thumbContainer a:not(.largeThumbnail)');
+       } else
+       if (location.pathname.match(/\/user\/\d+\/top/)) {
+         initializeLargeThumbnail('nicorepo', '.nicorepo', '.log-target-thumbnail a:not(.largeThumbnail)');
+       }
+     });
+
+     if (location.pathname.indexOf('/mylist') < 0) {
+       window.SmartNicorepo.initialize();
+     }
 
    }); // end of monkey
 
