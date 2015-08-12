@@ -6,7 +6,7 @@
 // @include     http://www.nicovideo.jp/user/*
 // @include     http://www.nicovideo.jp/my/fav/user
 // @include     http://www.nicovideo.jp/mylist/*
-// @version     2.2.0
+// @version     2.2.1
 // @grant       none
 // ==/UserScript==
 
@@ -247,10 +247,17 @@
        }
 
        .largeThumbnailLink::after {
+         content: "";
          position: fixed;
-         bottom: -400px;
+         bottom: -280px;
+         width: 360px;
+         height: 270px;
          left: 24px;
          opacity: 0;
+         background-color: #fff;
+         background-size: contain;
+         background-repeat: no-repeat;
+         background-position: center center;
          transition:
            bottom     0.5s ease 0.5s,
            z-index    0.5s ease,
@@ -266,7 +273,7 @@
 
        .largeThumbnailLink:hover::after {
          position: fixed;
-         bottom: 24px;
+         bottom: 32px;
          opacity: 1;
          box-shadow: 4px 4px 4px #333;
          transition:
@@ -307,76 +314,156 @@
 
       var updatedItems = [];
       var each = function(i, v) {
-        try{
-          //console.log(i, v); //return;
-          var href = v.href;
-          if (typeof href !== 'string' || href.toString().indexOf('/watch/sm') < 0) {
-            return;
-          }
+        //console.log(i, v); //return;
+        var href = v.href;
+        if (typeof href !== 'string' || href.toString().indexOf('/watch/sm') < 0) {
+          return;
+        }
 
-          var videoId = href.replace(/^.+(sm\d+).*$/, '$1');
+        var videoId = href.replace(/^.+(sm\d+).*$/, '$1');
 
-          if (!hasLargeThumbnail(videoId)) {
-            return;
-          }
+        if (!hasLargeThumbnail(videoId)) {
+          return;
+        }
 
-          var $this = $(v);
-          var $thumbnail = $this.find('img');
-          var src = $thumbnail.attr('src');
-          var org = $thumbnail.attr('data-original');
-          var attr = org ? 'data-original' : 'src';
-          src = org ? org : src;
+        var $this = $(v);
+        var $thumbnail = $this.find('img');
+        var src = $thumbnail.attr('src');
+        var org = $thumbnail.attr('data-original');
+        var attr = org ? 'data-original' : 'src';
+        src = org ? org : src;
 
-          //console.log('', attr, src, org);
+        //console.log('', attr, src, org);
 
-          if (src && src.indexOf('.L') < 0 && src.indexOf('/smile?i=') > 0) {
-            var url = src + '.L';
-            $thumbnail
-              .on('error', onLoadImageError)
-              .addClass('largeThumbnail ' + videoId)
-              .attr(attr, url);
+        if (src && src.indexOf('.L') < 0 && src.indexOf('/smile?i=') > 0) {
+          var url = src + '.L';
+          $thumbnail
+            .on('error', onLoadImageError)
+            .addClass('largeThumbnail ' + videoId)
+            .attr(attr, url);
 
-            $this.addClass('largeThumbnailLink ' + videoId);
-            updatedItems.push([videoId, url]);
-          }
-        } catch (e) {
-          console.error(e);
+          $this.addClass('largeThumbnailLink ' + videoId);
+          updatedItems.push([videoId, url]);
         }
       };
 
-      var cssAdded = {};
+      var cssExist = {};
       var updateCss = function(items) {
         if (items.length < 1) { return; }
         var css = [];
         for (var i = 0, len = items.length; i < len; i++) {
           var videoId = items[i][0], src = items[i][1];
-          if (cssAdded[videoId]) {
+          if (cssExist[videoId]) {
             continue;
           }
-          cssAdded[videoId] = true;
+          cssExist[videoId] = true;
           css.push([
             '.largeThumbnailLink.', videoId, '::after {',
-            '  content: url(', src, ');',
+            '  background-image: url(', src, ');',
+//            '  content: url(', src, ');',
             '}',
-          ''].join(''));
+          '\n'].join(''));
         }
         if (css.length > 0) {
           addStyle(css.join(''));
         }
       };
 
-      var timer;
+      var delayTimer;
       var update = function() {
-        if (timer) {
-          clearTimeout(timer);
+        if (delayTimer) {
+          clearTimeout(delayTimer);
         }
 
-        timer = setTimeout(function() {
+        delayTimer = setTimeout(function() {
           console.log('%cupdate large thumbnail', 'background: lightgreen;');
           updatedItems = [];
           $(selector).each(each);
           updateCss(updatedItems);
-          timer = null;
+          delayTimer = null;
+        }, 500);
+      };
+
+      update();
+
+      $(container).on('DOMNodeInserted', update);
+    };
+
+    var initializeSeigaThumbnail = function(type, container, selector) {
+      console.log('%cinitializeSeigaThumbnail: type=%s', 'background: lightgreen;', type);
+
+      var onLoadImageError = function() {
+        console.log('%c large thumbnail load error!', 'background: red;', this);
+        this.src = this.src.replace(/i$/, 'z');
+        $(this)
+          .removeClass('largeThumbnail')
+          .closest('a')
+          .removeClass('largeThumbnailLink');
+      };
+
+      var updatedItems = [];
+      var each = function(i, v) {
+        var href = v.href;
+        if (typeof href !== 'string' || href.indexOf('/seiga/im') < 0) {
+          //console.log(i, href, href.indexOf('/seiga/im'), typeof href , v);
+          return;
+        }
+
+        var seigaId = href.replace(/^.+(im\d+).*$/, '$1');
+
+        var $this = $(v);
+        var $thumbnail = $this.find('img');
+        var src = $thumbnail.attr('src');
+        var org = $thumbnail.attr('data-original');
+        var attr = org ? 'data-original' : 'src';
+        src = org ? org : src;
+
+        if (src && src.match(/thumb\/\d+z$/)) {
+          var url = src.replace(/z$/, 'i');
+          $thumbnail
+            .on('error', onLoadImageError)
+            .addClass('largeThumbnail ' + seigaId)
+            .attr(attr, url);
+
+          $this.addClass('largeThumbnailLink ' + seigaId);
+          updatedItems.push([seigaId, url]);
+        }
+
+      };
+
+      var cssExist = {};
+      var updateCss = function(items) {
+        if (items.length < 1) { return; }
+        var css = [];
+        for (var i = 0, len = items.length; i < len; i++) {
+          var seigaId = items[i][0], src = items[i][1];
+          if (cssExist[seigaId]) {
+            continue;
+          }
+          cssExist[seigaId] = true;
+          css.push([
+            '.largeThumbnailLink.', seigaId, '::after {',
+            '  background-image: url(', src, ');',
+            '}',
+          '\n'].join(''));
+        }
+        if (css.length > 0) {
+          addStyle(css.join(''));
+        }
+      };
+
+      var delayTimer;
+      var update = function() {
+        if (delayTimer) {
+          clearTimeout(delayTimer);
+        }
+
+        delayTimer = setTimeout(function() {
+          console.log('%cupdate seiga thumbnail', 'background: lightgreen;');
+          updatedItems = [];
+          $(selector).each(each);
+          updateCss(updatedItems);
+          delayTimer = null;
         }, 500);
       };
 
@@ -734,22 +821,24 @@
      window.Nico.onReady(function() {
        console.log('%cNico.onReady', 'background: lightgreen;');
        if (location.pathname.indexOf('/my/top') === 0) {
-         initializeLargeThumbnail('nicorepo', '.nicorepo', '.log-target-thumbnail a:not(.largeThumbnail)');
+         initializeLargeThumbnail('nicorepo', '.nicorepo', '.log-target-thumbnail a[href*=nicovideo.jp/watch/sm]:not(.largeThumbnailLink)');
+         initializeSeigaThumbnail('nicorepo', '.nicorepo', '.log-target-thumbnail a:not(.largeThumbnailLink)');
+         //initializeSeigaThumbnail('nicorepo', '.nicorepo', '.log-target-thumbnail a[href*=/seiga/im]:not(.largeThumbnailLink)');
        } else
        if (location.pathname.indexOf('/my/mylist') === 0) {
-         initializeLargeThumbnail('mylist', '#mylist', '.thumbContainer a:not(.largeThumbnail)');
+         initializeLargeThumbnail('mylist', '#mylist', '.thumbContainer a:not(.largeThumbnailLink)');
        } else
        if (location.pathname.indexOf('/my/video') === 0) {
-         initializeLargeThumbnail('video', '#video', '.thumbContainer a:not(.largeThumbnail)');
+         initializeLargeThumbnail('video', '#video', '.thumbContainer a:not(.largeThumbnailLink)');
        } else
        if (location.pathname.indexOf('/mylist') === 0) {
-         initializeLargeThumbnail('openMylist', '#PAGEBODY', '.SYS_box_item a:not(.watch):not(.largeThumbnail):visible');
+         initializeLargeThumbnail('openMylist', '#PAGEBODY', '.SYS_box_item a:not(.watch):not(.largeThumbnailLink):visible');
        } else
        if (location.pathname.match(/\/user\/\d+\/video/)) {
-         initializeLargeThumbnail('video', '#video', '.thumbContainer a:not(.largeThumbnail)');
+         initializeLargeThumbnail('video', '#video', '.thumbContainer a:not(.largeThumbnailLink)');
        } else
        if (location.pathname.match(/\/user\/\d+\/top/)) {
-         initializeLargeThumbnail('nicorepo', '.nicorepo', '.log-target-thumbnail a:not(.largeThumbnail)');
+         initializeLargeThumbnail('nicorepo', '.nicorepo', '.log-target-thumbnail a[href*=nicovideo.jp/watch/sm]:not(.largeThumbnailLink)');
        }
      });
 
