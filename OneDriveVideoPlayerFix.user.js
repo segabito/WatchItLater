@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         OneDrive VideoPlayer fix
 // @namespace    http://github.com/segabito/
-// @version      0.1.1
+// @version      0.1.4
 // @description  OneDriveの動画プレイヤーのフルスクリーン再生を復活&細かい調整
-// @author       You
+// @author       segabito
 // @match        https://onedrive.live.com/prev?*
 // @grant        none
 // ==/UserScript==
@@ -11,6 +11,15 @@
 (function() {
   var monkey = function() {
     var playerFrame = window, video;
+
+    // https://onedrive.live.com/handlers/clientstring.mvc?mkt=ja-JP&group=Files&v=19.8.1712.2000&useRequiresJs=False
+    var rrZW = top.window.live = top.window.live || {};
+    var uUks = rrZW.shared = rrZW.shared || {};
+    var ccEt = uUks.skydrive = uUks.skydrive || {};
+    var MOFY = ccEt.shared = ccEt.shared || {};
+    var jHBx = MOFY.video = MOFY.video || {};
+    var videoLoadErrorMessage = jHBx["loaderror"] || "問題が発生したため、動画を再生できません。";
+
 
     var config = (function() {
       var prefix = 'OV_';
@@ -44,6 +53,16 @@
         right: 0;
         bottom: 0;
       }
+
+      .OneUp-detailsBar {
+        min-height: inherit !important;
+      }
+
+      .fullscreen .OneUp-detailsBar,
+      .fullscreen .OneUp-commandBar
+      {
+        display: none !important;
+      }
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
 
     var __css__ = (function() {/*
@@ -72,10 +91,10 @@
         #ovPanel {
           position: fixed;
           z-index: 10000;
-          top:0;
-          right: 50px;
+          top:32px;
+          right: 0px;
           min-width: 100px;
-          transition: opacity 0.5s ease;
+          {*transition: opacity 0.5s ease;*}
           background-color: #888;
           border: 1px solid #000;
           box-shadow: 4px 4px 0 black;
@@ -175,12 +194,13 @@
     };
 
     var isVideoFinished = function() {
+      //console.log('"%s","%s"', playerFrame.$('.duration').text(), playerFrame.$('.currentTime').text());
+      //console.log(playerFrame.$('.duration').text() === playerFrame.$('.currentTime').text());
       return playerFrame.$('.duration').text() === playerFrame.$('.currentTime').text();
     };
 
     var isVideoPlayingError = function() {
-      // TODO: 多言語
-      return $('.errorMessage').text() === "問題が発生したため、動画を再生できません。";
+      return $('.errorMessage').text() === videoLoadErrorMessage ; // "問題が発生したため、動画を再生できません。";
     };
 
     var togglePlay = function() {
@@ -188,7 +208,13 @@
     };
 
     var playNext = function() {
-      window.parent.$('.OneUp-flipper--next').click();
+      try {
+          var $nextButton = top.window.jQuery('.OneUp-button[data-automationid=nextButton]');
+          top.$nextButton = $nextButton.click();
+      } catch (e) {
+        console.log('%cException: ', 'background: red;', e, $nextButton);
+      }
+      //window.parent.$('.OneUp-flipper--next').click();
     };
 
     var toggleFitMode = function(v) {
@@ -201,13 +227,17 @@
       config.set('slideshow', $('body').hasClass('slideshow'));
     };
 
-    var timer = null;
+    var timer = null, count = 0;
     var onTimer = function() {
       if (isVideoPlayingError()) {
-        togglePlay();
-        return;
+        console.log('%cVideo Playing Error. count:%s', 'background: lightgreen;', count++);
+        if (count < 200) {
+          togglePlay();
+          return;
+        }
       }
-      if (config.get('slideshow') && isVideoFinished()) {
+
+      if (config.get('slideshow') && (isVideoFinished() || count >= 200)) {
         playNext();
         window.clearInterval(timer);
         return;
@@ -245,7 +275,66 @@
       td.addEventListener('mozfullscreenchange',    onFullscreenStatusChange);
       td.addEventListener('msFullscreenChange',     onFullscreenStatusChange);
       td.addEventListener('fullscreenchange',       onFullscreenStatusChange);
+      window.onbeforeunload = function() {
+        td.removeEventListener('webkitfullscreenchange', onFullscreenStatusChange);
+        td.removeEventListener('mozfullscreenchange',    onFullscreenStatusChange);
+        td.removeEventListener('msFullscreenChange',     onFullscreenStatusChange);
+        td.removeEventListener('fullscreenchange',       onFullscreenStatusChange);
+      };
 
+      if (!top.ovpWatcherInitialized) {
+        top.ovpWatcherInitialized = true;
+        var watcher = function() {
+            var config = (function() {
+              var prefix = 'OV_';
+              var conf = {
+                slideshow: false,
+                fitMode: '',
+              };
+              return {
+                get: function(key) {
+                  try {
+                    if (window.sessionStorage.hasOwnProperty(prefix + key)) {
+                      return JSON.parse(window.sessionStorage.getItem(prefix + key));
+                    }
+                    return conf[key];
+                  } catch (e) {
+                    return conf[key];
+                  }
+                },
+                set: function(key, value) {
+                  window.sessionStorage.setItem(prefix + key, JSON.stringify(value));
+                }
+              };
+            })();
+            var playNext = function() {
+              try {
+                  var $nextButton = top.window.jQuery('.OneUp-button[data-automationid=nextButton]');
+                  top.$nextButton = $nextButton.click();
+              } catch (e) {
+                console.log('%cException: ', 'background: red;', e, $nextButton);
+              }
+              //window.parent.$('.OneUp-flipper--next').click();
+            };
+            var timer = window.setInterval(function() {
+            	//console.log('timer!',
+            	//	config.get('slideshow'),
+            	//	$('.ThumbnailTile-image:last img').is(':visible'),
+            	//	$('.od-ItemVideoPlayer-frame').length
+            	//	);
+                if (config.get('slideshow') && $('.ThumbnailTile-image:last img').is(':visible') && $('.od-ItemVideoPlayer-frame').length < 1) {
+					//console.log('playNext!');
+                    playNext();
+                }
+            }, 3000);
+        };
+        var script = document.createElement("script");
+        script.id = "OneDriveVideoPlayerFixWatcher";
+        script.setAttribute("type", "text/javascript");
+        script.setAttribute("charset", "UTF-8");
+        script.appendChild(top.document.createTextNode('(' + watcher + ')();'));
+        top.document.body.appendChild(script);
+     }
 
       parent.$imageButton = $('#ImageButton-20_0').off().on('click', function() { toggleMonitorFull(); });
       var $panel = $(__panel__);
