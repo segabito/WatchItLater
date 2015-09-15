@@ -3,7 +3,7 @@
 // @namespace   https://github.com/segabito/
 // @description ランキングにある公式動画を左に分離するやつ
 // @include     http://www.nicovideo.jp/ranking*
-// @version     0.0.1
+// @version     0.0.2
 // @grant       none
 // ==/UserScript==
 
@@ -180,7 +180,6 @@
       var $items = $('.item.videoRanking');
       var $officialVideoContainer = $('<div class="column officialVideoContainer list"><header class="contentHeader"><h1 class="title">チャンネル・公式動画ランキング</h1></header></div>');
       $items.each(function(i, item) {
-        console.log(i, item);
         var $item = $(item);
         var videoId = $item.attr('data-id');
         if (isOfficialVideoMaybe(videoId)) {
