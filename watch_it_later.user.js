@@ -22,46 +22,9 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          GM_xmlhttpRequest
-// @version        1.150712
+// @version        1.151026
 // ==/UserScript==
 
-
-//
-// * ver 1.140524
-// * ver 1.140522
-// - 本家のサムネイル仕様変更に対応
-
-// * ver 1.140428
-// - 本家の仕様変更で使えなくなっていた、プレイリストのブックマーク保存機能を復活
-
-// * ver 1.140319
-// - 謎の技術によって、ニコメンドがなくても説明文の動画リンクにサムネイルを出せるように
-// - 細かなスタイル調整
-
-// * ver 1.140303
-// - 動画選択画面で再生リストの開閉が記憶されなくなったのに対抗
-// - 動画切換え時に一番上までスクロールするようになったのに対抗
-// - 本家の内部仕様変更(jQuery ver up等)に対応
-
-// * ver 1.140227
-// - タグ検索のソート順が毎回リセットされるようになったのに対抗
-
-// * ver 1.140218
-// - コメント重複を勝手に直してたけど不要になったので除去
-// - 二本目以降の動画だけ自動再生を追加
-
-// * ver 1.140207
-// - テレビちゃんメニューの表示修正
-// - スレッドIDのリンクからもタグを取得できるように(watchページ内のみ)
-// - マイリスト選択メニュー部分の右クリックでとりマイの位置に戻る隠し機能
-
-// * ver 1.140122
-// - テレビちゃんメニューをShinjukuWatch仕様に
-
-// * ver 1.140110
-// - 検索フォームのオートコンプリートを調整
-// - ニコメンドまわりのコード除去
-// - 微妙にNicorenizerとの相性を改善
 
 (function() {
   var isNativeGM = true;
@@ -536,6 +499,12 @@
         left: -100px;
         border: 0;
         overflow: hidden;
+      }
+
+
+      {* tagrepo *}
+      .contents-thumbnail a {
+        display: inline-block;
       }
 
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1]
@@ -7531,7 +7500,7 @@
           if (typeof callback === 'function') {
             setTimeout(function() { callback(cacheData); } , 0);
           }
-          setTimeout(function() {  def.resolve(cacheData); } , 0);
+          setTimeout(function() { def.resolve(cacheData); } , 0);
           return def.promise();
         }
 
@@ -9050,7 +9019,8 @@
       },
       _getFilter: function() {
         var to_h = function(str) {
-          return str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function(s) {
+          var m = new RegExp(window.unescape('"%5B%uFF21-%uFF3A%uFF41-%uFF5A%uFF10-%uFF19%5D"'), 'g');
+          return str.replace(m, function(s) {
              return String.fromCharCode(s.charCodeAt(0) - 65248);
           }).toLowerCase();
         };
@@ -10349,7 +10319,7 @@
       EventDispatcher.addEventListener('onSearchStart', function(word, type) {
         searchType = type.replace(/^.*\./, '');
         $searchInput.val(word);
-        window.setTimeout(function() {clearButton.refresh(); }, 0);
+        window.setTimeout(function() { clearButton.refresh(); }, 100);
       });
       initAutoComplete($searchInput);
 
