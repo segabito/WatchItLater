@@ -6,7 +6,7 @@
 // @include     http://www.nicovideo.jp/user/*
 // @include     http://www.nicovideo.jp/my/fav/user
 // @include     http://www.nicovideo.jp/mylist/*
-// @version     2.2.1
+// @version     2.3.1
 // @grant       none
 // ==/UserScript==
 
@@ -285,6 +285,17 @@
        }
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
 
+    var __tagrepocss__ = (function() {/*
+        .newVideoChannel .post-item,
+        .newVideoUser .post-item {
+          {* background: #ffe;*}
+        }
+
+        .newLiveChannel .post-item,
+        .newLiveUser .post-item {
+          background: #eee;
+        }
+    */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
 
     var initializeLargeThumbnail = function(type, container, selector) {
       console.log('%cinitializeLargeThumbnail: type=%s', 'background: lightgreen;', type);
@@ -336,7 +347,7 @@
         //console.log('', attr, src, org);
 
         if (src && src.indexOf('.L') < 0 && src.indexOf('/smile?i=') > 0) {
-          var url = src + '.L';
+          var url = src.replace('.M', '') + '.L';
           $thumbnail
             .on('error', onLoadImageError)
             .addClass('largeThumbnail ' + videoId)
@@ -481,6 +492,9 @@
          this.initializeUserConfig();
          if (location.pathname === '/my/fav/user') {
            this.initializeFavUser();
+         } else
+         if (location.pathname.indexOf('/my/tagrepo/') === 0) {
+           this.initializeTagrepo();
          } else {
            this.initializeNicorepo();
            this.initializeAutoPageRize();
@@ -527,6 +541,10 @@
 
          $('.timeline>*:first').before($button);
          $('.timeline>*:last').before($button.clone(true).addClass('bottom'));
+       },
+       initializeTagrepo: function() {
+         console.log('%cinitializeTagrepo', 'background: lightgreen;');
+         addStyle(__tagrepocss__, 'tagrepoCss');
        },
        initializeFavUser: function() {
          addStyle(__favusercss__, 'favUserCss');
@@ -839,6 +857,9 @@
        } else
        if (location.pathname.match(/\/user\/\d+\/top/)) {
          initializeLargeThumbnail('nicorepo', '.nicorepo', '.log-target-thumbnail a[href*=nicovideo.jp/watch/sm]:not(.largeThumbnailLink)');
+       } else
+       if (location.pathname.match(/\/my\/tagrepo\//)) {
+         initializeLargeThumbnail('tagrepo', '#tagrepo', '.newVideoUser .contents-thumbnail a[href*=nicovideo.jp/watch/sm]:not(.largeThumbnailLink)');
        }
      });
 
