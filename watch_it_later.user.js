@@ -21,13 +21,13 @@
 // @match          http://*.nicovideo.jp/*
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
-// @grant          GM_xmlhttpRequest
-// @version        1.151026
+// @grant          none
+// @version        1.151027
 // ==/UserScript==
 
 
 (function() {
-  var isNativeGM = true;
+  var isNativeGM = false;
   var monkey =
   (function(isNativeGM) {
     var w;
@@ -195,7 +195,7 @@
     }
 
     if (!isNativeGM) {
-      this.GM_xmlhttpRequest = function(options) {
+      this.httpRequest = function(options) {
         try {
           var req = new XMLHttpRequest();
           var method = options.method || 'GET';
@@ -2915,7 +2915,7 @@
             if (typeof callback === 'function') callback(result.status, result);
           }
         };
-        GM_xmlhttpRequest(req);
+        httpRequest(req);
       };
 
       WatchController.getTid2Vid(watchId, function(videoId) {
@@ -3142,7 +3142,7 @@
       }
       var url = 'http://' + host + '/mylist_add/video/sm9'; // マイリスト登録ウィンドウから強引にtoken取得
 //      var url = 'http://' + host + '/my/mylist'; // マイリスト登録ウィンドウから強引にtoken取得
-      GM_xmlhttpRequest({
+      httpRequest({
         url: url,
         onload: function(resp) {
           //console.log(116, resp.responseText);
@@ -3197,7 +3197,7 @@
       token = getToken();
       //var url = 'http://' + host + '/api/watch/uservideo?user_id=' + uid;
       var url = 'http://' + host + '/api/mylistgroup/list';
-      GM_xmlhttpRequest({
+      httpRequest({
         url: url,
         onload: function(resp) {
           var result = JSON.parse(resp.responseText);
@@ -3231,7 +3231,7 @@
 
     pt.reloadDeflist = function(callback) {
       var url = 'http://' + host + '/api/deflist/list';
-      GM_xmlhttpRequest({
+      httpRequest({
         url: url,
         onload: function(resp) {
           try {
@@ -3256,7 +3256,7 @@
         return;
       }
       var url = 'http://' + host + '/api/mylist/list?group_id=' + groupId;
-      GM_xmlhttpRequest({
+      httpRequest({
         url: url,
         onload: function(resp) {
           var result = JSON.parse(resp.responseText);
@@ -3325,7 +3325,7 @@
           dispatchEvent('defMylistUpdate');
         }
       };
-      GM_xmlhttpRequest(req);
+      httpRequest(req);
       return true;
     };
 
@@ -3352,7 +3352,7 @@
             if (typeof callback === "function") callback(result.status, result, replaced);
           }
         };
-        GM_xmlhttpRequest(req);
+        httpRequest(req);
       };
       // とりあえずマイリストにある場合はdeleteDeflistItem()のcallbackで追加、ない場合は即時追加
       if (!this.deleteDeflistItem(watchId, _add)) {
@@ -3393,7 +3393,7 @@
             Popup.alert('ネットワークエラー');
           }
         };
-        GM_xmlhttpRequest(req);
+        httpRequest(req);
       };
       // 普通のマイリストに入れたら、とりあえずマイリストからは削除(≒移動)
       if (!this.deleteDeflistItem(watchId, _add)) _add();
@@ -3432,7 +3432,7 @@
           }
         };
 
-      GM_xmlhttpRequest(req);
+      httpRequest(req);
     };
 
     pt.updateMylistItem = function(watchId, groupId, callback, description) {
@@ -3470,7 +3470,7 @@
             }
           };
 
-        GM_xmlhttpRequest(req);
+        httpRequest(req);
       });
     };
 
@@ -3509,7 +3509,7 @@
             }
           };
 
-        GM_xmlhttpRequest(req);
+        httpRequest(req);
       });
     };
 
@@ -4310,7 +4310,7 @@
 
         function request(page) {
           url = baseUrl + '?page=' + page;
-          GM_xmlhttpRequest({
+          httpRequest({
             url: url,
             onload: function(resp) {
               var $result = $(resp.responseText).find('#favMylist');
@@ -6707,7 +6707,7 @@
         user_id: myId,
         user_name: 'ニコニコ動画'
       });
-      GM_xmlhttpRequest({
+      httpRequest({
         url: url,
         onload: function(resp) {
           var $dom = $(resp.responseText), $list = $dom.find('#historyList');
@@ -6776,7 +6776,7 @@
         sort: '1',
         name: 'あなたにオススメの動画'
       });
-      GM_xmlhttpRequest({
+      httpRequest({
         url: url,
         onload: function(resp) {
           var text = resp.responseText, lines = text.split(/[\r\n]/), found = false, data, i, len;
@@ -14219,7 +14219,7 @@
     if (location.host.indexOf('smile-') >= 0) {
       return;
     } else
-    if (location.host.indexOf('localhost.') === 0 || location.host.indexOf('www.') === 0 || !this.GM_getValue || this.GM_getValue.toString().indexOf('not supported') > -1) {
+    if (location.host.indexOf('localhost.') === 0 || location.host.indexOf('www.') === 0) {
       isNativeGM = false;
       var inject = document.createElement('script');
       inject.id = 'monkey';
@@ -14265,13 +14265,11 @@
         document.documentElement.appendChild(inject);
       }
     } else {
-      // やや古いFirefoxはここらしい
-      monkey(true);
+      monkey(false);
     }
 
   } catch(e) {
-    // 最近のFirefoxはここに飛んでくる
-    monkey(true);
+    monkey(false);
   }
 })();
 
