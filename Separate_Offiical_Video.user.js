@@ -2,8 +2,8 @@
 // @name        Separate_Offiical_Video
 // @namespace   https://github.com/segabito/
 // @description ランキングにある公式動画を左に分離するやつ
-// @include     http://www.nicovideo.jp/ranking*
-// @version     0.0.2
+// @include     http://www.nicovideo.jp/ranking/*
+// @version     0.0.3
 // @grant       none
 // ==/UserScript==
 
