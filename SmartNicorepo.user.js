@@ -6,7 +6,7 @@
 // @include     http://www.nicovideo.jp/user/*
 // @include     http://www.nicovideo.jp/my/fav/user
 // @include     http://www.nicovideo.jp/mylist/*
-// @version     2.3.1
+// @version     2.3.3
 // @grant       none
 // ==/UserScript==
 
@@ -295,6 +295,13 @@
         .newLiveUser .post-item {
           background: #eee;
         }
+
+        .newVideoUser     .contents-thumbnail img.largeThumbnail,
+        .newVideoOfficial .contents-thumbnail img.largeThumbnail,
+        .newVideoChannel  .contents-thumbnail img.largeThumbnail {
+          margin-top: -21px;
+        }
+
     */}).toString().match(/[^]*\/\*([^]*)\*\/\}$/)[1].replace(/\{\*/g, '/*').replace(/\*\}/g, '*/');
 
     var initializeLargeThumbnail = function(type, container, selector) {
