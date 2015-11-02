@@ -4,11 +4,11 @@
 // @description 動画プレイヤーがホラーに切り替わるのを防止する
 // @include     http://www.nicovideo.jp/*
 // @match       http://www.nicovideo.jp/*
-// @version     2015b
+// @version     2015.2
 // @grant       none
 // ==/UserScript==
 
-(function() {
+(function() { return;
 
   var taisan = function() {
     var HorrorInitializer = require('watchapp/init/HorrorInitializer');
@@ -36,7 +36,7 @@
  } else {
     (function() {
       var $ = window.jQuery;
-      $('#horror2015header, .userDetail>div:last, [title^="閲覧注意な呼び声"]').remove();
+      $('#horror2015header, [title^="閲覧注意な呼び声"]').remove();
     })();
  }
 
