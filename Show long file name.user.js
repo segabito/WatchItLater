@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         OneDrie Show long file name
+// @name         OneDrive Show long file name
 // @namespace    http://github.com/segabito
-// @version      0.1
+// @version      0.1.1
 // @description  長いファイル名をポップアップで表示
 // @author       segabito
 // @match        https://onedrive.live.com/*
