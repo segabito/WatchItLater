@@ -3,7 +3,7 @@
 // @namespace   https://github.com/segabito/
 // @description ランキングにある公式動画を左に分離するやつ
 // @include     http://www.nicovideo.jp/ranking/*
-// @version     0.0.3
+// @version     0.0.4
 // @grant       none
 // ==/UserScript==
 
@@ -39,6 +39,10 @@
 
         .officialVideoContainer  .contentHeader {
           margin-bottom: 8px;
+        }
+
+        .officialVideoContainer .title::before {
+          background-position: 0 -102px;
         }
 
         .officialVideoContainer .item {
@@ -144,7 +148,7 @@
           font-size: 85%;
           margin-bottom: 4px;
         }
-        .officialVideoContainer .itemData .count .value {
+        .officialVideoContainer .itemData .count .value a {
           color: #333;
           padding: 0 4px 0 2px;
         }
