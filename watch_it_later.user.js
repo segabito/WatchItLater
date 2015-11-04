@@ -22,7 +22,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          none
-// @version        1.151027
+// @version        1.151104
 // ==/UserScript==
 
 
@@ -11920,6 +11920,7 @@
       var SearchSortOrder  = require('watchapp/components/nicosearchstatus/model/SearchSortOrder');
       var SearchType       = require('watchapp/components/nicosearchstatus/model/SearchType');
       var View             = require('watchapp/components/videoexplorer/view/content/SearchContentView');
+      var advice           = require('advice');
       var vec              = VideoExplorerInitializer.videoExplorerController;
       var explorer         = vec.getVideoExplorer();
       var content          = explorer.getContentList().getContent(ContentType.SEARCH);
@@ -12265,14 +12266,14 @@
       var _searchSortOrder =
         content._nicoSearchStatus ?
           content._nicoSearchStatus._searchSortOrder : content._searchSortOrder;
-      _searchSortOrder._flush_org = _searchSortOrder._flush;
-      _searchSortOrder._flush = $.proxy(function() {
+
+      advice.around(_searchSortOrder, '_flush', function(_flush, type) {
         var sort = this._sort[SearchType.KEYWORD];
         if (sort === '_hot' || sort === '_popular'  || sort === '_explore' || sort === '_id') { // 新検索にしかないパラメータは保存しない
           return;
         }
-        this._flush_org();
-      }, _searchSortOrder);
+        _flush.call(this, type);
+      });
 
 
       EventDispatcher.addEventListener('on.config.searchPageItemCount', function() {
