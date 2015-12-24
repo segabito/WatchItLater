@@ -22,7 +22,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          none
-// @version        1.151104
+// @version        1.151224
 // ==/UserScript==
 
 
@@ -3175,6 +3175,10 @@
       events.mylistUpdate.push(callback);
     };
 
+    pt.setCsrfToken = function(csrfToken) {
+      token = csrfToken;
+    };
+
     pt.getUserId = function() {
       if (document.cookie.match(/user_session_(\d+)/)) {
         return RegExp.$1;
@@ -4648,6 +4652,11 @@
             var $e = jQuery(self);
             var t = $e.text();
             o = t !== "" ? $e.offset() : $e.find('*').offset();
+            var href = $e.closest('a').attr('href');
+            if (videoReg.test(href)) {
+              window.console.log(watchId, RegExp.$2, href);
+              watchId = RegExp.$2;
+            }
             showPanel(watchId, o.left, o.top);
           } else
           if (self.getBoundingClientRect) {
@@ -7597,6 +7606,34 @@
   };
 
 
+  function initZenzaWatchConnector() {
+    var onZenzaWatchFound = function(ZenzaWatch) {
+      ZenzaWatch.emitter.on('hideHover', function() {
+        AnchorHoverPopup.hidePopup();
+      });
+      ZenzaWatch.emitter.on('csrfTokenUpdate', function(token) {
+        //window.console.log('%ccsrfToken from ZenzaWatch: ', 'background: cyan;', token);
+        Mylist.setCsrfToken(token);
+      });
+    };
+    var watchCount = 0;
+    var watchTimer = window.setInterval(function() {
+      watchCount++;
+      if (window.ZenzaWatch) {
+        console.log('%cZenzaWatch Found', 'background: lightgreen; font-weight: bolder;');
+        window.clearInterval(watchTimer);
+        onZenzaWatchFound(window.ZenzaWatch);
+      }
+      if (watchCount >= 300) {
+        window.clearInterval(watchTimer);
+      }
+    }, 100);
+  } //
+
+  window.setTimeout(initZenzaWatchConnector, 3000);
+
+
+
   /**
    *  GINZAwatch上でのあれこれ
    *  無計画に増築中
@@ -9176,13 +9213,11 @@
       }, content);
       content.getFilter     = $.proxy(function()       { return this._filter; }, content);
 
-
-      content.clear_org = content.clear;
-      content.clear = $.proxy(function() {
+      advice.around(content, 'clear', function(clear) {
         this.setFilter(null);
-        this.clear_org();
+        clear.call(this);
         grepOptionView.clear();
-      }, content);
+      });
 
       content.getNickname = $.proxy(function() {
         if (this._nickname && this._nickname.length > 0) {
@@ -9191,8 +9226,8 @@
         return 'no-name';
       }, content);
 
-      content.onLoad_org = content.onLoad;
-      content.onLoad = $.proxy(function(err, result) {
+      //content.onLoad_org = content.onLoad;
+      advice.around(content, 'onLoad', function(onLoad, err, result) {
         this._isOwnerNicorepo = result.isOwnerNicorepo;
         this._isRanking       = result.isRanking;
 
@@ -9219,14 +9254,14 @@
         }
 
         this._rawList = result.rawList || [];
-        this.onLoad_org(err, result);
+        onLoad.call(this, err, result);
         if (this.getIsMine()) {
           EventDispatcher.dispatch('myMylistLoad', this.getMylistId(), {
             name: this.getName(),
             items: result.rawList
           });
         }
-      }, content);
+      });
 
       content.containsWatchId = $.proxy(function(watchId) {
         var list = this.getRawList();
@@ -9246,8 +9281,8 @@
         this.data = data;
       };
 
-      loader.load_org = loader.load;
-      loader.load = $.proxy(function(params, callback) {
+      //loader.load_org = loader.load;
+      advice.around(loader, 'load', function(load, params, callback) {
         var isOwnerNicorepo = false, isRanking = false;
         var id = params.id;
 
@@ -9270,7 +9305,7 @@
           return;
         } else
         if (id >= 0) {
-          this.load_org(params, applyFilter);
+          load.call(this, params, applyFilter);
           return;
         }
 
@@ -9347,7 +9382,7 @@
            onerror({message: 'エラーが発生しました:' + id, status: 'fail'});
           }
         }
-      }, loader);
+      });
 
 
       var __css__ = Util.here(function() {/*
@@ -9425,16 +9460,15 @@
       addStyle(__css__, 'mylistContentCss');
 
       var MylistDetailView = require('watchapp/components/videoexplorer/view/content/parts/MylistDetailView');
-      MylistDetailView.prototype.update_org = MylistDetailView.prototype.update;
-      MylistDetailView.prototype.update = function(id, name, description, count) {
-        this.update_org(id, name, description, count);
-        if (id.toString().match(/repo-owner-(\d+)/)) {
-          this._$name.attr('href', '/user/' + RegExp.$1);
-        } else
-        if (parseInt(id, 10) <= 0) {
-          this._$name.attr('href', '');
-        }
-      };
+      advice.after(MylistDetailView.prototype, 'update',
+        function(id, name, description, count) {
+          if (id.toString().match(/repo-owner-(\d+)/)) {
+            this._$name.attr('href', '/user/' + RegExp.$1);
+          } else
+          if (parseInt(id, 10) <= 0) {
+            this._$name.attr('href', '');
+          }
+      });
 
       var
         overrideContentView = function(proto, watchingVideoView, grepOptionView) {
@@ -9447,31 +9481,25 @@
               ;
           };
 
-          proto.detach_org = proto.detach || function() {};
-          proto.detach = function() {
-            this.detach_org();
+          advice.after(proto, 'detach', function() {
             watchingVideoView.detach();
             grepOptionView.detach();
-          };
+          });
 
-          proto.onUpdate_org = proto.onUpdate || function() {};
-          proto.onUpdate = function() {
-            this.onUpdate_org();
+          advice.after(proto, 'onUpdate', function() {
             updateCssClass(this._content);
             watchingVideoView.update();
             grepOptionView.update();
             this._$content.find('.mylistSortOrder').before(watchingVideoView.getView());
             this._$content.find('.mylistSortOrder').before(grepOptionView.getView());
-          };
+          });
 
-          proto.onError_org = proto.onError || function() {};
-          proto.onError = function() {
-            this.onError_org();
+          advice.after(proto, 'onError', function() {
             updateCssClass(this._content);
             watchingVideoView.update();
             grepOptionView.update();
             this._$content.find('.mylistSortOrder').before(grepOptionView.getView());
-          };
+          });
 
         };
 
@@ -11744,14 +11772,6 @@
       var pac = PlayerInitializer.playerAreaConnector;
       var npc = PlayerInitializer.nicoPlayerConnector;
 
-//      pac.addEventListener("onVideoInitialized", onVideoInitialized);
-//      pac.addEventListener("onVideoEnded",       onVideoEnded);
-//      pac.addEventListener("onVideoStopped",     onVideoStopped);
-//      npc.onCommentListInitialized_org = npc.onCommentListInitialized;
-//      npc.onCommentListInitialized = function() {
-//        npc.onCommentListInitialized_org();
-//        EventDispatcher.dispatch('onCommentListInitialized');
-//      };
       advice.after(npc, 'onCommentListInitialized', function() {
         EventDispatcher.dispatch('onCommentListInitialized');
       });
@@ -11920,7 +11940,6 @@
       var SearchSortOrder  = require('watchapp/components/nicosearchstatus/model/SearchSortOrder');
       var SearchType       = require('watchapp/components/nicosearchstatus/model/SearchType');
       var View             = require('watchapp/components/videoexplorer/view/content/SearchContentView');
-      var advice           = require('advice');
       var vec              = VideoExplorerInitializer.videoExplorerController;
       var explorer         = vec.getVideoExplorer();
       var content          = explorer.getContentList().getContent(ContentType.SEARCH);
@@ -12280,9 +12299,9 @@
         content.updateSearchPageItemCount();
       });
 
-      content.getParams_org = content.getParams;
-      content.getParams = $.proxy(function() {
-        var params = this.getParams_org();
+      //content.getParams_org = content.getParams;
+      advice.around(content, 'getParams', function(getParams) {
+        var params = getParams.call(this);
         params = $.extend(true, {
             l:    this.getLengthSecondsRange(),
             u:    this.getStartTimeRange(),
@@ -12298,7 +12317,7 @@
           }
         }
         return params;
-      }, content);
+      });
 
       // タグ検索だけ毎回ソート順がデフォルトにリセットされるようになったので、
       // デフォルト値を書き換えるという力技で対抗
