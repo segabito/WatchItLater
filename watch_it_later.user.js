@@ -4654,7 +4654,6 @@
             o = t !== "" ? $e.offset() : $e.find('*').offset();
             var href = $e.closest('a').attr('href');
             if (videoReg.test(href)) {
-              window.console.log(watchId, RegExp.$2, href);
               watchId = RegExp.$2;
             }
             showPanel(watchId, o.left, o.top);
