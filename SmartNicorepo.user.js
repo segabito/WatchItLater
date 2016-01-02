@@ -6,7 +6,7 @@
 // @include     http://www.nicovideo.jp/user/*
 // @include     http://www.nicovideo.jp/my/fav/user
 // @include     http://www.nicovideo.jp/mylist/*
-// @version     2.3.3
+// @version     2.3.4
 // @grant       none
 // ==/UserScript==
 
@@ -327,7 +327,8 @@
         $(this)
           .removeClass('largeThumbnail')
           .closest('a')
-          .removeClass('largeThumbnailLink');
+          .removeClass('largeThumbnailLink')
+          .off('error');
       };
 
       var updatedItems = [];
