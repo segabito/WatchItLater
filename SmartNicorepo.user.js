@@ -6,7 +6,7 @@
 // @include     http://www.nicovideo.jp/user/*
 // @include     http://www.nicovideo.jp/my/fav/user
 // @include     http://www.nicovideo.jp/mylist/*
-// @version     2.3.4
+// @version     2.3.7
 // @grant       none
 // ==/UserScript==
 
@@ -323,12 +323,15 @@
 
       var onLoadImageError = function() {
         console.log('%c large thumbnail load error!', 'background: red;', this);
-        this.src = this.src.replace('.L', '');
-        $(this)
-          .removeClass('largeThumbnail')
-          .closest('a')
-          .removeClass('largeThumbnailLink')
-          .off('error');
+        var src =  this.src.replace('.L', '');
+        if (this.src !== src) {
+          this.src = src;
+          $(this)
+            .removeClass('largeThumbnail')
+            .closest('a')
+            .removeClass('largeThumbnailLink')
+            .off('error');
+        }
       };
 
       var updatedItems = [];
@@ -664,6 +667,9 @@
          // TODO: キャッシュする
          var $nextPage = $('.next-page');
          var $window = $(window);
+         if ($nextPage.length < 1) {
+           return;
+         }
 
          var isLoading = function() {
            return $nextPage.hasClass('loading');
