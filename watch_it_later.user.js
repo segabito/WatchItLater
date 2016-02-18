@@ -22,7 +22,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          none
-// @version        1.151224
+// @version        1.160220
 // ==/UserScript==
 
 
@@ -4638,7 +4638,9 @@
 
       this.addEventListener('mouseover', function() {
         var mx = 0, my = 0, self = this;
-        if (this.href) this.setAttribute('href', this.href.split('?')[0]);
+        if (typeof this.href === 'string' && !this.href.match(/playlist_type/)) {
+          this.setAttribute('href', this.href.split('?')[0]);
+        }
 
         self.w_mouse_in = true;
         self.w_mouse_timer = null;
@@ -7606,7 +7608,9 @@
 
 
   function initZenzaWatchConnector() {
+    if (!window.jQuery) { return; }
     var onZenzaWatchFound = function(ZenzaWatch) {
+      window.console.log('%conZenzaWatchFound', 'background: lightgreen;');
       ZenzaWatch.emitter.on('hideHover', function() {
         AnchorHoverPopup.hidePopup();
       });
@@ -7615,18 +7619,12 @@
         Mylist.setCsrfToken(token);
       });
     };
-    var watchCount = 0;
-    var watchTimer = window.setInterval(function() {
-      watchCount++;
-      if (window.ZenzaWatch) {
-        console.log('%cZenzaWatch Found', 'background: lightgreen; font-weight: bolder;');
-        window.clearInterval(watchTimer);
-        onZenzaWatchFound(window.ZenzaWatch);
-      }
-      if (watchCount >= 300) {
-        window.clearInterval(watchTimer);
-      }
-    }, 100);
+
+    if (window.ZenzaWatch && window.ZenzaWatch.ready) {
+      onZenzaWatchFound(window.ZenzaWatch);
+    } else {
+      window.jQuery('body').on('ZenzaWatchReady', onZenzaWatchFound);
+    }
   } //
 
   window.setTimeout(initZenzaWatchConnector, 3000);
@@ -14246,27 +14244,6 @@
       inject.setAttribute('charset', 'UTF-8');
 
       if (location.pathname.indexOf('/watch/') === 0) {
-        setTimeout(function() {
-          // ブロックが発動しててもとりあえず動くように (Firefoxだけ？)
-          if (!window.Ads && !require.defined('Ads')) {
-            define('Ads', [], function() {
-              window.Ads = { Advertisement: function() { return {set: function() {}}; }, SwitchView: function() {} };
-              return window.Ads;
-            });
-          }
-          if (!window.channel && !require.defined('channel')) {
-            define('channel', [], function() {
-              window.channel = {};
-              return window.channel;
-            });
-          }
-          if (!window.enquete && !require.defined('enquete')) {
-            define('enquete', [], function() {
-              window.enquete = { emitter: function() {} };
-              return window.enquete;
-            });
-          }
-        }, 0);
         inject.appendChild(document.createTextNode(
           'require(["WatchApp", "jquery", "lodash"], function() {' +
             'console.log("%crequire WatchApp", "background: lightgreen;");' +
