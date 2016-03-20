@@ -22,7 +22,7 @@
 // @match          http://ext.nicovideo.jp/*
 // @match          http://search.nicovideo.jp/*
 // @grant          none
-// @version        1.160220
+// @version        1.160320
 // ==/UserScript==
 
 
@@ -2947,13 +2947,27 @@
         }
       });
 
+      function getBodyMarginLeft() {
+        try {
+          var cp = document.defaultView.getComputedStyle(document.body, null);
+          var ml = cp.getPropertyValue('margin-left');
+          if (ml.match(/^(\d+)px/)) {
+            return parseInt(RegExp.$1, 10);
+          }
+          return 0;
+        } catch (e) {
+          window.console.error('getBodyMarginLeft Exception!', e);
+          return 0;
+        }
+      }
+
       function createPopup(tags, baseX, baseY) {
         var popup = createDOM(tags, baseX, baseY);
         popupContainer.appendChild(popup);
         popup.style.right = null;
         popup.style.left = baseX + 'px';
         popup.style.top = Math.max(baseY - popup.offsetHeight, 0, document.body.scrollTop, document.documentElement.scrollTop) + 'px';
-        if (popup.offsetLeft + popup.offsetWidth > document.body.clientWidth) {
+        if (popup.offsetLeft + popup.offsetWidth > document.body.clientWidth + getBodyMarginLeft()) {
           popup.style.left = null;
           popup.style.right = 0;
         }
@@ -3029,8 +3043,8 @@
         if (conf.defaultSearchOption && conf.defaultSearchOption !== '' && !text.match(/(sm|nm|so)\d+/)) {
           href += ' ' + conf.defaultSearchOption;
         }
-        var sortOrder = '?sort=' + conf.searchSortType + '&order=' + conf.searchSortOrder;
-        a.href = 'http://' + host + '/tag/' + encodeURIComponent(href) + sortOrder;
+        //var sortOrder = '?sort=' + conf.searchSortType + '&order=' + conf.searchSortOrder;
+        a.href = 'http://' + host + '/tag/' + encodeURIComponent(href);
         a.addEventListener('click', createItemOnClick(text, dic), false);
         li.appendChild(a);
 
@@ -4599,6 +4613,20 @@
       hoverMenuDelay = Math.abs(delay * 1000);
     });
 
+    function getBodyMarginLeft() {
+      try {
+        var cp = document.defaultView.getComputedStyle(document.body, null);
+        var ml = cp.getPropertyValue('margin-left');
+        if (ml.match(/^(\d+)px/)) {
+          return parseInt(RegExp.$1, 10);
+        }
+        return 0;
+      } catch (e) {
+        window.console.error('getBodyMarginLeft Exception!', e);
+        return 0;
+      }
+    }
+
     function showPanel(watchId, baseX, baseY, w_touch) {
 
       var cn = mylistPanel.className.toString();
@@ -4621,7 +4649,7 @@
       mylistPanel.style.left = (baseX) + 'px';
       mylistPanel.style.top = Math.max(baseY - mylistPanel.offsetHeight, 0, document.body.scrollTop, document.documentElement.scrollTop) + 'px';
 
-      if (mylistPanel.offsetLeft + mylistPanel.offsetWidth > document.body.clientWidth) {
+      if (mylistPanel.offsetLeft + mylistPanel.offsetWidth > document.body.clientWidth + getBodyMarginLeft()) {
         mylistPanel.style.left = null;
         mylistPanel.style.right = 0;
       }
@@ -7608,7 +7636,7 @@
 
 
   function initZenzaWatchConnector() {
-    if (!window.jQuery) { return; }
+    if (window !== top || !window.jQuery) { return; }
     var onZenzaWatchFound = function(ZenzaWatch) {
       window.console.log('%conZenzaWatchFound', 'background: lightgreen;');
       ZenzaWatch.emitter.on('hideHover', function() {
